@@ -1,3 +1,19 @@
 <Solution>
-  <Project Path="GraNAS.WebAPI/GraNAS.WebAPI.csproj" />
+  <Folder Name="/docker/">
+    <File Path=".dockerignore" />
+    <File Path=".env" />
+    <File Path="compose.Development.yaml" />
+    <File Path="compose.yaml" />
+  </Folder>
+  <Folder Name="/git/">
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+  </Folder>
+  <Folder Name="/Solution Items/" />
+  <Folder Name="/Backend/">
+    <Project Path="Backend/GraNAS.Models/GraNAS.Models.csproj" />
+    <Project Path="Backend/GraNAS.WebAPI.DAL/GraNAS.WebAPI.DAL.csproj" />
+    <Project Path="Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj" />
+
+  </Folder>
 </Solution>
