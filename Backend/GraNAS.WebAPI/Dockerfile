@@ -14,7 +14,7 @@ RUN dotnet build "GraNAS.WebAPI.csproj" -c $BUILD_CONFIGURATION -o /app/build --
 
 # Publish to optimized output
 FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
+ARG BUILD_CONFIGURATION=Debug
 RUN dotnet publish "GraNAS.WebAPI.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \

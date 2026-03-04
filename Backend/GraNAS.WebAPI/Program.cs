@@ -29,6 +29,7 @@ public class Program
     // добавляем бд
     builder.AddPostgreSql();
 
+    // Настройка CORS
     builder.Services.AddCors(options =>
     {
       options.AddPolicy(corsPolicyName,
@@ -88,12 +89,11 @@ public class Program
     });
 
 
-    builder.Services.AddOpenApi();
     builder.Services.AddEndpointsApiExplorer();
     // Настройка Swagger с поддержкой JWT
     builder.Services.AddSwaggerGen(c =>
     {
-      c.SwaggerDoc("v1", new OpenApiInfo { Title = "GraNAS", Version = "v1" });
+      c.SwaggerDoc("v1", new OpenApiInfo { Title = builder.Environment.ApplicationName, Version = "v1" });
 
       // Добавляем возможность вводить токен в Swagger UI
       c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -114,29 +114,30 @@ public class Program
       });
     });
 
-    builder.Services.AddSwaggerGen(c =>
-    {
-      c.SwaggerDoc(versionApi,
-        new OpenApiInfo { Title = builder.Environment.ApplicationName, Version = versionApi });
-    });
-
     WebApplication app = builder.Build();
 
     if (app.Environment.IsDevelopment())
     {
-      app.MapOpenApi();
       app.UseSwagger();
-      app.UseSwaggerUI(c => c.SwaggerEndpoint($"/swagger/{versionApi}/swagger.json",
-        $"{builder.Environment.ApplicationName} {versionApi}"));
+      app.UseSwaggerUI(c =>
+      {
+        c.SwaggerEndpoint($"/swagger/{versionApi}/swagger.json",
+          $"{builder.Environment.ApplicationName} {versionApi}");
+        c.RoutePrefix = string.Empty;
+      });
     }
+
+    ;
 
 
     app.UseCors(corsPolicyName);
 
     // HttpsRedirection
+
     app.UseHttpsRedirection();
 
     //  HTTP Strict Transport Security Protocol (HSTS)
+
     app.UseHsts();
 
     app.UseAuthentication(); // Добавляем аутентификацию
