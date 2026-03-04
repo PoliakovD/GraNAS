@@ -1,0 +1,6 @@
+@GraNAS.WebAPI_HostAddress = http://localhost:5008
+
+GET {{GraNAS.WebAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
