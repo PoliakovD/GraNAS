@@ -11,6 +11,8 @@
   </Folder>
   <Folder Name="/Solution Items/" />
   <Folder Name="/Backend/">
+    <Project Path="Backend/GraNAS.Models/GraNAS.Models.csproj" />
+    <Project Path="Backend/GraNAS.WebAPI.DAL/GraNAS.WebAPI.DAL.csproj" />
     <Project Path="Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj" />
 
   </Folder>

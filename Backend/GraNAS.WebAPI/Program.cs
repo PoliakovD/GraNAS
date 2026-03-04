@@ -1,87 +1,149 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
+using GraNAS.WebAPI.DAL;
+using GraNAS.WebAPI.Extensions;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Microsoft.OpenApi.Reader;
 
 namespace GraNAS.WebAPI;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+  public static async Task Main(string[] args)
+  {
+    const string versionApi = "v1";
+    const string corsPolicyName = "MyAllowSpecificOrigins";
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // добавляем бд
+    builder.AddPostgreSql();
+
+    builder.Services.AddCors(options =>
     {
-
-        const string versionApi = "v1";
-        const string corsPolicyName = "MyAllowSpecificOrigins";
-
-        var builder = WebApplication.CreateBuilder(args);
-        var connectionString = builder.Configuration.GetConnectionString("Default");
-        if (string.IsNullOrEmpty(connectionString))
-            throw new Exception("Отсутствует строка подключения к БД");
-
-        builder.Services.AddCors(options =>
+      options.AddPolicy(corsPolicyName,
+        policy =>
         {
-            options.AddPolicy(corsPolicyName,
-                policy =>
-                {
-                    policy
-                        .AllowAnyOrigin()
-                        .AllowAnyMethod()
-                        .AllowAnyHeader();
-                });
+          policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
         });
-        // HttpsRedirection
-        builder.Services.AddHttpsRedirection(options =>
+    });
+
+    // Настройка аутентификации JWT
+    var jwtSettings = builder.Configuration.GetSection("Jwt");
+    var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
+
+    builder.Services.AddAuthentication(options =>
+      {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+      })
+      .AddJwtBearer(options =>
+      {
+        options.RequireHttpsMetadata = true; // Требовать HTTPS для получения токена
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
-            options.HttpsPort = 44344;
-        });
+          ValidateIssuer = true,
+          ValidateAudience = true,
+          ValidateLifetime = true,
+          ValidateIssuerSigningKey = true,
+          ValidIssuer = jwtSettings["Issuer"],
+          ValidAudience = jwtSettings["Audience"],
+          IssuerSigningKey = new SymmetricSecurityKey(secretKey)
+        };
+      });
 
-        //  HTTP Strict Transport Security Protocol (HSTS)
-        builder.Services.AddHsts(options =>
+    // Добавление авторизации
+    builder.Services.AddAuthorization();
+
+    // Добавление контроллеров
+    builder.Services.AddControllers();
+
+    // HttpsRedirection
+    builder.Services.AddHttpsRedirection(options =>
+    {
+      options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
+      options.HttpsPort = 44344;
+    });
+
+    //  HTTP Strict Transport Security Protocol (HSTS)
+    builder.Services.AddHsts(options =>
+    {
+      options.Preload = true;
+      options.IncludeSubDomains = true;
+      options.MaxAge = TimeSpan.FromDays(365);
+    });
+
+
+    builder.Services.AddOpenApi();
+    builder.Services.AddEndpointsApiExplorer();
+    // Настройка Swagger с поддержкой JWT
+    builder.Services.AddSwaggerGen(c =>
+    {
+      c.SwaggerDoc("v1", new OpenApiInfo { Title = "GraNAS", Version = "v1" });
+
+      // Добавляем возможность вводить токен в Swagger UI
+      c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+      {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+      });
+
+      // Требование безопасности: создаём ссылку на схему "Bearer"
+      c.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+      {
         {
-            options.Preload = true;
-            options.IncludeSubDomains = true;
-            options.MaxAge = TimeSpan.FromDays(365);
-        });
-
-
-
-        builder.Services.AddOpenApi();
-        builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen(c =>
-        {
-            c.SwaggerDoc(versionApi,
-                new OpenApiInfo { Title = builder.Environment.ApplicationName, Version = versionApi });
-        });
-
-        WebApplication app = builder.Build();
-
-        if (app.Environment.IsDevelopment())
-        {
-            app.MapOpenApi();
-            app.UseSwagger();
-            app.UseSwaggerUI(c => c.SwaggerEndpoint($"/swagger/{versionApi}/swagger.json",
-                $"{builder.Environment.ApplicationName} {versionApi}"));
+          new OpenApiSecuritySchemeReference("Bearer"), []
         }
+      });
+    });
 
+    builder.Services.AddSwaggerGen(c =>
+    {
+      c.SwaggerDoc(versionApi,
+        new OpenApiInfo { Title = builder.Environment.ApplicationName, Version = versionApi });
+    });
 
+    WebApplication app = builder.Build();
 
-
-        app.UseCors(corsPolicyName);
-
-        // HttpsRedirection
-        app.UseHttpsRedirection();
-
-        //  HTTP Strict Transport Security Protocol (HSTS)
-        app.UseHsts();
-
-        //app.UseAuthorization();
-
-
-        await app.RunAsync();
+    if (app.Environment.IsDevelopment())
+    {
+      app.MapOpenApi();
+      app.UseSwagger();
+      app.UseSwaggerUI(c => c.SwaggerEndpoint($"/swagger/{versionApi}/swagger.json",
+        $"{builder.Environment.ApplicationName} {versionApi}"));
     }
+
+
+    app.UseCors(corsPolicyName);
+
+    // HttpsRedirection
+    app.UseHttpsRedirection();
+
+    //  HTTP Strict Transport Security Protocol (HSTS)
+    app.UseHsts();
+
+    app.UseAuthentication(); // Добавляем аутентификацию
+    app.UseAuthorization();
+
+    app.MapControllers();
+
+    await app.RunAsync();
+  }
 }
