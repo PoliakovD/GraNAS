@@ -6,8 +6,9 @@ namespace GraNAS.WebAPI.DAL;
 public class AppDbContext: DbContext
 {
   public DbSet<User> Users { get; set; }
-  public AppDbContext(DbContextOptions options) : base(options)
+  public DbSet<RefreshToken> RefreshTokens { get; set; }
+  public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
   {
-    Database.EnsureCreated();
+
   }
 }

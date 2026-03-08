@@ -3,6 +3,7 @@
     <File Path=".dockerignore" />
     <File Path=".env" />
     <File Path="compose.Development.yaml" />
+    <File Path="compose.LocalDevelopment.yaml" />
     <File Path="compose.yaml" />
   </Folder>
   <Folder Name="/git/">
