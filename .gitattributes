@@ -1,0 +1,245 @@
+## Объединенный .gitattributes из двух файлов
+## Содержит настройки для нормализации концов строк, определения diff и исключения файлов из экспорта.
+## Источники: первый файл (C#/.NET ориентация) и второй файл (веб-ориентация).
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# .NET / C#
+*.cs     text diff=csharp
+*.cshtml text diff=html
+*.csx    text diff=csharp
+*.sln    text eol=crlf
+*.slnx   text eol=crlf   
+
+# Source code
+*.bash            text eol=lf
+*.bat             text eol=crlf
+*.cmd             text eol=crlf
+*.coffee          text
+*.css             text diff=css
+*.fish            text eol=lf
+*.htm             text diff=html
+*.html            text diff=html
+*.inc             text
+*.ini             text
+*.js              text
+*.mjs             text
+*.cjs             text
+*.json            text
+*.jsx             text
+*.ksh             text eol=lf
+*.less            text
+*.ls              text
+*.map             text -diff
+*.od              text
+*.onlydata        text
+*.php             text diff=php
+*.pl              text
+*.ps1             text eol=crlf
+*.py              text diff=python
+*.rb              text diff=ruby
+*.sass            text
+*.scm             text
+*.scss            text diff=css
+*.sh              text eol=lf
+.husky/*          text eol=lf
+*.sql             text
+*.styl            text
+*.tag             text
+*.ts              text
+*.tsx             text
+*.xml             text
+*.xhtml           text diff=html
+*.zsh             text eol=lf
+
+# Documentation
+*.bibtex   text diff=bibtex
+*.doc      -text diff=astextplain
+*.DOC      -text diff=astextplain
+*.docx     -text diff=astextplain
+*.DOCX     -text diff=astextplain
+*.pdf      -text diff=astextplain
+*.PDF      -text diff=astextplain
+*.rtf      -text diff=astextplain
+*.RTF      -text diff=astextplain
+*.md       text diff=markdown
+*.mdx      text diff=markdown
+*.tex      text diff=tex
+*.adoc     text
+*.textile  text
+*.csv      text eol=crlf
+*.tab      text
+*.tsv      text
+*.txt      text
+*.ipynb    text eol=lf
+*.markdown text diff=markdown
+*.mdwn     text diff=markdown
+*.mdown    text diff=markdown
+*.mkd      text diff=markdown
+*.mkdn     text diff=markdown
+*.mdtxt    text
+*.mdtext   text
+AUTHORS           text
+CHANGELOG         text
+CHANGES           text
+CONTRIBUTING      text
+COPYING           text
+copyright         text
+*COPYRIGHT*       text
+INSTALL           text
+license           text
+LICENSE           text
+NEWS              text
+readme            text
+*README*          text
+TODO              text
+
+# Templates
+*.dot             text
+*.ejs             text
+*.erb             text
+*.haml            text
+*.handlebars      text
+*.hbs             text
+*.hbt             text
+*.jade            text
+*.latte           text
+*.mustache        text
+*.njk             text
+*.phtml           text
+*.svelte          text
+*.tmpl            text
+*.tpl             text
+*.twig            text
+*.vue             text
+
+# Configs
+*.cnf             text
+*.conf            text
+*.config          text
+.editorconfig     text
+*.env             text
+.gitattributes    text export-ignore
+.gitconfig        text
+.htaccess         text
+*.lock            text -diff
+package.json      text eol=lf
+package-lock.json text eol=lf -diff
+pnpm-lock.yaml    text eol=lf -diff
+yarn.lock         text -diff
+.prettierrc       text
+*.toml            text
+*.yaml            text
+*.yml             text
+browserslist      text
+Makefile          text
+makefile          text
+Dockerfile        text
+Procfile          text
+# Fixes syntax highlighting on GitHub to allow comments
+tsconfig.json     linguist-language=JSON-with-Comments
+.gitignore        text export-ignore
+.gitkeep          export-ignore
+
+# RC files (like .babelrc or .eslintrc)
+*.*rc             text
+
+# Ignore files (like .npmignore or .gitignore)
+*.*ignore         text
+
+# Graphics
+*.ai              binary
+*.bmp             binary
+*.eps             binary
+*.gif             binary
+*.gifv            binary
+*.ico             binary
+*.jng             binary
+*.jp2             binary
+*.jpg             binary
+*.jpeg            binary
+*.jpx             binary
+*.jxr             binary
+*.png             binary
+*.psb             binary
+*.psd             binary
+# SVG treated as an asset (binary) by default.
+*.svg             text
+# If you want to treat it as binary,
+# use the following line instead.
+# *.svg           binary
+*.svgz            binary
+*.tif             binary
+*.tiff            binary
+*.wbmp            binary
+*.webp            binary
+
+# Audio
+*.kar             binary
+*.m4a             binary
+*.mid             binary
+*.midi            binary
+*.mp3             binary
+*.ogg             binary
+*.ra              binary
+
+# Video
+*.3gpp            binary
+*.3gp             binary
+*.as              binary
+*.asf             binary
+*.asx             binary
+*.avi             binary
+*.fla             binary
+*.flv             binary
+*.m4v             binary
+*.mng             binary
+*.mov             binary
+*.mp4             binary
+*.mpeg            binary
+*.mpg             binary
+*.ogv             binary
+*.swc             binary
+*.swf             binary
+*.webm            binary
+
+# Archives
+*.7z              binary
+*.bz              binary
+*.bz2             binary
+*.bzip2           binary
+*.gz              binary
+*.jar             binary
+*.lz              binary
+*.lzma            binary
+*.rar             binary
+*.tar             binary
+*.taz             binary
+*.tbz             binary
+*.tbz2            binary
+*.tgz             binary
+*.tlz             binary
+*.txz             binary
+*.xz              binary
+*.Z               binary
+*.zip             binary
+*.zst             binary
+
+# Fonts
+*.ttf             binary
+*.eot             binary
+*.otf             binary
+*.woff            binary
+*.woff2           binary
+
+# Executables
+*.exe             binary
+*.pyc             binary
+# Prevents massive diffs caused by vendored, minified files
+**/.yarn/releases/**   binary
+**/.yarn/plugins/**    binary
+dist/**           binary
+
+# Other
+*.patch    -text
