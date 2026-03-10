@@ -96,7 +96,9 @@ public class Program
     // Cобственная реализация jwt
     builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
     builder.Services.AddScoped<ITokenService, JwtTokenService>();
+
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
 
     builder.Services.AddEndpointsApiExplorer();
     // Настройка Swagger с поддержкой JWT
