@@ -3,7 +3,11 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using GraNAS.WebAPI.DAL;
+using GraNAS.WebAPI.DAL.Repositories.Implementation;
+using GraNAS.WebAPI.DAL.Repositories.Interfaces;
 using GraNAS.WebAPI.Extensions;
+using GraNAS.WebAPI.Services.Implementations;
+using GraNAS.WebAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -61,6 +65,7 @@ public class Program
           ValidateAudience = true,
           ValidateLifetime = true,
           ValidateIssuerSigningKey = true,
+          ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
           ValidIssuer = jwtSettings["Issuer"],
           ValidAudience = jwtSettings["Audience"],
           IssuerSigningKey = new SymmetricSecurityKey(secretKey)
@@ -88,6 +93,10 @@ public class Program
       options.MaxAge = TimeSpan.FromDays(365);
     });
 
+    // Cобственная реализация jwt
+    builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
+    builder.Services.AddScoped<ITokenService, JwtTokenService>();
+    builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
     builder.Services.AddEndpointsApiExplorer();
     // Настройка Swagger с поддержкой JWT
@@ -123,7 +132,7 @@ public class Program
       {
         c.SwaggerEndpoint($"/swagger/{versionApi}/swagger.json",
           $"{builder.Environment.ApplicationName} {versionApi}");
-        c.RoutePrefix = string.Empty;
+        c.RoutePrefix = "swagger";
       });
     }
 

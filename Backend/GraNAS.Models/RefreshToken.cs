@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GraNAS.Models;
 
 [Table("table_refresh_tokens")]
-[Index(nameof(Token), IsUnique = true)] // уникальный индекс на Token
+[Index(nameof(Token), IsUnique = true)]
 public class RefreshToken
 {
   [Key]
@@ -16,7 +16,7 @@ public class RefreshToken
   public Guid Id { get; set; }
 
   [Required]
-  [ForeignKey(nameof(User))] // указывает, что UserId является внешним ключом
+  [ForeignKey(nameof(User))]
   [Column("user_id")]
   public Guid UserId { get; set; }
   [Column("token")]
@@ -29,7 +29,6 @@ public class RefreshToken
   [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
   [Column("created_at")]
   public DateTime CreatedAt { get; set; }
-
-  // Навигационное свойство
+  
   public User User { get; set; }
 }
