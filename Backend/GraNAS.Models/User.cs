@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GraNAS.Models;
 
 [Table("table_users")]
-[Index(nameof(Email), IsUnique = true)] // уникальный индекс на Email
+[Index(nameof(Email), IsUnique = true)]
 public class User
 {
   [Key]
@@ -16,11 +16,11 @@ public class User
 
   [Required]
   [MaxLength(255)]
-  [EmailAddress] // для валидации на уровне приложения
+  [EmailAddress]
   public string Email { get; set; }
 
   [Required]
-  [Column("password_hash")] // задаёт имя столбца в БД
+  [Column("password_hash")]
   public string PasswordHash { get; set; }
 
   [Column("is_admin")]
@@ -30,6 +30,5 @@ public class User
   [Column("created_at")]
   public DateTime CreatedAt { get; set; }
 
-  // Навигационное свойство для связи с токенами
   public ICollection<RefreshToken> RefreshTokens { get; set; }
 }
