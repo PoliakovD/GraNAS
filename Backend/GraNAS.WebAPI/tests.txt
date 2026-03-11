@@ -1,0 +1,6 @@
+﻿{
+  "email": "user@example.com",
+  "password": "Testing1"
+}
+
+ "userId": "8e2344ba-297f-4845-99aa-de4abd9ec09d",
