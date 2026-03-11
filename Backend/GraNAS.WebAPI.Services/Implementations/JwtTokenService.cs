@@ -23,6 +23,7 @@ public class JwtTokenService : ITokenService
     _refreshTokenRepository = refreshTokenRepository;
   }
 
+
   public string GenerateAccessToken(User user)
   {
     var jwtSettings = _configuration.GetSection("Jwt");
