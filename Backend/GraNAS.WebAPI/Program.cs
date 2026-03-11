@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using GraNAS.Models;
 using GraNAS.WebAPI.DAL;
 using GraNAS.WebAPI.DAL.Repositories.Implementation;
 using GraNAS.WebAPI.DAL.Repositories.Interfaces;
 using GraNAS.WebAPI.Extensions;
+using GraNAS.WebAPI.Middleware;
 using GraNAS.WebAPI.Services.Implementations;
 using GraNAS.WebAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +33,26 @@ public class Program
     const string corsPolicyName = "MyAllowSpecificOrigins";
 
     var builder = WebApplication.CreateBuilder(args);
+
+
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+      options.InvalidModelStateResponseFactory = context =>
+      {
+        var errors = context.ModelState
+          .Where(e => e.Value.Errors.Count > 0)
+          .SelectMany(e => e.Value.Errors.Select(er => er.ErrorMessage))
+          .ToList();
+
+        var errorResponse = new ErrorResponse
+        {
+          Error = "validation_error",
+          ErrorDescription = errors.FirstOrDefault() ?? "One or more validation errors occurred."
+        };
+
+        return new BadRequestObjectResult(errorResponse);
+      };
+    });
 
     // добавляем бд
     builder.AddPostgreSql();
@@ -126,6 +150,8 @@ public class Program
     });
 
     WebApplication app = builder.Build();
+
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
 
     if (app.Environment.IsDevelopment())
     {
