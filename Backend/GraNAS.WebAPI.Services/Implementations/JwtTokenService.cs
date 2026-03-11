@@ -92,4 +92,23 @@ public class JwtTokenService : ITokenService
       ExpiresIn = expiresIn
     };
   }
+  public async Task<TokenResponse?> RefreshTokensAsync(string refreshToken)
+  {
+    // 1. Получить валидный токен из БД
+    var existingToken = await _refreshTokenRepository.GetValidTokenAsync(refreshToken);
+    if (existingToken == null)
+      return null; // токен недействителен
+
+    // 2. Отозвать старый токен
+    await _refreshTokenRepository.RevokeAsync(existingToken.Id);
+
+    // 3. Получить пользователя (он уже загружен через Include в GetValidTokenAsync)
+    var user = existingToken.User;
+    if (user == null)
+      return null; // пользователь не найден (не должно происходить)
+
+    // 4. Сгенерировать новую пару токенов
+    // GenerateTokensAsync создаст новый refresh token и сохранит его в БД
+    return await GenerateTokensAsync(user);
+  }
 }
