@@ -77,6 +77,53 @@ namespace GraNAS.WebAPI.Controllers;
             return Ok(response);
         }
 
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+          // 1. Валидация модели
+          if (!ModelState.IsValid)
+          {
+            return BadRequest(ModelState);
+          }
+
+          // 2. Поиск пользователя по email
+          var user = await _userRepository.GetByEmailAsync(request.Email);
+          if (user == null)
+          {
+            // Общее сообщение об ошибке (не уточняем, что именно не так)
+            return Unauthorized(new
+            {
+              error = "invalid_grant",
+              error_description = "Invalid email or password."
+            });
+          }
+
+          // 3. Проверка пароля
+          if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
+          {
+            return Unauthorized(new
+            {
+              error = "invalid_grant",
+              error_description = "Invalid email or password."
+            });
+          }
+
+          // 4. Генерация токенов
+          var tokens = await _tokenService.GenerateTokensAsync(user);
+
+          // 5. Возврат успешного ответа
+          return Ok(new
+          {
+            access_token = tokens.AccessToken,
+            refresh_token = tokens.RefreshToken,
+            expires_in = tokens.ExpiresIn,
+            token_type = tokens.TokenType,
+            // опционально можно вернуть id пользователя
+            user_id = user.Id
+          });
+        }
+
+
         private bool IsPasswordStrong(string password)
         {
             // Минимальные требования: длина >= 6, хотя бы одна заглавная, одна строчная, одна цифра
