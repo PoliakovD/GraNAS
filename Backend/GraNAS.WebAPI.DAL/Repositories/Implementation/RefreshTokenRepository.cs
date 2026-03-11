@@ -41,4 +41,30 @@ public class RefreshTokenRepository : IRefreshTokenRepository
       await _context.SaveChangesAsync();
     }
   }
+  public async Task<bool> RevokeTokenAsync(string token, Guid userId)
+  {
+    var refreshToken = await _context.RefreshTokens
+      .FirstOrDefaultAsync(rt => rt.Token == token && rt.UserId == userId);
+
+    if (refreshToken == null || refreshToken.Revoked != null)
+      return false; // токен не найден или уже отозван
+
+    refreshToken.Revoked = DateTime.UtcNow;
+    await _context.SaveChangesAsync();
+    return true;
+  }
+
+  public async Task RevokeAllForUserAsync(Guid userId)
+  {
+    var now = DateTime.UtcNow;
+    var tokens = await _context.RefreshTokens
+      .Where(rt => rt.UserId == userId && rt.Revoked == null)
+      .ToListAsync();
+
+    foreach (var token in tokens)
+    {
+      token.Revoked = now;
+    }
+    await _context.SaveChangesAsync();
+  }
 }

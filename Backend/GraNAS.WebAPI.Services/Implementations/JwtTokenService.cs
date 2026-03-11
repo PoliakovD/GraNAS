@@ -111,4 +111,14 @@ public class JwtTokenService : ITokenService
     // GenerateTokensAsync создаст новый refresh token и сохранит его в БД
     return await GenerateTokensAsync(user);
   }
+  public async Task<bool> RevokeRefreshTokenAsync(string refreshToken, Guid userId)
+  {
+    // Делегируем репозиторию, который проверит принадлежность токена пользователю
+    return await _refreshTokenRepository.RevokeTokenAsync(refreshToken, userId);
+  }
+
+  public async Task RevokeAllUserRefreshTokensAsync(Guid userId)
+  {
+    await _refreshTokenRepository.RevokeAllForUserAsync(userId);
+  }
 }
