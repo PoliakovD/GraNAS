@@ -18,4 +18,6 @@ public interface ITokenService
   /// Генерирует пару токенов (access + refresh) и сохраняет refresh token в БД
   /// </summary>
   Task<TokenResponse> GenerateTokensAsync(User user);
+
+  Task<TokenResponse?> RefreshTokensAsync(string refreshToken);
 }

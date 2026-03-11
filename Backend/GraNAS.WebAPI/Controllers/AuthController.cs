@@ -123,6 +123,31 @@ namespace GraNAS.WebAPI.Controllers;
           });
         }
 
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
+        {
+          if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+          var tokens = await _tokenService.RefreshTokensAsync(request.RefreshToken);
+          if (tokens == null)
+          {
+            return Unauthorized(new
+            {
+              error = "invalid_grant",
+              error_description = "Invalid refresh token."
+            });
+          }
+
+          return Ok(new
+          {
+            access_token = tokens.AccessToken,
+            refresh_token = tokens.RefreshToken,
+            expires_in = tokens.ExpiresIn,
+            token_type = tokens.TokenType
+          });
+        }
+
 
         private bool IsPasswordStrong(string password)
         {

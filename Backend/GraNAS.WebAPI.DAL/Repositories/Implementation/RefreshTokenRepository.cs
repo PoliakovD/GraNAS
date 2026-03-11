@@ -23,7 +23,15 @@ public class RefreshTokenRepository : IRefreshTokenRepository
   {
     return await _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == token);
   }
-
+  public async Task<RefreshToken?> GetValidTokenAsync(string token)
+  {
+    var now = DateTime.UtcNow;
+    return await _context.RefreshTokens
+      .Include(rt => rt.User)
+      .FirstOrDefaultAsync(rt => rt.Token == token
+                                 && rt.Expires > now
+                                 && rt.Revoked == null);
+  }
   public async Task RevokeAsync(Guid id)
   {
     var token = await _context.RefreshTokens.FindAsync(id);
