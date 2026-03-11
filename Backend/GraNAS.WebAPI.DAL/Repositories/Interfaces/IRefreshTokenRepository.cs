@@ -9,4 +9,7 @@ public interface IRefreshTokenRepository
   Task<RefreshToken?> GetValidTokenAsync(string token);
   Task RevokeAsync(Guid id);
 
+  Task<bool> RevokeTokenAsync(string token, Guid userId);
+  Task RevokeAllForUserAsync(Guid userId);
+
 }

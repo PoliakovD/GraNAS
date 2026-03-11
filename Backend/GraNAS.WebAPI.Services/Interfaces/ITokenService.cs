@@ -20,4 +20,7 @@ public interface ITokenService
   Task<TokenResponse> GenerateTokensAsync(User user);
 
   Task<TokenResponse?> RefreshTokensAsync(string refreshToken);
+
+  Task<bool> RevokeRefreshTokenAsync(string refreshToken, Guid userId);
+  Task RevokeAllUserRefreshTokensAsync(Guid userId);
 }
