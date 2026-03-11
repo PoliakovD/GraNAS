@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using GraNAS.Models;
 using GraNAS.WebAPI.DAL;
@@ -96,11 +97,7 @@ public class Program
         };
       });
 
-    // Добавление авторизации
-    builder.Services.AddAuthorization();
 
-    // Добавление контроллеров
-    builder.Services.AddControllers();
 
     // HttpsRedirection
     builder.Services.AddHttpsRedirection(options =>
@@ -108,6 +105,36 @@ public class Program
       options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
       options.HttpsPort = 44344;
     });
+
+    // Добавление контроллеров
+    builder.Services.AddControllers();
+
+    builder.Services.AddRateLimiter(options =>
+    {
+      options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        httpContext => RateLimitPartition.GetFixedWindowLimiter(
+          partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+          factory: partition => new FixedWindowRateLimiterOptions
+          {
+            AutoReplenishment = true,
+            PermitLimit = 10,      // максимум 10 запросов
+            Window = TimeSpan.FromMinutes(1) // в окне 1 минута
+          }));
+
+      options.OnRejected = async (context, token) =>
+      {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(new ErrorResponse
+        {
+          Error = "too_many_requests",
+          ErrorDescription = "Too many requests. Please try again later."
+        });
+      };
+    });
+
+    // Добавление авторизации
+    builder.Services.AddAuthorization();
+
 
     //  HTTP Strict Transport Security Protocol (HSTS)
     builder.Services.AddHsts(options =>
@@ -153,6 +180,31 @@ public class Program
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+    // HttpsRedirection
+
+    app.UseHttpsRedirection();
+
+    app.UseSecurityHeaders(policy =>
+    {
+      policy.AddDefaultSecurityHeaders(); // добавляет рекомендуемые заголовки (X-Content-Type-Options, X-Frame-Options и др.)
+      // или кастомные:
+      policy.AddFrameOptionsDeny();
+      policy.AddXssProtectionBlock();
+      policy.AddContentTypeOptionsNoSniff();
+      policy.AddStrictTransportSecurityMaxAge(TimeSpan.FromDays(30).Seconds);
+    });
+
+    //  HTTP Strict Transport Security Protocol (HSTS)
+
+    app.UseHsts();
+
+    app.UseCors(corsPolicyName);
+
+    app.UseRateLimiter();
+
+    app.UseAuthentication(); // Добавляем аутентификацию
+    app.UseAuthorization();
+
     if (app.Environment.IsDevelopment())
     {
       app.UseSwagger();
@@ -162,23 +214,7 @@ public class Program
           $"{builder.Environment.ApplicationName} {versionApi}");
         c.RoutePrefix = "swagger";
       });
-    }
-
-    ;
-
-
-    app.UseCors(corsPolicyName);
-
-    // HttpsRedirection
-
-    app.UseHttpsRedirection();
-
-    //  HTTP Strict Transport Security Protocol (HSTS)
-
-    app.UseHsts();
-
-    app.UseAuthentication(); // Добавляем аутентификацию
-    app.UseAuthorization();
+    };
 
     app.MapControllers();
 
