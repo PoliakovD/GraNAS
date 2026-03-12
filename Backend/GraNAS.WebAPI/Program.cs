@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using GraNAS.Models;
+using GraNAS.Models.DTO;
 using GraNAS.WebAPI.DAL;
 using GraNAS.WebAPI.DAL.Repositories.Implementation;
 using GraNAS.WebAPI.DAL.Repositories.Interfaces;

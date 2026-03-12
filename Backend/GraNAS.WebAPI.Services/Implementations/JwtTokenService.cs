@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using GraNAS.Models.DTO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 

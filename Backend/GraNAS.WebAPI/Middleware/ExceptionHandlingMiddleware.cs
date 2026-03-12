@@ -4,6 +4,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using GraNAS.Models;
+using GraNAS.Models.DTO;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

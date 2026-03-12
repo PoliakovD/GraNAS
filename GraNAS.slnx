@@ -6,6 +6,7 @@
     <File Path="compose.LocalDevelopment.yaml" />
     <File Path="compose.yaml" />
   </Folder>
+  <Folder Name="/Frontend/" />
   <Folder Name="/git/">
     <File Path=".gitattributes" />
     <File Path=".gitignore" />

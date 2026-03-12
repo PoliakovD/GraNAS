@@ -1,4 +1,4 @@
-﻿namespace GraNAS.Models;
+﻿namespace GraNAS.Models.DTO;
 
 public class ErrorResponse
 {
