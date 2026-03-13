@@ -169,6 +169,7 @@ public class Program
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IFolderRepository, FolderRepository>();
+    builder.Services.AddScoped<IFileRepository, FileRepository>();
 
     builder.Services.AddEndpointsApiExplorer();
 

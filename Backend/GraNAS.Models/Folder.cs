@@ -8,6 +8,7 @@ namespace GraNAS.Models;
 
 [Table("table_folders")]
 [Index(nameof(OwnerId), Name = "IX_folders_owner_id")]
+[Index(nameof(ParentId), Name = "IX_folders_parent_id")]
 public class Folder
 {
   [Key]
@@ -17,6 +18,9 @@ public class Folder
   [Required]
   [Column("owner_id")]
   public Guid OwnerId { get; set; }
+
+  [Column("parent_id")]
+  public Guid? ParentId { get; set; }
 
   [Required]
   [MaxLength(255)]
@@ -33,6 +37,9 @@ public class Folder
   // Навигационные свойства
   [ForeignKey(nameof(OwnerId))]
   public User Owner { get; set; }
+  [ForeignKey(nameof(ParentId))]
+  public Folder Parent { get; set; }
 
+  public ICollection<Folder> Subfolders { get; set; }
   public ICollection<File> Files { get; set; }
 }

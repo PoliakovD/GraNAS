@@ -3,6 +3,7 @@ using System;
 using GraNAS.WebAPI.DAL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GraNAS.WebAPI.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260313173815_AddFileSize")]
+    partial class AddFileSize
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -93,10 +96,6 @@ namespace GraNAS.WebAPI.DAL.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("parent_id");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -104,8 +103,6 @@ namespace GraNAS.WebAPI.DAL.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex(new[] { "OwnerId" }, "IX_folders_owner_id");
-
-                    b.HasIndex(new[] { "ParentId" }, "IX_folders_parent_id");
 
                     b.ToTable("table_folders");
                 });
@@ -209,13 +206,7 @@ namespace GraNAS.WebAPI.DAL.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("GraNAS.Models.Folder", "Parent")
-                        .WithMany("Subfolders")
-                        .HasForeignKey("ParentId");
-
                     b.Navigation("Owner");
-
-                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("GraNAS.Models.RefreshToken", b =>
@@ -232,8 +223,6 @@ namespace GraNAS.WebAPI.DAL.Migrations
             modelBuilder.Entity("GraNAS.Models.Folder", b =>
                 {
                     b.Navigation("Files");
-
-                    b.Navigation("Subfolders");
                 });
 
             modelBuilder.Entity("GraNAS.Models.User", b =>

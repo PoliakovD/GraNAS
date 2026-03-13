@@ -28,6 +28,10 @@ public class File
   public string Name { get; set; }
 
   [Required]
+  [Column("size")]
+  public long Size { get; set; }
+
+  [Required]
   [MaxLength(100)]
   [Column("type")]
   public string Type { get; set; }

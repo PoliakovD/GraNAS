@@ -42,6 +42,23 @@ public class FolderRepository : IFolderRepository
     }
   }
 
+  public async Task<IEnumerable<Folder>> GetChildFoldersAsync(Guid parentId)
+  {
+    return await _context.Folders
+      .Where(f => f.ParentId == parentId)
+      .OrderBy(f => f.Name)
+      .ToListAsync();
+  }
+
+  public async Task<bool> HasSubfoldersAsync(Guid folderId)
+  {
+    return await _context.Folders.AnyAsync(f => f.ParentId == folderId);
+  }
+  public async Task<int> GetSubfoldersCountAsync(Guid folderId)
+  {
+    return await _context.Folders.CountAsync(f => f.ParentId == folderId);
+  }
+
   public async Task<int> GetFilesCountAsync(Guid folderId)
   {
     return await _context.Files.CountAsync(f => f.FolderId == folderId);

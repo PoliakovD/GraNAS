@@ -1,13 +1,12 @@
 ﻿namespace GraNAS.Models.DTO;
 
-public class FolderResponse
+public class FileResponse
 {
   public Guid Id { get; set; }
+  public Guid FolderId { get; set; }
   public string Name { get; set; }
-  public Guid? ParentId { get; set; }
+  public string Type { get; set; }
+  public long Size { get; set; }
   public DateTime CreatedAt { get; set; }
   public DateTime? UpdatedAt { get; set; }
-  public int FilesCount { get; set; }
-  public int SubfoldersCount{ get; set; }
-
 }

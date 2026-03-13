@@ -9,4 +9,7 @@ public interface IFolderRepository
   Task CreateAsync(Folder folder);
   Task DeleteAsync(Guid id);
   Task<int> GetFilesCountAsync(Guid folderId);
+  Task<IEnumerable<Folder>> GetChildFoldersAsync(Guid parentId);
+  Task<bool> HasSubfoldersAsync(Guid folderId);
+  Task<int> GetSubfoldersCountAsync(Guid folderId);
 }
