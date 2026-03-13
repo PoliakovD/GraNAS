@@ -1,6 +1,7 @@
 ﻿
 using System;
 using GraNAS.WebAPI.DAL;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,5 +22,14 @@ public static class AddDbExtension
 
     builder.Services.AddDbContext<AppDbContext>(options =>
       options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+  }
+
+  public static void AddTestHeaders( IHeaderDictionary headers)
+  {
+    // test
+    foreach (var header in headers)
+    {
+      Console.WriteLine($"{header.Key} - {header.Value}");
+    }
   }
 }

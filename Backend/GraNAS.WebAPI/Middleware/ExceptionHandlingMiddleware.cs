@@ -1,10 +1,12 @@
 ﻿
 using System;
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using GraNAS.Models;
 using GraNAS.Models.DTO;
+using GraNAS.WebAPI.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -25,6 +27,8 @@ public class ExceptionHandlingMiddleware
         {
             try
             {
+              // TEST
+              //AddDbExtension.AddTestHeaders(context.Request.Headers);
                 await _next(context);
             }
             catch (Exception ex)

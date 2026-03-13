@@ -1,5 +1,6 @@
 ﻿using System;
-using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GraNAS.Models;
@@ -7,9 +8,8 @@ using GraNAS.Models.DTO;
 using GraNAS.WebAPI.DAL.Repositories.Interfaces;
 using GraNAS.WebAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
-using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace GraNAS.WebAPI.Controllers;
@@ -109,8 +109,9 @@ public class AuthController : ControllerBase
   /// <response code="400">Ошибка валидации запроса</response>
   /// <response code="401">Неверный email или пароль</response>
   /// <response code="429">Слишком много запросов</response>
-  [HttpPost("login")]
+
   [EnableRateLimiting("auth")]
+  [HttpPost("login")]
   [ProducesResponseType(typeof(object), StatusCodes.Status200OK)] // можно уточнить тип, но он анонимный
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]

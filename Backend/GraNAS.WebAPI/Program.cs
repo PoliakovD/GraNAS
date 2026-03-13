@@ -18,13 +18,15 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using Microsoft.OpenApi.Reader;
+
 
 namespace GraNAS.WebAPI;
 
@@ -97,8 +99,22 @@ public class Program
           ValidAudience = jwtSettings["Audience"],
           IssuerSigningKey = new SymmetricSecurityKey(secretKey)
         };
+        options.Events = new JwtBearerEvents
+        {
+          OnAuthenticationFailed = context =>
+          {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError(context.Exception, "JWT authentication failed");
+            return Task.CompletedTask;
+          },
+          OnChallenge = context =>
+          {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("JWT challenge: {Error}, {ErrorDescription}", context.Error, context.ErrorDescription);
+            return Task.CompletedTask;
+          }
+        };
       });
-
 
 
     // HttpsRedirection
@@ -113,15 +129,14 @@ public class Program
 
     builder.Services.AddRateLimiter(options =>
     {
-      options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
-        httpContext => RateLimitPartition.GetFixedWindowLimiter(
-          partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
-          factory: partition => new FixedWindowRateLimiterOptions
-          {
-            AutoReplenishment = true,
-            PermitLimit = 10,      // максимум 10 запросов
-            Window = TimeSpan.FromMinutes(1) // в окне 1 минута
-          }));
+      // Добавляем именованную политику для аутентификационных эндпоинтов
+      options.AddFixedWindowLimiter("auth", policy =>
+      {
+        policy.PermitLimit = 10; // максимум 10 запросов
+        policy.Window = TimeSpan.FromMinutes(1); // в окне 1 минута
+        policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        policy.QueueLimit = 0; // без очереди
+      });
 
       options.OnRejected = async (context, token) =>
       {
@@ -150,10 +165,15 @@ public class Program
     builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
     builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
+    // Репозитории
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IFolderRepository, FolderRepository>();
 
     builder.Services.AddEndpointsApiExplorer();
+
+    // Рабочая настройка
+
     // Настройка Swagger с поддержкой JWT
     builder.Services.AddSwaggerGen(c =>
     {
@@ -171,17 +191,20 @@ public class Program
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
       });
 
-      // Требование безопасности: создаём ссылку на схему "Bearer"
-      c.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+      // // Требование безопасности: создаём ссылку на схему "Bearer"
+     c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
       {
-        {
-          new OpenApiSecuritySchemeReference("Bearer"), []
-        }
+        { new OpenApiSecuritySchemeReference("Bearer", doc), new List<string>() }
       });
+
     });
+
+    // Рабочая настройка
+
 
     WebApplication app = builder.Build();
 
@@ -190,7 +213,9 @@ public class Program
     // HttpsRedirection
 
     app.UseHttpsRedirection();
+    //  HTTP Strict Transport Security Protocol (HSTS)
 
+    app.UseHsts();
     app.UseSecurityHeaders(policy =>
     {
       policy.AddDefaultSecurityHeaders(); // добавляет рекомендуемые заголовки (X-Content-Type-Options, X-Frame-Options и др.)
@@ -201,9 +226,6 @@ public class Program
       policy.AddStrictTransportSecurityMaxAge(TimeSpan.FromDays(30).Seconds);
     });
 
-    //  HTTP Strict Transport Security Protocol (HSTS)
-
-    app.UseHsts();
 
     app.UseCors(corsPolicyName);
 
