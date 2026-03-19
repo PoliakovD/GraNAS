@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
@@ -97,23 +98,78 @@ public class Program
           ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
           ValidIssuer = jwtSettings["Issuer"],
           ValidAudience = jwtSettings["Audience"],
-          IssuerSigningKey = new SymmetricSecurityKey(secretKey)
+          IssuerSigningKey = new SymmetricSecurityKey(secretKey),
         };
-        options.Events = new JwtBearerEvents
+
+        if (!builder.Environment.IsEnvironment("Test"))
         {
-          OnAuthenticationFailed = context =>
+          options.Events = new JwtBearerEvents
           {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(context.Exception, "JWT authentication failed");
-            return Task.CompletedTask;
-          },
-          OnChallenge = context =>
+            OnAuthenticationFailed = context =>
+            {
+              var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+              logger.LogError(context.Exception, "JWT authentication failed for user: {User}, Token: {Token}",
+                context.HttpContext.User?.Identity?.Name,
+                context.Request.Headers.Authorization.ToString());
+              return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+              var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+              logger.LogWarning(
+                "JWT challenge issued: {Error}, Description: {ErrorDescription}, Path: {Path}, Scheme: {Scheme}, Header{Header}",
+                context.Error,
+                context.ErrorDescription,
+                context.HttpContext.Request.Path,
+                context.Scheme.Name,
+                context.Request.Headers.Authorization.ToString());
+              return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+              var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+              var userId = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? context.Principal?.FindFirst("sub")?.Value;
+              logger.LogInformation("JWT successfully validated for user ID: {UserId} at {ValidationTime}",
+                userId, DateTime.UtcNow);
+              return Task.CompletedTask;
+            },
+            OnMessageReceived = context =>
+            {
+              var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+              if (string.IsNullOrEmpty(context.Token))
+              {
+                logger.LogDebug("No JWT token found in request for path: {Path}", context.HttpContext.Request.Path);
+              }
+              else
+              {
+                logger.LogDebug("JWT token received for user agent: {UserAgent}, Path: {Path}",
+                  context.HttpContext.Request.Headers.UserAgent,
+                  context.HttpContext.Request.Path);
+              }
+
+              return Task.CompletedTask;
+            }
+          };
+        }
+        else
+        {
+          options.Events = new JwtBearerEvents
           {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogWarning("JWT challenge: {Error}, {ErrorDescription}", context.Error, context.ErrorDescription);
-            return Task.CompletedTask;
-          }
-        };
+            OnAuthenticationFailed = context =>
+            {
+              var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+              logger.LogError(context.Exception, "JWT authentication failed");
+              return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+              var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+              logger.LogWarning("JWT challenge: {Error}, {ErrorDescription}", context.Error, context.ErrorDescription);
+              return Task.CompletedTask;
+            }
+          };
+        }
       });
 
 
@@ -197,11 +253,10 @@ public class Program
       });
 
       // // Требование безопасности: создаём ссылку на схему "Bearer"
-     c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
+      c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
       {
         { new OpenApiSecuritySchemeReference("Bearer", doc), new List<string>() }
       });
-
     });
 
     // Рабочая настройка
@@ -211,12 +266,15 @@ public class Program
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-    // HttpsRedirection
+    // HttpsRedirection – отключаем в тестах
+    // HSTS – тоже отключаем в тестах
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
+      app.UseHttpsRedirection();
+      app.UseHsts();
+    }
 
-    app.UseHttpsRedirection();
-    //  HTTP Strict Transport Security Protocol (HSTS)
 
-    app.UseHsts();
     app.UseSecurityHeaders(policy =>
     {
       policy.AddDefaultSecurityHeaders(); // добавляет рекомендуемые заголовки (X-Content-Type-Options, X-Frame-Options и др.)
@@ -244,7 +302,9 @@ public class Program
           $"{builder.Environment.ApplicationName} {versionApi}");
         c.RoutePrefix = "swagger";
       });
-    };
+    }
+
+    ;
 
     app.MapControllers();
 

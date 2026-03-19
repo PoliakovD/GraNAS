@@ -29,14 +29,15 @@ public class JwtTokenService : ITokenService
   {
     var jwtSettings = _configuration.GetSection("Jwt");
     var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]);
+
     var signingCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256);
 
     var claims = new[]
     {
       new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
       new Claim(JwtRegisteredClaimNames.Email, user.Email),
-      new Claim("is_admin", user.IsAdmin.ToString())
-      // можно добавить другие claims
+      new Claim("is_admin", user.IsAdmin.ToString()),
+      new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
     };
 
     var token = new JwtSecurityToken(

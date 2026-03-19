@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GraNAS.Models;
@@ -216,11 +218,15 @@ public class AuthController : ControllerBase
                       ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
     if (!Guid.TryParse(userIdClaim, out var userId))
+    {
+
       return Unauthorized(new ErrorResponse
       {
-        Error = "invalid_token",
-        ErrorDescription = "Invalid user identifier."
+        Error = $"invalid_token",
+        ErrorDescription = $"Invalid user identifier. {userId}"
       });
+    }
+
 
     // Если запрошен выход из всех сессий
     if (request.AllSessions == true)
