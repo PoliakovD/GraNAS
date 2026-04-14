@@ -25,9 +25,10 @@
   </Folder>
   <Folder Name="/Backend/Shared/">
     <Project Path="Backend/Shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj" />
+    <Project Path="Backend/Shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj" />
   </Folder>
 
   <Folder Name="/Backend/Authorization/">
-    <Project Path="Backend/Authorization/GraNAS.WebAPI.Authorization/GraNAS.WebAPI.csproj" />
+    <Project Path="Backend/Authorization/GraNAS.WebAPI.Authorization/GraNAS.WebAPI.Authorization.csproj" />
   </Folder>
 </Solution>
