@@ -9,11 +9,10 @@ using GraNAS.WebAPI.DAL.Repositories.Interfaces;
 using GraNAS.WebAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
-namespace GraNAS.WebAPI.Controllers;
+namespace GraNAS.WebAPI.Authorization.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]

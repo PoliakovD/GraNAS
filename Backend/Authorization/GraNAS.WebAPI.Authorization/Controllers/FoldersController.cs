@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace GraNAS.WebAPI.Controllers;
+namespace GraNAS.WebAPI.Authorization.Controllers;
 
 [Authorize]
 [ApiController]

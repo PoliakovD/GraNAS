@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <RootNamespace>GraNAS.WebAPI</RootNamespace>
+    <RootNamespace>GraNAS.WebAPI.Authorization</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

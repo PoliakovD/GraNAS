@@ -5,9 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
-using GraNAS.Models;
 using GraNAS.Models.DTO;
-using GraNAS.WebAPI.DAL;
 using GraNAS.WebAPI.DAL.Repositories.Implementation;
 using GraNAS.WebAPI.DAL.Repositories.Interfaces;
 using GraNAS.WebAPI.Extensions;
@@ -17,19 +15,15 @@ using GraNAS.WebAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
-
-namespace GraNAS.WebAPI;
+namespace GraNAS.WebAPI.Authorization;
 
 public class Program
 {
