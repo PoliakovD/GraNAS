@@ -1,4 +1,4 @@
-services:
+﻿services:
   postgres:
     container_name: ${PREFIX}_postgres_container
     image: postgres:${POSTGRES_VERSION}
@@ -22,6 +22,8 @@ services:
           memory: 4G
     networks:
       - postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     container_name: ${PREFIX}_redis_container
@@ -42,19 +44,21 @@ services:
           memory: 512M
     networks:
       - postgres
+    volumes:
+      - redis_data:/data
     command: redis-server --appendonly yes
 
   webapi:
     container_name: ${PREFIX}_webapi_container
-    build:
-      context: .
-      dockerfile: Backend/GraNAS.WebAPI/Dockerfile
-      args:
-        BUILD_CONFIGURATION: ${DOCKER_BUILD_BUILD_CONFIGURATION}
+    image: ${WEBAPI_IMAGE}:${WEBAPI_VERSION}
     ports:
-      - "${WEBAPI_PORT_HOST}:8080"
+      - "${WEBAPI_PORT_HOST}:443"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,28 +72,17 @@ services:
           memory: 2G
     networks:
       - postgres
-
-  pgadmin:
-    container_name: ${PREFIX}_pgadmin_container
-    image: dpage/pgadmin4:${PGADMIN_VERSION}
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT_HOST}:${PGADMIN_PORT_CONTAINER}"
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1G
-    networks:
-      - postgres
-    depends_on:
-      postgres:
-        condition: service_healthy
-        restart: true
+    healthcheck:
+      test: [ "CMD", "curl", "-k", "-f", "https://localhost:443/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
 networks:
   postgres:
     driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

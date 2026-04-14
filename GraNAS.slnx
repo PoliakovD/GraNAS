@@ -1,22 +1,33 @@
 <Solution>
+
   <Folder Name="/docker/">
     <File Path=".dockerignore" />
     <File Path=".env" />
     <File Path="compose.Development.yaml" />
     <File Path="compose.LocalDevelopment.yaml" />
+    <File Path="compose.prod.yaml" />
     <File Path="compose.yaml" />
   </Folder>
   <Folder Name="/Frontend/" />
   <Folder Name="/git/">
     <File Path=".gitattributes" />
+    <File Path=".github/workflows/ci-cd.yml" />
     <File Path=".gitignore" />
   </Folder>
   <Folder Name="/Solution Items/" />
   <Folder Name="/Backend/">
+
     <Project Path="Backend/GraNAS.Models/GraNAS.Models.csproj" />
     <Project Path="Backend/GraNAS.WebAPI.DAL/GraNAS.WebAPI.DAL.csproj" />
     <Project Path="Backend/GraNAS.WebAPI.Services/GraNAS.WebAPI.Services.csproj" />
-    <Project Path="Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj" />
 
+
+  </Folder>
+  <Folder Name="/Backend/Shared/">
+    <Project Path="Backend/Shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj" />
+  </Folder>
+
+  <Folder Name="/Backend/Authorization/">
+    <Project Path="Backend/Authorization/GraNAS.WebAPI.Authorization/GraNAS.WebAPI.csproj" />
   </Folder>
 </Solution>

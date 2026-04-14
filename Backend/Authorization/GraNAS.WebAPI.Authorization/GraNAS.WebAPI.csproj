@@ -31,8 +31,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GraNAS.WebAPI.DAL\GraNAS.WebAPI.DAL.csproj" />
-    <ProjectReference Include="..\GraNAS.WebAPI.Services\GraNAS.WebAPI.Services.csproj" />
+    <ProjectReference Include="..\..\GraNAS.WebAPI.DAL\GraNAS.WebAPI.DAL.csproj" />
+    <ProjectReference Include="..\..\GraNAS.WebAPI.Services\GraNAS.WebAPI.Services.csproj" />
   </ItemGroup>
 
 </Project>

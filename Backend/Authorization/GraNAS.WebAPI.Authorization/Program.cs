@@ -17,6 +17,7 @@ using GraNAS.WebAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -38,7 +39,6 @@ public class Program
     const string corsPolicyName = "MyAllowSpecificOrigins";
 
     var builder = WebApplication.CreateBuilder(args);
-
 
     builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
@@ -223,7 +223,7 @@ public class Program
       policy.AddFrameOptionsDeny();
       policy.AddXssProtectionBlock();
       policy.AddContentTypeOptionsNoSniff();
-      policy.AddStrictTransportSecurityMaxAge(TimeSpan.FromDays(30).Seconds);
+      policy.AddStrictTransportSecurityMaxAge(TimeSpan.FromDays(300).Seconds);
     });
 
 

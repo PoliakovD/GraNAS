@@ -11,7 +11,8 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
     // Загружаем конфигурацию из appsettings.json
     var configuration = new ConfigurationBuilder()
       .SetBasePath(Directory.GetCurrentDirectory()) // Путь к проекту DAL
-      .AddJsonFile("appsettings.json")
+      .AddJsonFile("appsettings.json", true)
+      .AddEnvironmentVariables()
       .Build();
 
     var connectionString = configuration.GetConnectionString("Default");

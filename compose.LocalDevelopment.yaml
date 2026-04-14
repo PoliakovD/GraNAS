@@ -69,26 +69,26 @@ services:
 #    networks:
 #      - postgres
 
-  pgadmin:
-    container_name: ${PREFIX}_pgadmin_container
-    image: dpage/pgadmin4:${PGADMIN_VERSION}
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT_HOST}:${PGADMIN_PORT_CONTAINER}"
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1G
-    networks:
-      - postgres
-    depends_on:
-      postgres:
-        condition: service_healthy
-        restart: true
+#  pgadmin:
+#    container_name: ${PREFIX}_pgadmin_container
+#    image: dpage/pgadmin4:${PGADMIN_VERSION}
+#    environment:
+#      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+#      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+#    ports:
+#      - "${PGADMIN_PORT_HOST}:${PGADMIN_PORT_CONTAINER}"
+#    restart: unless-stopped
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#          memory: 1G
+#    networks:
+#      - postgres
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#        restart: true
 
 networks:
   postgres:
