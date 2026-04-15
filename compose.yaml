@@ -82,3 +82,9 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  granas.logservice:
+    image: granas.logservice
+    build:
+      context: .
+      dockerfile: Backend/LogService/GraNAS.LogService/Dockerfile
+

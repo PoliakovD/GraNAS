@@ -14,6 +14,14 @@
     <File Path=".github/workflows/ci-cd.yml" />
     <File Path=".gitignore" />
   </Folder>
+  <Folder Name="/LogService/">
+
+
+  </Folder>
+  <Folder Name="/LogService/backend/">
+    <File Path="LogService/backend/compose.yaml" />
+    <Project Path="LogService/backend/GraNAS.LogService/GraNAS.LogService.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/" />
   <Folder Name="/Backend/">
 
@@ -25,6 +33,7 @@
   </Folder>
   <Folder Name="/Backend/Shared/">
     <Project Path="Backend/Shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj" />
+    <Project Path="Backend/Shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj" />
     <Project Path="Backend/Shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj" />
   </Folder>
 

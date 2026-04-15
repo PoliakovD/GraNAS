@@ -6,12 +6,15 @@ using System.Text;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using GraNAS.Models.DTO;
+using GraNAS.Shared.Correlation;
+using GraNAS.Shared.Swagger;
 using GraNAS.WebAPI.DAL.Repositories.Implementation;
 using GraNAS.WebAPI.DAL.Repositories.Interfaces;
 using GraNAS.WebAPI.Extensions;
 using GraNAS.WebAPI.Middleware;
 using GraNAS.WebAPI.Services.Implementations;
 using GraNAS.WebAPI.Services.Interfaces;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -30,6 +33,7 @@ public class Program
   public static async Task Main(string[] args)
   {
     const string versionApi = "v1";
+    const string apiTitle = "GraNAS.WebAPI.Authorization";
     const string corsPolicyName = "MyAllowSpecificOrigins";
 
     var builder = WebApplication.CreateBuilder(args);
@@ -53,6 +57,10 @@ public class Program
       };
     });
 
+    // Добавляем Корреляцию
+
+    builder.Services.AddHttpContextAccessor();
+
     // добавляем бд
     builder.AddPostgreSql();
 
@@ -68,6 +76,9 @@ public class Program
             .AllowAnyHeader();
         });
     });
+
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<ILoggerService, LoggerService>();
 
     // Настройка аутентификации JWT
     var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -166,43 +177,15 @@ public class Program
 
     builder.Services.AddEndpointsApiExplorer();
 
-    // Рабочая настройка
 
-    // Настройка Swagger с поддержкой JWT
-    builder.Services.AddSwaggerGen(c =>
-    {
-      c.SwaggerDoc("v1", new OpenApiInfo { Title = builder.Environment.ApplicationName, Version = "v1" });
-
-      // Включение XML-комментариев
-      var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-      var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-      c.IncludeXmlComments(xmlPath);
-
-      // Добавляем возможность вводить токен в Swagger UI
-      c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-      {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-      });
-
-      // // Требование безопасности: создаём ссылку на схему "Bearer"
-     c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
-      {
-        { new OpenApiSecuritySchemeReference("Bearer", doc), new List<string>() }
-      });
-
-    });
+    builder.Services.AddSwaggerWithJwt(apiTitle, versionApi);
 
     // Рабочая настройка
-
 
     WebApplication app = builder.Build();
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseMiddleware<CorrelationIdMiddleware>();
 
     // HttpsRedirection
 
@@ -230,6 +213,7 @@ public class Program
 
     if (app.Environment.IsDevelopment())
     {
+      app.UseSwaggerWithJwt(apiTitle, versionApi);
       app.UseSwagger();
       app.UseSwaggerUI(c =>
       {

@@ -1,95 +1,155 @@
 services:
-  postgres:
-    container_name: ${PREFIX}_postgres_container
+  # ========== БАЗЫ ДАННЫХ ==========
+
+  log_postgres:
     image: postgres:${POSTGRES_VERSION}
+    container_name: ${PREFIX}_log_postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${LOG_POSTGRES_DB}
+      POSTGRES_USER: ${LOG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${LOG_POSTGRES_PASSWORD}
+    volumes:
+      - ${LOG_POSTGRES_DATA_VOLUME}:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+      - "${LOG_POSTGRES_PORT_HOST}:${LOG_POSTGRES_PORT_CONTAINER}"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${LOG_POSTGRES_USER} -d ${LOG_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 4G
     networks:
-      - postgres
+      - backend
+
+  auth_postgres:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: ${PREFIX}_auth_postgres
+    environment:
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+    volumes:
+      - ${AUTH_POSTGRES_DATA_VOLUME}:/var/lib/postgresql/data
+    ports:
+      - "${AUTH_POSTGRES_PORT_HOST}:${AUTH_POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # ========== КЭШ И БРОКЕР ==========
 
   redis:
-    container_name: ${PREFIX}_redis_container
+    container_name: ${PREFIX}_redis
     image: redis:${REDIS_VERSION}
     ports:
       - "${REDIS_PORT_HOST}:${REDIS_PORT_CONTAINER}"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    networks:
-      - postgres
     command: redis-server --appendonly yes
+    networks:
+      - backend
 
-#  webapi:
-#    container_name: ${PREFIX}_webapi_container
-#    build:
-#      context: .
-#      dockerfile: Backend/GraNAS.WebAPI/Dockerfile
-#      args:
-#        BUILD_CONFIGURATION: Debug
-#    ports:
-#      - "${WEBAPI_PORT_HOST}:8080"
-#    environment:
-#      ASPNETCORE_ENVIRONMENT: Development
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#      redis:
-#        condition: service_healthy
-#    restart: unless-stopped
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '1'
-#          memory: 2G
-#    networks:
-#      - postgres
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION}
+    container_name: ${PREFIX}_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${RABBITMQ_PORT_HOST}:5672"
+      - "${RABBITMQ_MGMT_PORT_HOST}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend
 
-#  pgadmin:
-#    container_name: ${PREFIX}_pgadmin_container
-#    image: dpage/pgadmin4:${PGADMIN_VERSION}
-#    environment:
-#      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-#      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-#    ports:
-#      - "${PGADMIN_PORT_HOST}:${PGADMIN_PORT_CONTAINER}"
-#    restart: unless-stopped
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.5'
-#          memory: 1G
-#    networks:
-#      - postgres
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#        restart: true
+  # ========== МИКРОСЕРВИСЫ ==========
+
+  auth_service:
+    build:
+      context: ./Backend/Authorization
+      dockerfile: Dockerfile
+    container_name: ${PREFIX}_auth_service
+    depends_on:
+      auth_postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=auth_postgres;Database=${AUTH_POSTGRES_DB};Username=${AUTH_POSTGRES_USER};Password=${AUTH_POSTGRES_PASSWORD}
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=${RABBITMQ_DEFAULT_USER}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS}
+      - Redis__ConnectionString=redis:${REDIS_PORT_CONTAINER}
+    ports:
+      - "${AUTH_SERVICE_PORT_HOST}:${AUTH_SERVICE_PORT_CONTAINER}"
+    restart: unless-stopped
+    networks:
+      - backend
+
+  log_service:
+    build:
+      context: ./LogService
+      dockerfile: Dockerfile
+    container_name: ${PREFIX}_log_service
+    depends_on:
+      log_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=log_postgres;Database=${LOG_POSTGRES_DB};Username=${LOG_POSTGRES_USER};Password=${LOG_POSTGRES_PASSWORD}
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=${RABBITMQ_DEFAULT_USER}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${LOG_SERVICE_PORT_HOST}:${LOG_SERVICE_PORT_CONTAINER}"
+    restart: unless-stopped
+    networks:
+      - backend
+
+  react_ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ${PREFIX}_react_ui
+    ports:
+      - "${REACT_UI_PORT_HOST}:${REACT_UI_PORT_CONTAINER}"
+    depends_on:
+      - log_service
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+    restart: unless-stopped
+    networks:
+      - backend
 
 networks:
-  postgres:
+  backend:
     driver: bridge
+
+volumes:
+  log_postgres_data:
+    name: ${LOG_POSTGRES_DATA_VOLUME}
+  auth_postgres_data:
+    name: ${AUTH_POSTGRES_DATA_VOLUME}

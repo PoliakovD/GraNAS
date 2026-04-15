@@ -1,0 +1,6 @@
+@GraNAS.LogService_HostAddress = http://localhost:5070
+
+GET {{GraNAS.LogService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

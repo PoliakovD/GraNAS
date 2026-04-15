@@ -22,15 +22,19 @@ public class AuthController : ControllerBase
   private readonly IUserRepository _userRepository;
   private readonly IPasswordHasher _passwordHasher;
   private readonly ITokenService _tokenService;
+  private readonly ILoggerService _logger;
+
 
   public AuthController(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
-    ITokenService tokenService)
+    ITokenService tokenService,
+    ILoggerService logger)
   {
     _userRepository = userRepository;
     _passwordHasher = passwordHasher;
     _tokenService = tokenService;
+    _logger = logger;
   }
 
   /// <summary>
@@ -97,6 +101,8 @@ public class AuthController : ControllerBase
       Message = "Registration successful."
     };
 
+    await _logger.LogInfo($"New user registered: {request.Email}", userId: user.Id.ToString());
+
     return Ok(response);
   }
 
@@ -148,6 +154,8 @@ public class AuthController : ControllerBase
 
     // 4. Генерация токенов
     var tokens = await _tokenService.GenerateTokensAsync(user);
+
+    await _logger.LogInfo($"User {user.Email} logged in", userId: user.Id.ToString());
 
     // 5. Возврат успешного ответа
     return Ok(new
