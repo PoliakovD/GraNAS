@@ -1,9 +1,9 @@
 ﻿using BCrypt.Net;
-using GraNAS.WebAPI.Services.Interfaces;
+using GraNAS.Auth.Services.Interfaces;
 
-namespace GraNAS.WebAPI.Services.Implementations;
+namespace GraNAS.Auth.Services.Implementations;
 
-  public class BCryptPasswordHasher : IPasswordHasher
+public class BCryptPasswordHasher : IPasswordHasher
   {
     public string HashPassword(string password)
     {

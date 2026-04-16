@@ -9,10 +9,10 @@ using GraNAS.Shared.Infrastructure.Extensions;
 using GraNAS.Shared.Infrastructure.Middleware;
 using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Swagger;
-using GraNAS.WebAPI.DAL.Repositories.Implementation;
-using GraNAS.WebAPI.DAL.Repositories.Interfaces;
-using GraNAS.WebAPI.Services.Implementations;
-using GraNAS.WebAPI.Services.Interfaces;
+using GraNAS.Auth.DAL.Repositories.Implementation;
+using GraNAS.Auth.DAL.Repositories.Interfaces;
+using GraNAS.Auth.Services.Implementations;
+using GraNAS.Auth.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -25,7 +25,7 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Sinks.Elasticsearch;
 
-namespace GraNAS.WebAPI.Authorization;
+namespace GraNAS.Auth.API;
 
 public class Program
 {
@@ -36,6 +36,9 @@ public class Program
     const string corsPolicyName = "MyAllowSpecificOrigins";
 
     var builder = WebApplication.CreateBuilder(args);
+
+    // Добавляет сервис CorrelationId для отслеживания запроса
+    builder.Services.AddCorrelationId();
 
     builder.Host.UseSerilog((ctx, cfg) =>
     {
@@ -78,7 +81,7 @@ public class Program
     builder.Services.AddHttpContextAccessor();
 
     // добавляем бд
-    builder.AddPostgreSql<GraNAS.WebAPI.DAL.AppDbContext>();
+    builder.AddPostgreSql<GraNAS.Auth.DAL.AppDbContext>();
 
     // Настройка CORS
     builder.Services.AddCors(options =>
@@ -199,8 +202,11 @@ public class Program
 
     WebApplication app = builder.Build();
 
+
     app.UseMiddleware<ExceptionHandlingMiddleware>();
-    app.UseMiddleware<CorrelationIdMiddleware>();
+
+    app.UseCorrelationId();
+
     app.UseSerilogRequestLogging();
 
     // HttpsRedirection

@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace GraNAS.WebAPI.DAL.Migrations
+namespace GraNAS.Auth.DAL.Migrations
 {
     /// <inheritdoc />
     public partial class AddCascadeAndTriggers : Migration

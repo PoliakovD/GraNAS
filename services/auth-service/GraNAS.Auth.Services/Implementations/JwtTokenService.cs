@@ -1,6 +1,6 @@
 ﻿using GraNAS.Models;
-using GraNAS.WebAPI.DAL.Repositories.Interfaces;
-using GraNAS.WebAPI.Services.Interfaces;
+using GraNAS.Auth.DAL.Repositories.Interfaces;
+using GraNAS.Auth.Services.Interfaces;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -11,7 +11,7 @@ using GraNAS.Models.DTO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace GraNAS.WebAPI.Services.Implementations;
+namespace GraNAS.Auth.Services.Implementations;
 
 public class JwtTokenService : ITokenService
 {

@@ -1,6 +1,6 @@
 ﻿using GraNAS.Models;
 
-namespace GraNAS.WebAPI.DAL.Repositories.Interfaces;
+namespace GraNAS.Auth.DAL.Repositories.Interfaces;
 
 public interface IRefreshTokenRepository
 {

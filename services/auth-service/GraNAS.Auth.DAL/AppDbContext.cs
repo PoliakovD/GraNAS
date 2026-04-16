@@ -1,7 +1,7 @@
 ﻿using GraNAS.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace GraNAS.WebAPI.DAL;
+namespace GraNAS.Auth.DAL;
 
 public class AppDbContext : DbContext
 {

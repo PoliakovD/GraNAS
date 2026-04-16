@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 
-namespace GraNAS.WebAPI.DAL;
+namespace GraNAS.Auth.DAL;
 
 public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {

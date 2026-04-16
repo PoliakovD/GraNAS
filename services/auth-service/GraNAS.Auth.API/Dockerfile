@@ -4,18 +4,18 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 # Restore dependencies first for better layer caching
-COPY ["Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj", "Backend/GraNAS.WebAPI/"]
-RUN dotnet restore "Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj"
+COPY ["services/auth-service/GraNAS.Auth.API/GraNAS.Auth.API.csproj", "services/auth-service/GraNAS.Auth.API/"]
+RUN dotnet restore "services/auth-service/GraNAS.Auth.API/GraNAS.Auth.API.csproj"
 
 # Copy remaining source and build
 COPY . .
-WORKDIR "/src/Backend/GraNAS.WebAPI"
-RUN dotnet build "GraNAS.WebAPI.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
+WORKDIR "/src/services/auth-service/GraNAS.Auth.API"
+RUN dotnet build "GraNAS.Auth.API.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
 
 # Publish to optimized output
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "GraNAS.WebAPI.csproj" \
+RUN dotnet publish "GraNAS.Auth.API.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \
     /p:UseAppHost=false \
@@ -38,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 USER appuser
-ENTRYPOINT ["dotnet", "GraNAS.WebAPI.dll"]
+ENTRYPOINT ["dotnet", "GraNAS.Auth.API.dll"]

@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <RootNamespace>GraNAS.WebAPI.Authorization</RootNamespace>
+    <RootNamespace>GraNAS.Auth.API</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,7 +18,7 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.1.5" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
   </ItemGroup>
 
 
@@ -39,9 +39,9 @@
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.LoggingService\GraNAS.Shared.LoggingService.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Models\GraNAS.Shared.Models.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Swagger\GraNAS.Shared.Swagger.csproj" />
-    <ProjectReference Include="..\GraNAS.Models\GraNAS.Models.csproj" />
-    <ProjectReference Include="..\GraNAS.WebAPI.DAL\GraNAS.WebAPI.DAL.csproj" />
-    <ProjectReference Include="..\GraNAS.WebAPI.Services\GraNAS.WebAPI.Services.csproj" />
+    <ProjectReference Include="..\GraNAS.Auth.Models\GraNAS.Auth.Models.csproj" />
+    <ProjectReference Include="..\GraNAS.Auth.DAL\GraNAS.Auth.DAL.csproj" />
+    <ProjectReference Include="..\GraNAS.Auth.Services\GraNAS.Auth.Services.csproj" />
   </ItemGroup>
 
 </Project>

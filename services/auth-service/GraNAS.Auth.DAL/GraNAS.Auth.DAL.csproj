@@ -16,7 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\GraNAS.Models\GraNAS.Models.csproj" />
+      <ProjectReference Include="..\GraNAS.Auth.Models\GraNAS.Auth.Models.csproj" />
     </ItemGroup>
 
     <ItemGroup>

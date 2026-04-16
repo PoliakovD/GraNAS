@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace GraNAS.WebAPI.DAL.Migrations
+namespace GraNAS.Auth.DAL.Migrations
 {
     /// <inheritdoc />
     public partial class AddUserAndRefreshTokenTables : Migration

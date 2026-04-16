@@ -1,8 +1,8 @@
 ﻿using GraNAS.Models;
-using GraNAS.WebAPI.DAL.Repositories.Interfaces;
+using GraNAS.Auth.DAL.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace GraNAS.WebAPI.DAL.Repositories.Implementation;
+namespace GraNAS.Auth.DAL.Repositories.Implementation;
 
 public class UserRepository : IUserRepository
 {

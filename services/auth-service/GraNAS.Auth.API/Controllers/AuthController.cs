@@ -6,14 +6,14 @@ using System.Threading.Tasks;
 using GraNAS.Models;
 using GraNAS.Models.DTO;
 using GraNAS.Shared.LoggingService;
-using GraNAS.WebAPI.DAL.Repositories.Interfaces;
-using GraNAS.WebAPI.Services.Interfaces;
+using GraNAS.Auth.DAL.Repositories.Interfaces;
+using GraNAS.Auth.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
-namespace GraNAS.WebAPI.Authorization.Controllers;
+namespace GraNAS.Auth.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]

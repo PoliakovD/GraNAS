@@ -1,7 +1,7 @@
 ﻿using GraNAS.Models;
 using GraNAS.Models.DTO;
 
-namespace GraNAS.WebAPI.Services.Interfaces;
+namespace GraNAS.Auth.Services.Interfaces;
 
 public interface ITokenService
 {

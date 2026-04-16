@@ -1,4 +1,4 @@
-﻿namespace GraNAS.WebAPI.Services.Interfaces;
+﻿namespace GraNAS.Auth.Services.Interfaces;
 
 public interface IPasswordHasher
 {
