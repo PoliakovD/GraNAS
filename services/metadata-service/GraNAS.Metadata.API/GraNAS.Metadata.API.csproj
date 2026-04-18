@@ -27,7 +27,9 @@
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.LoggingService\GraNAS.Shared.LoggingService.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Models\GraNAS.Shared.Models.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Swagger\GraNAS.Shared.Swagger.csproj" />
+    <ProjectReference Include="..\GraNAS.Metadata.Models\GraNAS.Metadata.Models.csproj" />
     <ProjectReference Include="..\GraNAS.Metadata.DAL\GraNAS.Metadata.DAL.csproj" />
+    <ProjectReference Include="..\GraNAS.Metadata.Services\GraNAS.Metadata.Services.csproj" />
   </ItemGroup>
 
 </Project>

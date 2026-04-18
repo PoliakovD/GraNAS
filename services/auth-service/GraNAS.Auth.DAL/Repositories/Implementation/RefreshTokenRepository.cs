@@ -1,5 +1,7 @@
-﻿using GraNAS.Models;
-using GraNAS.Auth.DAL.Repositories.Interfaces;
+using System;
+using System.Threading.Tasks;
+using GraNAS.Auth.Models;
+using GraNAS.Auth.Models.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace GraNAS.Auth.DAL.Repositories.Implementation;
@@ -23,6 +25,7 @@ public class RefreshTokenRepository : IRefreshTokenRepository
   {
     return await _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == token);
   }
+
   public async Task<RefreshToken?> GetValidTokenAsync(string token)
   {
     var now = DateTime.UtcNow;
@@ -32,6 +35,7 @@ public class RefreshTokenRepository : IRefreshTokenRepository
                                  && rt.Expires > now
                                  && rt.Revoked == null);
   }
+
   public async Task RevokeAsync(Guid id)
   {
     var token = await _context.RefreshTokens.FindAsync(id);
@@ -41,13 +45,14 @@ public class RefreshTokenRepository : IRefreshTokenRepository
       await _context.SaveChangesAsync();
     }
   }
+
   public async Task<bool> RevokeTokenAsync(string token, Guid userId)
   {
     var refreshToken = await _context.RefreshTokens
       .FirstOrDefaultAsync(rt => rt.Token == token && rt.UserId == userId);
 
     if (refreshToken == null || refreshToken.Revoked != null)
-      return false; // токен не найден или уже отозван
+      return false;
 
     refreshToken.Revoked = DateTime.UtcNow;
     await _context.SaveChangesAsync();

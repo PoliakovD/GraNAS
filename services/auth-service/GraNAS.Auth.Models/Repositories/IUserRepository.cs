@@ -1,6 +1,7 @@
-﻿using GraNAS.Models;
+using System;
+using System.Threading.Tasks;
 
-namespace GraNAS.Auth.DAL.Repositories.Interfaces;
+namespace GraNAS.Auth.Models.Repositories;
 
 public interface IUserRepository
 {

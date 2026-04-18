@@ -3,16 +3,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
-using GraNAS.Models.DTO;
+using GraNAS.Auth.DAL;
+using GraNAS.Auth.DAL.Extensions;
+using GraNAS.Auth.Services.Extensions;
 using GraNAS.Shared.Correlation;
 using GraNAS.Shared.Infrastructure.Extensions;
 using GraNAS.Shared.Infrastructure.Middleware;
 using GraNAS.Shared.LoggingService;
+using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
-using GraNAS.Auth.DAL.Repositories.Implementation;
-using GraNAS.Auth.DAL.Repositories.Interfaces;
-using GraNAS.Auth.Services.Implementations;
-using GraNAS.Auth.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -37,7 +36,6 @@ public class Program
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Добавляет сервис CorrelationId для отслеживания запроса
     builder.Services.AddCorrelationId();
 
     builder.Host.UseSerilog((ctx, cfg) =>
@@ -62,8 +60,8 @@ public class Program
       options.InvalidModelStateResponseFactory = context =>
       {
         var errors = context.ModelState
-          .Where(e => e.Value.Errors.Count > 0)
-          .SelectMany(e => e.Value.Errors.Select(er => er.ErrorMessage))
+          .Where(e => e.Value!.Errors.Count > 0)
+          .SelectMany(e => e.Value!.Errors.Select(er => er.ErrorMessage))
           .ToList();
 
         var errorResponse = new ErrorResponse
@@ -76,14 +74,10 @@ public class Program
       };
     });
 
-    // Добавляем Корреляцию
-
     builder.Services.AddHttpContextAccessor();
 
-    // добавляем бд
-    builder.AddPostgreSql<GraNAS.Auth.DAL.AppDbContext>();
+    builder.AddPostgreSql<AppDbContext>();
 
-    // Настройка CORS
     builder.Services.AddCors(options =>
     {
       options.AddPolicy(corsPolicyName,
@@ -96,10 +90,8 @@ public class Program
         });
     });
 
-    builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ILoggerService, LoggerService>();
 
-    // Настройка аутентификации JWT
     var jwtSettings = builder.Configuration.GetSection("Jwt");
     var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
 
@@ -110,7 +102,7 @@ public class Program
       })
       .AddJwtBearer(options =>
       {
-        options.RequireHttpsMetadata = true; // Требовать HTTPS для получения токена
+        options.RequireHttpsMetadata = true;
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -140,26 +132,22 @@ public class Program
         };
       });
 
-
-    // HttpsRedirection
     builder.Services.AddHttpsRedirection(options =>
     {
       options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
       options.HttpsPort = 44344;
     });
 
-    // Добавление контроллеров
     builder.Services.AddControllers();
 
     builder.Services.AddRateLimiter(options =>
     {
-      // Добавляем именованную политику для аутентификационных эндпоинтов
       options.AddFixedWindowLimiter("auth", policy =>
       {
-        policy.PermitLimit = 10; // максимум 10 запросов
-        policy.Window = TimeSpan.FromMinutes(1); // в окне 1 минута
+        policy.PermitLimit = 10;
+        policy.Window = TimeSpan.FromMinutes(1);
         policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        policy.QueueLimit = 0; // без очереди
+        policy.QueueLimit = 0;
       });
 
       options.OnRejected = async (context, token) =>
@@ -173,11 +161,8 @@ public class Program
       };
     });
 
-    // Добавление авторизации
     builder.Services.AddAuthorization();
 
-
-    //  HTTP Strict Transport Security Protocol (HSTS)
     builder.Services.AddHsts(options =>
     {
       options.Preload = true;
@@ -185,52 +170,37 @@ public class Program
       options.MaxAge = TimeSpan.FromDays(365);
     });
 
-    // Cобственная реализация jwt
-    builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
-    builder.Services.AddScoped<ITokenService, JwtTokenService>();
-
-    // Репозитории
-    builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-    builder.Services.AddScoped<IUserRepository, UserRepository>();
+    // Composition root: регистрация слоёв
+    builder.Services.AddAuthDal();
+    builder.Services.AddAuthApplication();
 
     builder.Services.AddEndpointsApiExplorer();
-
-
     builder.Services.AddSwaggerWithJwt(apiTitle, versionApi);
-
-    // Рабочая настройка
 
     WebApplication app = builder.Build();
 
-
     app.UseMiddleware<ExceptionHandlingMiddleware>();
-
     app.UseCorrelationId();
-
     app.UseSerilogRequestLogging();
 
-    // HttpsRedirection
+    if (!app.Environment.IsDevelopment())
+    {
+      app.UseHttpsRedirection();
+      app.UseHsts();
+    }
 
-    app.UseHttpsRedirection();
-    //  HTTP Strict Transport Security Protocol (HSTS)
-
-    app.UseHsts();
     app.UseSecurityHeaders(policy =>
     {
-      policy.AddDefaultSecurityHeaders(); // добавляет рекомендуемые заголовки (X-Content-Type-Options, X-Frame-Options и др.)
-      // или кастомные:
+      policy.AddDefaultSecurityHeaders();
       policy.AddFrameOptionsDeny();
       policy.AddXssProtectionBlock();
       policy.AddContentTypeOptionsNoSniff();
       policy.AddStrictTransportSecurityMaxAge(TimeSpan.FromDays(300).Seconds);
     });
 
-
     app.UseCors(corsPolicyName);
-
     app.UseRateLimiter();
-
-    app.UseAuthentication(); // Добавляем аутентификацию
+    app.UseAuthentication();
     app.UseAuthorization();
 
     if (app.Environment.IsDevelopment())
@@ -243,7 +213,7 @@ public class Program
           $"{builder.Environment.ApplicationName} {versionApi}");
         c.RoutePrefix = "swagger";
       });
-    };
+    }
 
     app.MapControllers();
 

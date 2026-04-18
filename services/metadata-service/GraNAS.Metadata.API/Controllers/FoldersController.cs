@@ -1,11 +1,10 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using GraNAS.Models;
-using GraNAS.Models.DTO;
-using GraNAS.Metadata.DAL.Repositories.Interfaces;
+using GraNAS.Metadata.Models.DTO;
+using GraNAS.Metadata.Services.Interfaces;
+using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,19 +17,14 @@ namespace GraNAS.Metadata.API.Controllers;
 [Produces("application/json")]
 public class FoldersController : ControllerBase
 {
-  private readonly IFolderRepository _folderRepository;
+  private readonly IFolderService _folderService;
 
-  public FoldersController(IFolderRepository folderRepository)
+  public FoldersController(IFolderService folderService)
   {
-    _folderRepository = folderRepository;
+    _folderService = folderService;
   }
 
-  /// <summary>
-  /// Получить список всех папок текущего пользователя
-  /// </summary>
-  /// <returns>Список папок</returns>
-  /// <response code="200">Успешно</response>
-  /// <response code="401">Не авторизован</response>
+  /// <summary>Получить список всех папок текущего пользователя</summary>
   [HttpGet]
   [ProducesResponseType(typeof(FolderResponse[]), StatusCodes.Status200OK)]
   public async Task<IActionResult> GetFolders()
@@ -39,28 +33,11 @@ public class FoldersController : ControllerBase
     if (userId == null)
       return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
 
-    var folders = await _folderRepository.GetUserFoldersAsync(userId.Value);
-
-    var response = folders.Select(f => new FolderResponse
-    {
-      Id = f.Id,
-      Name = f.Name,
-      CreatedAt = f.CreatedAt,
-      UpdatedAt = f.UpdatedAt,
-      FilesCount = 0 // можно заполнить отдельным запросом, если необходимо
-    }).ToArray();
-
-    return Ok(response);
+    var folders = await _folderService.GetUserFoldersAsync(userId.Value);
+    return Ok(folders);
   }
 
-  /// <summary>
-  /// Создать новую папку
-  /// </summary>
-  /// <param name="request">Название папки</param>
-  /// <returns>Созданная папка</returns>
-  /// <response code="201">Папка создана</response>
-  /// <response code="400">Невалидные данные</response>
-  /// <response code="401">Не авторизован</response>
+  /// <summary>Создать новую папку</summary>
   [HttpPost]
   [ProducesResponseType(typeof(FolderResponse), StatusCodes.Status201Created)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
@@ -73,39 +50,11 @@ public class FoldersController : ControllerBase
     if (userId == null)
       return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
 
-    var folder = new Folder
-    {
-      Id = Guid.NewGuid(),
-      OwnerId = userId.Value,
-      Name = request.Name,
-      CreatedAt = DateTime.UtcNow,
-      UpdatedAt = null
-    };
-
-    await _folderRepository.CreateAsync(folder);
-
-    var response = new FolderResponse
-    {
-      Id = folder.Id,
-      Name = folder.Name,
-      CreatedAt = folder.CreatedAt,
-      UpdatedAt = folder.UpdatedAt,
-      FilesCount = 0
-    };
-
-    return CreatedAtAction(nameof(GetFolders), new { id = folder.Id }, response);
+    var response = await _folderService.CreateFolderAsync(userId.Value, request);
+    return CreatedAtAction(nameof(GetFolders), new { id = response.Id }, response);
   }
 
-  /// <summary>
-  /// Удалить папку
-  /// </summary>
-  /// <param name="id">Идентификатор папки</param>
-  /// <returns>Результат операции</returns>
-  /// <response code="204">Папка удалена</response>
-  /// <response code="401">Не авторизован</response>
-  /// <response code="403">Нет прав на удаление этой папки</response>
-  /// <response code="404">Папка не найдена</response>
-  /// <response code="409">Папка содержит файлы, удаление невозможно</response>
+  /// <summary>Удалить папку</summary>
   [HttpDelete("{id}")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -118,33 +67,30 @@ public class FoldersController : ControllerBase
     if (userId == null)
       return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
 
-    var folder = await _folderRepository.GetByIdAsync(id);
-    if (folder == null)
-      return NotFound(new ErrorResponse { Error = "folder_not_found", ErrorDescription = "Folder not found." });
+    var result = await _folderService.DeleteFolderAsync(userId.Value, id);
 
-    if (folder.OwnerId != userId.Value)
-      return Forbid();
-
-    var filesCount = await _folderRepository.GetFilesCountAsync(id);
-    if (filesCount > 0)
+    return result.Error switch
     {
-      return Conflict(new ErrorResponse
+      DeleteFolderError.None => NoContent(),
+      DeleteFolderError.NotFound => NotFound(new ErrorResponse
+      {
+        Error = "folder_not_found",
+        ErrorDescription = "Folder not found."
+      }),
+      DeleteFolderError.Forbidden => Forbid(),
+      DeleteFolderError.NotEmpty => Conflict(new ErrorResponse
       {
         Error = "folder_not_empty",
-        ErrorDescription = $"Folder contains {filesCount} file(s). Delete files first or confirm deletion."
-      });
-    }
-
-    await _folderRepository.DeleteAsync(id);
-    return NoContent();
+        ErrorDescription = $"Folder contains {result.FilesCount} file(s). Delete files first or confirm deletion."
+      }),
+      _ => StatusCode(StatusCodes.Status500InternalServerError)
+    };
   }
 
   private Guid? GetCurrentUserId()
   {
     var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                       ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
-    if (Guid.TryParse(userIdClaim, out var userId))
-      return userId;
-    return null;
+    return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
   }
 }

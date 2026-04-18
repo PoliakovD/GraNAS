@@ -1,13 +1,13 @@
-using GraNAS.Models;
+using GraNAS.Metadata.Models;
 using Microsoft.EntityFrameworkCore;
-using File = GraNAS.Models.File;
+using File = GraNAS.Metadata.Models.File;
 
 namespace GraNAS.Metadata.DAL;
 
 public class MetadataDbContext : DbContext
 {
-  public DbSet<Folder> Folders { get; set; }
-  public DbSet<File> Files { get; set; }
+  public DbSet<Folder> Folders => Set<Folder>();
+  public DbSet<File> Files => Set<File>();
 
   public MetadataDbContext(DbContextOptions<MetadataDbContext> options) : base(options)
   {
@@ -16,20 +16,6 @@ public class MetadataDbContext : DbContext
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
-
-    modelBuilder.Entity<Folder>()
-      .Property(f => f.CreatedAt)
-      .HasDefaultValueSql("NOW()");
-
-    modelBuilder.Entity<File>()
-      .Property(f => f.CreatedAt)
-      .HasDefaultValueSql("NOW()");
-
-    // При удалении папки удаляются все её файлы
-    modelBuilder.Entity<File>()
-      .HasOne(f => f.Folder)
-      .WithMany(f => f.Files)
-      .HasForeignKey(f => f.FolderId)
-      .OnDelete(DeleteBehavior.Cascade);
+    modelBuilder.ApplyConfigurationsFromAssembly(typeof(MetadataDbContext).Assembly);
   }
 }

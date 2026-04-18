@@ -10,7 +10,7 @@ namespace GraNAS.Shared.Correlation
     /// - IHttpContextAccessor
     /// - CorrelationIdDelegatingHandler (для исходящих HTTP-запросов)
     /// </summary>
-    public static IServiceCollection AddCorrelationId(this IServiceCollection services)
+    public static IServiceCollection (this IServiceCollection services)
     {
       services.AddHttpContextAccessor();
       services.AddTransient<CorrelationIdDelegatingHandler>();

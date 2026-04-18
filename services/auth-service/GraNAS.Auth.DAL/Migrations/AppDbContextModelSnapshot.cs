@@ -17,12 +17,12 @@ namespace GraNAS.Auth.DAL.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("GraNAS.Models.File", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -33,83 +33,6 @@ namespace GraNAS.Auth.DAL.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("NOW()");
-
-                    b.Property<Guid>("FolderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("folder_id");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("type");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex(new[] { "FolderId" }, "IX_files_folder_id");
-
-                    b.HasIndex(new[] { "OwnerId" }, "IX_files_owner_id");
-
-                    b.ToTable("table_files");
-                });
-
-            modelBuilder.Entity("GraNAS.Models.Folder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex(new[] { "OwnerId" }, "IX_folders_owner_id");
-
-                    b.ToTable("table_folders");
-                });
-
-            modelBuilder.Entity("GraNAS.Models.RefreshToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("timestamp with time zone")
@@ -136,10 +59,10 @@ namespace GraNAS.Auth.DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("table_refresh_tokens");
+                    b.ToTable("table_refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("GraNAS.Models.User", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -148,7 +71,8 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -169,42 +93,12 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("table_users");
+                    b.ToTable("table_users", (string)null);
                 });
 
-            modelBuilder.Entity("GraNAS.Models.File", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.RefreshToken", b =>
                 {
-                    b.HasOne("GraNAS.Models.Folder", "Folder")
-                        .WithMany("Files")
-                        .HasForeignKey("FolderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GraNAS.Models.User", "Owner")
-                        .WithMany()
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Folder");
-
-                    b.Navigation("Owner");
-                });
-
-            modelBuilder.Entity("GraNAS.Models.Folder", b =>
-                {
-                    b.HasOne("GraNAS.Models.User", "Owner")
-                        .WithMany()
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Owner");
-                });
-
-            modelBuilder.Entity("GraNAS.Models.RefreshToken", b =>
-                {
-                    b.HasOne("GraNAS.Models.User", "User")
+                    b.HasOne("GraNAS.Auth.Models.User", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -213,12 +107,7 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("GraNAS.Models.Folder", b =>
-                {
-                    b.Navigation("Files");
-                });
-
-            modelBuilder.Entity("GraNAS.Models.User", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.User", b =>
                 {
                     b.Navigation("RefreshTokens");
                 });

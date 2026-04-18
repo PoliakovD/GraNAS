@@ -12,17 +12,9 @@ public interface ILoggerService
   Task LogError(string message, string? userId = null, object? additionalData = null);
 }
 
-public class LoggerService : ILoggerService
+public class LoggerService(ILogger<LoggerService> logger, IHttpContextAccessor httpContextAccessor)
+  : ILoggerService
 {
-  private readonly ILogger<LoggerService> _logger;
-  private readonly IHttpContextAccessor _httpContextAccessor;
-
-  public LoggerService(ILogger<LoggerService> logger, IHttpContextAccessor httpContextAccessor)
-  {
-    _logger = logger;
-    _httpContextAccessor = httpContextAccessor;
-  }
-
   public Task LogInfo(string message, string? userId = null, object? additionalData = null)
   {
     WriteLog(LogLevel.Information, message, userId, additionalData);
@@ -43,13 +35,13 @@ public class LoggerService : ILoggerService
 
   private void WriteLog(LogLevel level, string message, string? userId, object? additionalData)
   {
-    var correlationId = _httpContextAccessor.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString();
+    var correlationId = httpContextAccessor.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString();
     var additionalJson = additionalData != null ? JsonSerializer.Serialize(additionalData) : null;
 
     using var _ = LogContext.PushProperty("CorrelationId", correlationId);
     using var __ = LogContext.PushProperty("UserId", userId);
     using var ___ = LogContext.PushProperty("AdditionalData", additionalJson);
 
-    _logger.Log(level, "{Message}", message);
+    logger.Log(level, "{Message}", message);
   }
 }

@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace GraNAS.Auth.DAL.Migrations
+namespace GraNAS.Metadata.DAL.Migrations
 {
     /// <inheritdoc />
-    public partial class AddFoldersAndFilesTables : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -24,12 +24,6 @@ namespace GraNAS.Auth.DAL.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_table_folders", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_table_folders_table_users_owner_id",
-                        column: x => x.owner_id,
-                        principalTable: "table_users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -51,12 +45,6 @@ namespace GraNAS.Auth.DAL.Migrations
                         name: "FK_table_files_table_folders_folder_id",
                         column: x => x.folder_id,
                         principalTable: "table_folders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_table_files_table_users_owner_id",
-                        column: x => x.owner_id,
-                        principalTable: "table_users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });

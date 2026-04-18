@@ -7,6 +7,7 @@ COPY ["services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj"
 COPY ["services/metadata-service/GraNAS.Metadata.DAL/GraNAS.Metadata.DAL.csproj", "services/metadata-service/GraNAS.Metadata.DAL/"]
 COPY ["shared/GraNAS.Shared.Models/GraNAS.Shared.Models.csproj", "shared/GraNAS.Shared.Models/"]
 COPY ["shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj", "shared/GraNAS.Shared.Correlation/"]
+COPY ["shared/GraNAS.Shared.Infrastructure/GraNAS.Shared.Infrastructure.csproj", "shared/GraNAS.Shared.Infrastructure/"]
 COPY ["shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj", "shared/GraNAS.Shared.LoggingService/"]
 COPY ["shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj", "shared/GraNAS.Shared.Swagger/"]
 RUN dotnet restore "services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj"

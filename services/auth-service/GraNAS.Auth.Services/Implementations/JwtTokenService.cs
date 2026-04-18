@@ -1,13 +1,13 @@
-﻿using GraNAS.Models;
-using GraNAS.Auth.DAL.Repositories.Interfaces;
-using GraNAS.Auth.Services.Interfaces;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using GraNAS.Models.DTO;
+using GraNAS.Auth.Models;
+using GraNAS.Auth.Models.DTO;
+using GraNAS.Auth.Models.Repositories;
+using GraNAS.Auth.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
@@ -24,11 +24,10 @@ public class JwtTokenService : ITokenService
     _refreshTokenRepository = refreshTokenRepository;
   }
 
-
   public string GenerateAccessToken(User user)
   {
     var jwtSettings = _configuration.GetSection("Jwt");
-    var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]);
+    var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
     var signingCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256);
 
     var claims = new[]
@@ -36,7 +35,6 @@ public class JwtTokenService : ITokenService
       new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
       new Claim(JwtRegisteredClaimNames.Email, user.Email),
       new Claim("is_admin", user.IsAdmin.ToString())
-      // можно добавить другие claims
     };
 
     var token = new JwtSecurityToken(
@@ -52,7 +50,6 @@ public class JwtTokenService : ITokenService
 
   public async Task<RefreshToken> GenerateRefreshTokenAsync(Guid userId)
   {
-    // Генерация криптостойкого токена (32 байта -> Base64)
     var randomBytes = new byte[32];
     using (var rng = RandomNumberGenerator.Create())
     {
@@ -71,12 +68,7 @@ public class JwtTokenService : ITokenService
       Revoked = null
     };
 
-    // Сохраняем в БД (репозиторий должен обработать уникальность Token)
-    // Если возникнет конфликт уникальности (очень редко), можно повторить генерацию.
-    // Для простоты считаем, что вставка пройдёт успешно.
-    // TODO обернуть в try catch
     await _refreshTokenRepository.AddAsync(refreshToken);
-
     return refreshToken;
   }
 
@@ -85,7 +77,7 @@ public class JwtTokenService : ITokenService
     var accessToken = GenerateAccessToken(user);
     var refreshToken = await GenerateRefreshTokenAsync(user.Id);
 
-    var expiresIn = Convert.ToInt64(_configuration["Jwt:AccessTokenExpirationMinutes"]) * 60; // в секундах
+    var expiresIn = Convert.ToInt64(_configuration["Jwt:AccessTokenExpirationMinutes"]) * 60;
 
     return new TokenResponse
     {
@@ -94,33 +86,29 @@ public class JwtTokenService : ITokenService
       ExpiresIn = expiresIn
     };
   }
+
   public async Task<TokenResponse?> RefreshTokensAsync(string refreshToken)
   {
-    // 1. Получить валидный токен из БД
     var existingToken = await _refreshTokenRepository.GetValidTokenAsync(refreshToken);
     if (existingToken == null)
-      return null; // токен недействителен
+      return null;
 
-    // 2. Отозвать старый токен
     await _refreshTokenRepository.RevokeAsync(existingToken.Id);
 
-    // 3. Получить пользователя (он уже загружен через Include в GetValidTokenAsync)
     var user = existingToken.User;
     if (user == null)
-      return null; // пользователь не найден (не должно происходить)
+      return null;
 
-    // 4. Сгенерировать новую пару токенов
-    // GenerateTokensAsync создаст новый refresh token и сохранит его в БД
     return await GenerateTokensAsync(user);
   }
-  public async Task<bool> RevokeRefreshTokenAsync(string refreshToken, Guid userId)
+
+  public Task<bool> RevokeRefreshTokenAsync(string refreshToken, Guid userId)
   {
-    // Делегируем репозиторию, который проверит принадлежность токена пользователю
-    return await _refreshTokenRepository.RevokeTokenAsync(refreshToken, userId);
+    return _refreshTokenRepository.RevokeTokenAsync(refreshToken, userId);
   }
 
-  public async Task RevokeAllUserRefreshTokensAsync(Guid userId)
+  public Task RevokeAllUserRefreshTokensAsync(Guid userId)
   {
-    await _refreshTokenRepository.RevokeAllForUserAsync(userId);
+    return _refreshTokenRepository.RevokeAllForUserAsync(userId);
   }
 }

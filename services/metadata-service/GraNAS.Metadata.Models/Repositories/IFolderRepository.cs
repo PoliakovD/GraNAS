@@ -1,6 +1,8 @@
-using GraNAS.Models;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace GraNAS.Metadata.DAL.Repositories.Interfaces;
+namespace GraNAS.Metadata.Models.Repositories;
 
 public interface IFolderRepository
 {

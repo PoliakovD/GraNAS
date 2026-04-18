@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace GraNAS.Models.DTO;
+namespace GraNAS.Metadata.Models.DTO;
 
 public class CreateFolderRequest
 {
   [Required]
   [MaxLength(255)]
-  public string Name { get; set; }
+  public string Name { get; set; } = null!;
 }

@@ -2,14 +2,15 @@ using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using GraNAS.Models.DTO;
+using GraNAS.Metadata.DAL;
+using GraNAS.Metadata.DAL.Extensions;
+using GraNAS.Metadata.Services.Extensions;
 using GraNAS.Shared.Correlation;
 using GraNAS.Shared.Infrastructure.Extensions;
 using GraNAS.Shared.Infrastructure.Middleware;
 using GraNAS.Shared.LoggingService;
+using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
-using GraNAS.Metadata.DAL.Repositories.Implementation;
-using GraNAS.Metadata.DAL.Repositories.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -55,8 +56,8 @@ public class Program
       options.InvalidModelStateResponseFactory = context =>
       {
         var errors = context.ModelState
-          .Where(e => e.Value.Errors.Count > 0)
-          .SelectMany(e => e.Value.Errors.Select(er => er.ErrorMessage))
+          .Where(e => e.Value!.Errors.Count > 0)
+          .SelectMany(e => e.Value!.Errors.Select(er => er.ErrorMessage))
           .ToList();
 
         var errorResponse = new ErrorResponse
@@ -71,7 +72,7 @@ public class Program
 
     builder.Services.AddHttpContextAccessor();
 
-    builder.AddPostgreSql<GraNAS.Metadata.DAL.MetadataDbContext>();
+    builder.AddPostgreSql<MetadataDbContext>();
 
     builder.Services.AddCors(options =>
     {
@@ -87,7 +88,6 @@ public class Program
 
     builder.Services.AddScoped<ILoggerService, LoggerService>();
 
-    // Валидация JWT — токены выпускаются auth-service
     var jwtSettings = builder.Configuration.GetSection("Jwt");
     var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
 
@@ -138,7 +138,9 @@ public class Program
       options.MaxAge = TimeSpan.FromDays(365);
     });
 
-    builder.Services.AddScoped<IFolderRepository, FolderRepository>();
+    // Composition root: регистрация слоёв
+    builder.Services.AddMetadataDal();
+    builder.Services.AddMetadataApplication();
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerWithJwt(apiTitle, versionApi);
@@ -149,8 +151,12 @@ public class Program
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging();
 
-    app.UseHttpsRedirection();
-    app.UseHsts();
+    if (!app.Environment.IsDevelopment())
+    {
+      app.UseHttpsRedirection();
+      app.UseHsts();
+    }
+
     app.UseSecurityHeaders(policy =>
     {
       policy.AddDefaultSecurityHeaders();

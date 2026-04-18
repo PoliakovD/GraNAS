@@ -1,65 +1,19 @@
 ﻿services:
-  postgres:
-    container_name: ${PREFIX}_postgres_container
+  postgres-auth:
+    container_name: ${PREFIX}_postgres_auth_container
     image: postgres:${POSTGRES_VERSION}
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
     ports:
-      - "${POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+      - "${AUTH_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 4G
-    networks:
-      - postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    container_name: ${PREFIX}_redis_container
-    image: redis:${REDIS_VERSION}
-    ports:
-      - "${REDIS_PORT_HOST}:${REDIS_PORT_CONTAINER}"
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    networks:
-      - postgres
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-
-  webapi:
-    container_name: ${PREFIX}_webapi_container
-    image: ${WEBAPI_IMAGE}:${WEBAPI_VERSION}
-    ports:
-      - "${WEBAPI_PORT_HOST}:443"
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -67,24 +21,167 @@
           cpus: '1'
           memory: 2G
     networks:
-      - postgres
+      - db-network
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+
+  postgres-metadata:
+    container_name: ${PREFIX}_postgres_metadata_container
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${METADATA_POSTGRES_DB}
+      POSTGRES_USER: ${METADATA_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${METADATA_POSTGRES_PASSWORD}
+    ports:
+      - "${METADATA_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:443/health" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${METADATA_POSTGRES_USER} -d ${METADATA_POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - db-network
+    volumes:
+      - postgres_metadata_data:/var/lib/postgresql/data
+
+  elasticsearch:
+    container_name: ${PREFIX}_elasticsearch_container
+    image: elasticsearch:${ELASTIC_VERSION}
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: [ "CMD-SHELL", "curl --silent --fail http://localhost:9200/_cluster/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - app-network
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "${ELASTIC_PORT_HOST}:9200"
+
+  rabbitmq:
+    container_name: ${PREFIX}_rabbitmq_container
+    image: rabbitmq:${RABBITMQ_VERSION}-management
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - messaging-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "${RABBITMQ_MANAGEMENT_PORT_HOST}:15672"
+
+  auth-service:
+    container_name: ${PREFIX}_auth_service_container
+    build:
+      context: ../..
+      dockerfile: services/auth-service/GraNAS.Auth.API/Dockerfile
+    image: ${AUTH_SERVICE_IMAGE}:${AUTH_SERVICE_VERSION}
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT}
+    ports:
+      - "${AUTH_SERVICE_PORT_HOST}:8080"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 20s
+
+  metadata-service:
+    container_name: ${PREFIX}_metadata_service_container
+    build:
+      context: ../..
+      dockerfile: services/metadata-service/GraNAS.Metadata.API/Dockerfile
+    image: ${METADATA_SERVICE_IMAGE}:${METADATA_SERVICE_VERSION}
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT}
+    ports:
+      - "${METADATA_SERVICE_PORT_HOST}:8080"
+    depends_on:
+      postgres-metadata:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
 
 networks:
-  postgres:
+  db-network:
+    driver: bridge
+  app-network:
+    driver: bridge
+  messaging-network:
     driver: bridge
 
 volumes:
-  postgres_data:
-  redis_data:
-  granas.logservice:
-    image: granas.logservice
-    build:
-      context: .
-      dockerfile: Backend/LogService/GraNAS.LogService/Dockerfile
-
+  postgres_auth_data:
+  postgres_metadata_data:
+  elasticsearch_data:
+  rabbitmq_data:

@@ -1,5 +1,7 @@
-﻿using GraNAS.Models;
-using GraNAS.Auth.DAL.Repositories.Interfaces;
+using System;
+using System.Threading.Tasks;
+using GraNAS.Auth.Models;
+using GraNAS.Auth.Models.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace GraNAS.Auth.DAL.Repositories.Implementation;
@@ -15,8 +17,7 @@ public class UserRepository : IUserRepository
 
   public async Task<User?> GetByEmailAsync(string email)
   {
-    return await _context.Users
-      .FirstOrDefaultAsync(u => u.Email == email);
+    return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
   }
 
   public async Task<User?> GetByIdAsync(Guid id)

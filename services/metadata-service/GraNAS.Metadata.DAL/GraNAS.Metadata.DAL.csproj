@@ -12,11 +12,12 @@
       <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.6" />
       <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.6" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.6" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.6" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Models\GraNAS.Shared.Models.csproj" />
+      <ProjectReference Include="..\GraNAS.Metadata.Models\GraNAS.Metadata.Models.csproj" />
     </ItemGroup>
 
     <ItemGroup>

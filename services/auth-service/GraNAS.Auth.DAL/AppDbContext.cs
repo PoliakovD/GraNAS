@@ -1,12 +1,12 @@
-﻿using GraNAS.Models;
+using GraNAS.Auth.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace GraNAS.Auth.DAL;
 
 public class AppDbContext : DbContext
 {
-  public DbSet<User> Users { get; set; }
-  public DbSet<RefreshToken> RefreshTokens { get; set; }
+  public DbSet<User> Users => Set<User>();
+  public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
   public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
   {
@@ -15,5 +15,6 @@ public class AppDbContext : DbContext
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
     base.OnModelCreating(modelBuilder);
+    modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
   }
 }

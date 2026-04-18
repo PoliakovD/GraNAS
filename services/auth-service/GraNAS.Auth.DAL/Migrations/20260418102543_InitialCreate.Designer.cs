@@ -12,20 +12,20 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GraNAS.Auth.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260308221054_AddUserAndRefreshTokenTables")]
-    partial class AddUserAndRefreshTokenTables
+    [Migration("20260418102543_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("GraNAS.Models.RefreshToken", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -34,7 +34,8 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("timestamp with time zone")
@@ -61,10 +62,10 @@ namespace GraNAS.Auth.DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("table_refresh_tokens");
+                    b.ToTable("table_refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("GraNAS.Models.User", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -73,7 +74,8 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -94,12 +96,12 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("table_users");
+                    b.ToTable("table_users", (string)null);
                 });
 
-            modelBuilder.Entity("GraNAS.Models.RefreshToken", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.RefreshToken", b =>
                 {
-                    b.HasOne("GraNAS.Models.User", "User")
+                    b.HasOne("GraNAS.Auth.Models.User", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -108,7 +110,7 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("GraNAS.Models.User", b =>
+            modelBuilder.Entity("GraNAS.Auth.Models.User", b =>
                 {
                     b.Navigation("RefreshTokens");
                 });

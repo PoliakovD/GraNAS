@@ -2,7 +2,7 @@ using System;
 using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
-using GraNAS.Models.DTO;
+using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -10,22 +10,13 @@ using Npgsql;
 
 namespace GraNAS.Shared.Infrastructure.Middleware;
 
-public class ExceptionHandlingMiddleware
+public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
 {
-  private readonly RequestDelegate _next;
-  private readonly ILogger<ExceptionHandlingMiddleware> _logger;
-
-  public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
-  {
-    _next = next;
-    _logger = logger;
-  }
-
   public async Task InvokeAsync(HttpContext context)
   {
     try
     {
-      await _next(context);
+      await next(context);
     }
     catch (Exception ex)
     {
@@ -35,7 +26,7 @@ public class ExceptionHandlingMiddleware
 
   private async Task HandleExceptionAsync(HttpContext context, Exception exception)
   {
-    _logger.LogError(exception, "An unhandled exception occurred.");
+    logger.LogError(exception, "An unhandled exception occurred.");
 
     var response = context.Response;
     response.ContentType = "application/json";
