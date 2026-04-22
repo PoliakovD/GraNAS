@@ -27,8 +27,7 @@ public class FolderService : IFolderService
       Id = f.Id,
       Name = f.Name,
       CreatedAt = f.CreatedAt,
-      UpdatedAt = f.UpdatedAt,
-      FilesCount = 0
+      UpdatedAt = f.UpdatedAt
     });
   }
 
@@ -50,8 +49,7 @@ public class FolderService : IFolderService
       Id = folder.Id,
       Name = folder.Name,
       CreatedAt = folder.CreatedAt,
-      UpdatedAt = folder.UpdatedAt,
-      FilesCount = 0
+      UpdatedAt = folder.UpdatedAt
     };
   }
 
@@ -59,16 +57,12 @@ public class FolderService : IFolderService
   {
     var folder = await _folderRepository.GetByIdAsync(folderId);
     if (folder == null)
-      return new DeleteFolderResult(DeleteFolderError.NotFound, 0);
+      return new DeleteFolderResult(DeleteFolderError.NotFound);
 
     if (folder.OwnerId != userId)
-      return new DeleteFolderResult(DeleteFolderError.Forbidden, 0);
-
-    var filesCount = await _folderRepository.GetFilesCountAsync(folderId);
-    if (filesCount > 0)
-      return new DeleteFolderResult(DeleteFolderError.NotEmpty, filesCount);
+      return new DeleteFolderResult(DeleteFolderError.Forbidden);
 
     await _folderRepository.DeleteAsync(folderId);
-    return new DeleteFolderResult(DeleteFolderError.None, 0);
+    return new DeleteFolderResult(DeleteFolderError.None);
   }
 }

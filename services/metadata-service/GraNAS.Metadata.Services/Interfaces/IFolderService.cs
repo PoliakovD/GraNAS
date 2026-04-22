@@ -9,11 +9,10 @@ public enum DeleteFolderError
 {
   None,
   NotFound,
-  Forbidden,
-  NotEmpty
+  Forbidden
 }
 
-public record DeleteFolderResult(DeleteFolderError Error, int FilesCount);
+public record DeleteFolderResult(DeleteFolderError Error);
 
 public interface IFolderService
 {
