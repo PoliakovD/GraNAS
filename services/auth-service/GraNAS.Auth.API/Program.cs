@@ -38,40 +38,28 @@ public class Program
 
     builder.Services.AddCorrelationId();
 
+    // В тестовом окружении используем только консольный вывод
     builder.Host.UseSerilog((ctx, cfg) =>
     {
-      var esUri = ctx.Configuration["Elasticsearch:Uri"]
-                  ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
+        cfg
+            .ReadFrom.Configuration(ctx.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Application", apiTitle);
 
-      cfg
-        .ReadFrom.Configuration(ctx.Configuration)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("Application", apiTitle)
-        .WriteTo.Console()
-        .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
+        if (ctx.HostingEnvironment.IsEnvironment("Test"))
         {
-          AutoRegisterTemplate = true,
-          IndexFormat = "granas-logs-{0:yyyy.MM.dd}"
-        });
-    });
-
-    builder.Services.Configure<ApiBehaviorOptions>(options =>
-    {
-      options.InvalidModelStateResponseFactory = context =>
-      {
-        var errors = context.ModelState
-          .Where(e => e.Value!.Errors.Count > 0)
-          .SelectMany(e => e.Value!.Errors.Select(er => er.ErrorMessage))
-          .ToList();
-
-        var errorResponse = new ErrorResponse
+            cfg.WriteTo.Console();
+        }
+        else
         {
-          Error = "validation_error",
-          ErrorDescription = errors.FirstOrDefault() ?? "One or more validation errors occurred."
-        };
-
-        return new BadRequestObjectResult(errorResponse);
-      };
+            var esUri = ctx.Configuration["Elasticsearch:Uri"]
+                        ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
+            cfg.WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
+            {
+                AutoRegisterTemplate = true,
+                IndexFormat = "granas-logs-{0:yyyy.MM.dd}"
+            });
+        }
     });
 
     builder.Services.AddHttpContextAccessor();
@@ -92,45 +80,46 @@ public class Program
 
     builder.Services.AddScoped<ILoggerService, LoggerService>();
 
+    // JWT Configuration
     var jwtSettings = builder.Configuration.GetSection("Jwt");
     var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
 
     builder.Services.AddAuthentication(options =>
-      {
+    {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-      })
-      .AddJwtBearer(options =>
-      {
-        options.RequireHttpsMetadata = true;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = !builder.Environment.IsEnvironment("Test"); // Отключаем для тестов
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-          ValidateIssuer = true,
-          ValidateAudience = true,
-          ValidateLifetime = true,
-          ValidateIssuerSigningKey = true,
-          ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
-          ValidIssuer = jwtSettings["Issuer"],
-          ValidAudience = jwtSettings["Audience"],
-          IssuerSigningKey = new SymmetricSecurityKey(secretKey)
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(secretKey)
         };
         options.Events = new JwtBearerEvents
         {
-          OnAuthenticationFailed = context =>
-          {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(context.Exception, "JWT authentication failed");
-            return Task.CompletedTask;
-          },
-          OnChallenge = context =>
-          {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogWarning("JWT challenge: {Error}, {ErrorDescription}", context.Error, context.ErrorDescription);
-            return Task.CompletedTask;
-          }
+            OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError(context.Exception, "JWT authentication failed");
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning("JWT challenge: {Error}, {ErrorDescription}", context.Error, context.ErrorDescription);
+                return Task.CompletedTask;
+            }
         };
-      });
+    });
 
     builder.Services.AddHttpsRedirection(options =>
     {
@@ -139,6 +128,26 @@ public class Program
     });
 
     builder.Services.AddControllers();
+
+    // Configure AFTER AddControllers so our factory is not overridden by ApiBehaviorOptionsSetup.
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(e => e.Value!.Errors.Count > 0)
+                .SelectMany(e => e.Value!.Errors.Select(er => er.ErrorMessage))
+                .ToList();
+
+            var errorResponse = new ErrorResponse
+            {
+                Error = "validation_error",
+                ErrorDescription = errors.FirstOrDefault() ?? "One or more validation errors occurred."
+            };
+
+            return new BadRequestObjectResult(errorResponse);
+        };
+    });
 
     builder.Services.AddRateLimiter(options =>
     {
