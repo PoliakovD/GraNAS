@@ -98,7 +98,7 @@ public class Program
       })
       .AddJwtBearer(options =>
       {
-        options.RequireHttpsMetadata = true;
+        options.RequireHttpsMetadata = !builder.Environment.IsEnvironment("Test");
         options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
