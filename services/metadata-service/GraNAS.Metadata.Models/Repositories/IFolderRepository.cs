@@ -8,6 +8,7 @@ public interface IFolderRepository
 {
   Task<IEnumerable<Folder>> GetUserFoldersAsync(Guid userId);
   Task<Folder?> GetByIdAsync(Guid id);
+  Task<Folder?> GetByIdForOwnerAsync(Guid id, Guid ownerId);
   Task CreateAsync(Folder folder);
   Task DeleteAsync(Guid id);
 }

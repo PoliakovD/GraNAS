@@ -30,6 +30,12 @@ public class FolderRepository : IFolderRepository
     return await _context.Folders.FindAsync(id);
   }
 
+  public async Task<Folder?> GetByIdForOwnerAsync(Guid id, Guid ownerId)
+  {
+    return await _context.Folders
+      .FirstOrDefaultAsync(f => f.Id == id && f.OwnerId == ownerId);
+  }
+
   public async Task CreateAsync(Folder folder)
   {
     await _context.Folders.AddAsync(folder);
