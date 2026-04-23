@@ -38,7 +38,7 @@
 
 | Слой | Роль | Реализация |
 |---|---|---|
-| **signaling** | сводит пиров, прокидывает SDP + ICE-кандидатов | `signaling-service` (ASP.NET Core + SignalR), авторизация JWT от auth-service + проверка прав/share-токена |
+| **signaling** | сводит пиров, прокидывает SDP + ICE-кандидатов | `signaling-service` (ASP.NET Core + SignalR), авторизация JWT от auth-service + проверка прав/share-токена; при авторизации join-а передаёт клиенту-владельцу скоуп `(folder_id, path?)` из permissions/share_links, чтобы владелец ограничил отдачу нужным поддеревом |
 | **STUN** | определение внешнего адреса пира (srflx-кандидат) | публичные серверы (Google, Cloudflare), без self-hosting |
 | **TURN** | fallback-ретранслятор для симметричных NAT | собственный **coturn**, временные креды через REST-API (RFC 8489), выдаёт signaling-service |
 | **ICE** | перебор host → srflx → relay и выбор рабочей пары | встроен в `RTCPeerConnection` (браузер / SIPSorcery) |
@@ -78,7 +78,9 @@
 
 - Вся метаинформация – в **PostgreSQL**
 - Только **хэши токенов** для share‑ссылок
-- **Нет хранения файлов** – только ссылки на локальные файлы
+- **Нет хранения файлов** – только метаданные папок и прав доступа. Список файлов внутри папки **не хранится на сервере** — клиент получает его от владельца по P2P при подключении
+- **Иерархия папок** — `parent_folder_id` self-FK с `ON DELETE CASCADE`; удаление корневой папки каскадно удаляет всё поддерево
+- **path-hint** — `permissions.path` и `share_links.path` хранят непрозрачную строку относительного пути (null = вся папка). Сервер не знает о существовании файлов как сущностей и не валидирует путь; валидация на стороне клиента-владельца при P2P-handshake
 - **Эфемерное состояние signaling-service** (активные пиры, TURN-креды с TTL) — в **Redis**
 - **Жёсткое разграничение доступа** на уровне БД и API
 
@@ -118,23 +120,21 @@
 |               | email           | VARCHAR, unique     | Email пользователя |
 |               | password_hash   | VARCHAR             | Хэш пароля |
 |               | is_admin        | BOOLEAN             | Признак администратора |
-| **folders**   | id              | UUID (PK)           | Уникальный ID папки |
-|               | owner_id        | UUID (FK → users)   | Владелец папки |
-|               | name            | VARCHAR             | Название папки |
-| **files**     | id              | UUID (PK)           | Уникальный ID файла |
-|               | folder_id       | UUID (FK → folders) | Родительская папка |
-|               | owner_id        | UUID (FK → users)   | Владелец файла |
-|               | name            | VARCHAR             | Название файла |
-|               | type            | VARCHAR             | Тип файла |
+| **folders**   | id              | UUID (PK)                  | Уникальный ID папки |
+|               | owner_id        | UUID (FK → users)          | Владелец папки |
+|               | parent_folder_id | UUID (FK → folders, NULL) | Родительская папка (NULL = корень); ON DELETE CASCADE |
+|               | name            | VARCHAR                    | Название папки |
 | **permissions** | id            | UUID (PK)           | Уникальный ID права |
 |               | folder_id       | UUID (FK → folders) | Папка |
 |               | user_id         | UUID (FK → users)   | Пользователь |
 |               | access_level    | ENUM (`view`, `full`) | Уровень доступа |
+|               | path            | VARCHAR, NULL       | Относительный путь внутри папки (NULL = вся папка, иначе подпапка или файл); сервер не валидирует |
 | **share_links** | id            | UUID (PK)           | Уникальный ID ссылки |
 |               | folder_id       | UUID (FK → folders) | Папка |
 |               | token_hash      | VARCHAR             | Хэш токена |
 |               | expires_at      | TIMESTAMP           | Срок действия |
 |               | revoked         | BOOLEAN             | Признак ручного отзыва |
+|               | path            | VARCHAR, NULL       | Относительный путь внутри папки (NULL = вся папка, иначе подпапка или файл); сервер не валидирует |
 | **events**    | id              | UUID (PK)           | Уникальный ID события |
 |               | user_id         | UUID (FK → users)   | Получатель уведомления |
 |               | type            | VARCHAR             | Тип события (`access_granted`, `access_revoked` и др.) |

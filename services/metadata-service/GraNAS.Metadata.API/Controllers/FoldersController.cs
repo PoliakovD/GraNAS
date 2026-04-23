@@ -41,6 +41,7 @@ public class FoldersController : ControllerBase
   [HttpPost]
   [ProducesResponseType(typeof(FolderResponse), StatusCodes.Status201Created)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
   public async Task<IActionResult> CreateFolder([FromBody] CreateFolderRequest request)
   {
     if (!ModelState.IsValid)
@@ -50,8 +51,18 @@ public class FoldersController : ControllerBase
     if (userId == null)
       return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
 
-    var response = await _folderService.CreateFolderAsync(userId.Value, request);
-    return CreatedAtAction(nameof(GetFolders), new { id = response.Id }, response);
+    var result = await _folderService.CreateFolderAsync(userId.Value, request);
+
+    return result.Error switch
+    {
+      CreateFolderError.None => CreatedAtAction(nameof(GetFolders), new { id = result.Response!.Id }, result.Response),
+      CreateFolderError.ParentNotFoundOrForbidden => NotFound(new ErrorResponse
+      {
+        Error = "parent_folder_not_found",
+        ErrorDescription = "Parent folder not found or access denied."
+      }),
+      _ => StatusCode(StatusCodes.Status500InternalServerError)
+    };
   }
 
   /// <summary>Удалить папку</summary>

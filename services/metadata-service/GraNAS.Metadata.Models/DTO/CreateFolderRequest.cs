@@ -7,4 +7,6 @@ public class CreateFolderRequest
   [Required]
   [MaxLength(255)]
   public string Name { get; set; } = null!;
+
+  public Guid? ParentFolderId { get; set; }
 }

@@ -14,7 +14,7 @@
 **Реализовано:**
 
 - `auth-service` — регистрация, логин, JWT, refresh-токены (Clean Architecture)
-- `metadata-service` — CRUD папок и файлов (Clean Architecture)
+- `metadata-service` — CRUD папок с иерархией подпапок (parent_folder_id, ON DELETE CASCADE); таблица files удалена, список файлов клиент получает от владельца по P2P (Clean Architecture)
 - `log-service` — централизованный сбор логов через RabbitMQ + React-дашборд
 - Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, Serilog → Elasticsearch
 - Docker Compose для dev и prod
@@ -34,7 +34,8 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
 
 - [ ] **Тесты auth-service** — юнит на AuthService (все Result-ветки) +
       интеграционные на контроллер с testcontainers PostgreSQL
-- [ ] **Тесты metadata-service** — аналогично, с каскадным удалением папок
+- [x] **Тесты metadata-service** — юнит на FolderService (создание корня и подпапки, валидация родителя) + интеграционные на FoldersController через Testcontainers PostgreSQL; проверка ON DELETE CASCADE рекурсивно (root → child → grandchild)
+- [x] **Миграция AddFolderHierarchy** — parent_folder_id UUID NULL, self-FK ON DELETE CASCADE, индекс IX_folders_parent_folder_id
 - [ ] **Убрать `tests.txt` с живыми JWT** из репозитория (если ещё где-то остался)
 - [ ] **Health-checks** (`/health`, `/health/ready`) во все API
 - [ ] **Rate limiting** на auth-эндпоинтах (ASP.NET Core RateLimiter)
@@ -53,15 +54,16 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
 Из брифа шаг 3 User Journey: владелец назначает `view` / `full` другому
 зарегистрированному пользователю.
 
-- [ ] **Таблица `permissions`** в metadata-service (folder_id, user_id, access_level enum)
+- [ ] **Таблица `permissions`** в metadata-service (folder_id, user_id, access_level enum, **path VARCHAR NULL**)
 - [ ] **Доменная модель** `Permission`, `AccessLevel { View, Full }` в `Metadata.Models`
 - [ ] **IPermissionRepository** + реализация
 - [ ] **PermissionService** — Grant / Revoke / List / Check
 - [ ] **Authorization policy** `CanReadFolder` / `CanWriteFolder` —
       проверка владения ИЛИ наличия permission на каждом запросе
-- [ ] **Эндпоинты** `POST /folders/{id}/permissions`, `DELETE /folders/{id}/permissions/{userId}`
+- [ ] **Эндпоинты** `POST /folders/{id}/permissions` (принимает опциональный `path` для гранулярного доступа), `DELETE /folders/{id}/permissions/{userId}`
 - [ ] **Интеграция с auth-service** — поиск пользователя по email для выдачи прав
       (через REST, не через общую БД)
+- [ ] **path-hint** — `permissions.path VARCHAR NULL`: null = вся папка, иначе подпапка или файл; сервер не валидирует путь, владелец применяет scope при P2P-handshake
 
 **Критерий готовности:** второй пользователь видит чужую папку согласно правам;
 попытка записи с `view` → 403.
@@ -73,13 +75,14 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
 Шаги 4-5, 13 User Journey: уникальные ссылки со сроком действия, отзыв.
 
 - [ ] Скелет `GraNAS.Sharing.{API,Services,Models,DAL}` по Clean Architecture
-- [ ] **Таблица `share_links`** (folder_id, token_hash, expires_at, revoked)
+- [ ] **Таблица `share_links`** (folder_id, token_hash, expires_at, revoked, **path VARCHAR NULL**)
 - [ ] **Криптостойкая генерация токенов** — `RandomNumberGenerator`, base64url
 - [ ] **Хранение только SHA-256 хэшей** (в БД токен в открытом виде не лежит)
 - [ ] Эндпоинты:
-  - `POST /folders/{id}/share` → возвращает токен один раз
+  - `POST /folders/{id}/share` → принимает опциональный `path` для гранулярного доступа к подпапке или файлу, возвращает токен один раз
   - `GET /share/{token}` → проверяет expires_at + revoked, отдаёт метаданные
   - `DELETE /share/{token}` → revoke
+- [ ] **path-hint** — `share_links.path VARCHAR NULL`: null = вся папка, иначе относительный путь к подпапке или файлу; сервер хранит непрозрачную строку, владелец применяет scope при P2P-handshake
 - [ ] **Фоновая очистка** просроченных ссылок (Hangfire / IHostedService)
 - [ ] **Публикация события** `share_revoked` в RabbitMQ для notification-service
 
@@ -307,3 +310,9 @@ P2P-скачивание с владельца.
 9. **Поддержка симметричных NAT в v1:** требовать TURN с первого релиза
    vs честный fallback "попросите открыть порт" — зависит от целевой аудитории
    (корпоративные сети часто за симметричным NAT).
+10. **Гранулярность шаринга (принято):** path-hint на сервере (Вариант C1) — колонка
+    `path VARCHAR NULL` в `share_links` и `permissions`, непрозрачная строка, сервер
+    не индексирует и не валидирует существование пути. Альтернатива (путь только на
+    клиенте владельца, Вариант C2) отвергнута: кросс-девайс управление шарами
+    становится невозможным, state теряется при переустановке клиента, UI получателя
+    некорректен пока владелец оффлайн.

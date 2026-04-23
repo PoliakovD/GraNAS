@@ -32,5 +32,15 @@ public class FolderConfiguration : IEntityTypeConfiguration<Folder>
 
     builder.Property(f => f.UpdatedAt)
       .HasColumnName("updated_at");
+
+    builder.Property(f => f.ParentFolderId)
+      .HasColumnName("parent_folder_id");
+
+    builder.HasOne(f => f.ParentFolder)
+      .WithMany(f => f.ChildFolders)
+      .HasForeignKey(f => f.ParentFolderId)
+      .OnDelete(DeleteBehavior.Cascade);
+
+    builder.HasIndex(f => f.ParentFolderId, "IX_folders_parent_folder_id");
   }
 }

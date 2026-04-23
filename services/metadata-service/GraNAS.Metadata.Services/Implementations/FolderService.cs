@@ -25,18 +25,27 @@ public class FolderService : IFolderService
     return folders.Select(f => new FolderResponse
     {
       Id = f.Id,
+      ParentFolderId = f.ParentFolderId,
       Name = f.Name,
       CreatedAt = f.CreatedAt,
       UpdatedAt = f.UpdatedAt
     });
   }
 
-  public async Task<FolderResponse> CreateFolderAsync(Guid userId, CreateFolderRequest request)
+  public async Task<CreateFolderResult> CreateFolderAsync(Guid userId, CreateFolderRequest request)
   {
+    if (request.ParentFolderId is Guid parentId)
+    {
+      var parent = await _folderRepository.GetByIdForOwnerAsync(parentId, userId);
+      if (parent == null)
+        return CreateFolderResult.ParentNotFoundOrForbidden();
+    }
+
     var folder = new Folder
     {
       Id = Guid.NewGuid(),
       OwnerId = userId,
+      ParentFolderId = request.ParentFolderId,
       Name = request.Name,
       CreatedAt = DateTime.UtcNow,
       UpdatedAt = null
@@ -44,13 +53,14 @@ public class FolderService : IFolderService
 
     await _folderRepository.CreateAsync(folder);
 
-    return new FolderResponse
+    return CreateFolderResult.Success(new FolderResponse
     {
       Id = folder.Id,
+      ParentFolderId = folder.ParentFolderId,
       Name = folder.Name,
       CreatedAt = folder.CreatedAt,
       UpdatedAt = folder.UpdatedAt
-    };
+    });
   }
 
   public async Task<DeleteFolderResult> DeleteFolderAsync(Guid userId, Guid folderId)
