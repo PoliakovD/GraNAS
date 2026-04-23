@@ -1,15 +1,12 @@
-using System.Text;
 using GraNAS.Auth.API;
 using GraNAS.Auth.DAL;
 using GraNAS.Shared.LoggingService;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Moq;
 using Testcontainers.PostgreSql;
 
@@ -67,21 +64,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>, 
                         .UseNpgsql(_postgres.GetConnectionString())
                         .Options)));
 
-            // 2. JWT: явно фиксируем подписывающий ключ через PostConfigure,
-            //    чтобы он гарантированно совпадал с тем, что использует JwtTokenService.
-            services.PostConfigure<JwtBearerOptions>(
-                JwtBearerDefaults.AuthenticationScheme,
-                opts =>
-                {
-                    opts.RequireHttpsMetadata = false;
-                    var key = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes("TestSecretKeyForAuthTests-AtLeast32Chars!"));
-                    opts.TokenValidationParameters.IssuerSigningKey = key;
-                    opts.TokenValidationParameters.ValidIssuer    = "GraNAS";
-                    opts.TokenValidationParameters.ValidAudience  = "GraNASClients";
-                });
-
-            // 3. Rate-limiter: удаляем ВСЕ IConfigureOptions<RateLimiterOptions>
+            // 2. Rate-limiter: удаляем ВСЕ IConfigureOptions<RateLimiterOptions>
             //    (включая политику "auth" из Program.cs) и заменяем безлимитной.
             var rateLimiterConfigs = services
                 .Where(d => d.ServiceType == typeof(IConfigureOptions<RateLimiterOptions>))
@@ -97,7 +80,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>, 
                     p.QueueLimit           = 0;
                 }));
 
-            // 4. ILoggerService: мок, чтобы не требовался RabbitMQ.
+            // 3. ILoggerService: мок, чтобы не требовался RabbitMQ.
             var loggerDescriptor = services.SingleOrDefault(
                 d => d.ServiceType == typeof(ILoggerService));
             if (loggerDescriptor != null) services.Remove(loggerDescriptor);
