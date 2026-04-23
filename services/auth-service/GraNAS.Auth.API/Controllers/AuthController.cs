@@ -96,9 +96,11 @@ public class AuthController : ControllerBase
 
   /// <summary>Обновление access токена</summary>
   [HttpPost("refresh")]
+  [EnableRateLimiting("auth")]
   [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
   public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
   {
     if (!ModelState.IsValid)

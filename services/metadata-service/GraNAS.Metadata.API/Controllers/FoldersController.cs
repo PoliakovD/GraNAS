@@ -8,6 +8,7 @@ using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace GraNAS.Metadata.API.Controllers;
 
@@ -15,6 +16,7 @@ namespace GraNAS.Metadata.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[EnableRateLimiting("api")]
 public class FoldersController : ControllerBase
 {
   private readonly IFolderService _folderService;
@@ -27,6 +29,7 @@ public class FoldersController : ControllerBase
   /// <summary>Получить список всех папок текущего пользователя</summary>
   [HttpGet]
   [ProducesResponseType(typeof(FolderResponse[]), StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
   public async Task<IActionResult> GetFolders()
   {
     var userId = GetCurrentUserId();
@@ -42,6 +45,7 @@ public class FoldersController : ControllerBase
   [ProducesResponseType(typeof(FolderResponse), StatusCodes.Status201Created)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
   public async Task<IActionResult> CreateFolder([FromBody] CreateFolderRequest request)
   {
     if (!ModelState.IsValid)
@@ -71,6 +75,7 @@ public class FoldersController : ControllerBase
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
   public async Task<IActionResult> DeleteFolder(Guid id)
   {
     var userId = GetCurrentUserId();

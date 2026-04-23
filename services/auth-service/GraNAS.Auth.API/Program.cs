@@ -14,10 +14,12 @@ using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -172,6 +174,10 @@ public class Program
 
     builder.Services.AddAuthorization();
 
+    builder.Services.AddHealthChecks()
+        .AddCheck("live", () => HealthCheckResult.Healthy(), tags: ["live"])
+        .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
+
     builder.Services.AddHsts(options =>
     {
       options.Preload = true;
@@ -225,6 +231,16 @@ public class Program
     }
 
     app.MapControllers();
+
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+      Predicate = c => c.Tags.Contains("live")
+    }).AllowAnonymous().DisableRateLimiting();
+
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+      Predicate = c => c.Tags.Contains("ready")
+    }).AllowAnonymous().DisableRateLimiting();
 
     await app.RunAsync();
   }

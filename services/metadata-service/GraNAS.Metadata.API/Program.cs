@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using GraNAS.Metadata.DAL;
 using GraNAS.Metadata.DAL.Extensions;
@@ -13,9 +14,12 @@ using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -131,6 +135,31 @@ public class Program
     builder.Services.AddControllers();
     builder.Services.AddAuthorization();
 
+    builder.Services.AddRateLimiter(options =>
+    {
+      options.AddFixedWindowLimiter("api", policy =>
+      {
+        policy.PermitLimit = 60;
+        policy.Window = TimeSpan.FromMinutes(1);
+        policy.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        policy.QueueLimit = 0;
+      });
+
+      options.OnRejected = async (context, token) =>
+      {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(new ErrorResponse
+        {
+          Error = "too_many_requests",
+          ErrorDescription = "Too many requests. Please try again later."
+        });
+      };
+    });
+
+    builder.Services.AddHealthChecks()
+      .AddCheck("live", () => HealthCheckResult.Healthy(), tags: ["live"])
+      .AddDbContextCheck<MetadataDbContext>("database", tags: ["ready"]);
+
     builder.Services.AddHsts(options =>
     {
       options.Preload = true;
@@ -167,6 +196,7 @@ public class Program
     });
 
     app.UseCors(corsPolicyName);
+    app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
 
@@ -183,6 +213,16 @@ public class Program
     }
 
     app.MapControllers();
+
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+      Predicate = c => c.Tags.Contains("live")
+    }).AllowAnonymous().DisableRateLimiting();
+
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+      Predicate = c => c.Tags.Contains("ready")
+    }).AllowAnonymous().DisableRateLimiting();
 
     await app.RunAsync();
   }
