@@ -60,7 +60,6 @@ public class FoldersController : ControllerBase
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
   public async Task<IActionResult> DeleteFolder(Guid id)
   {
     var userId = GetCurrentUserId();
@@ -78,11 +77,6 @@ public class FoldersController : ControllerBase
         ErrorDescription = "Folder not found."
       }),
       DeleteFolderError.Forbidden => Forbid(),
-      DeleteFolderError.NotEmpty => Conflict(new ErrorResponse
-      {
-        Error = "folder_not_empty",
-        ErrorDescription = $"Folder contains {result.FilesCount} file(s). Delete files first or confirm deletion."
-      }),
       _ => StatusCode(StatusCodes.Status500InternalServerError)
     };
   }

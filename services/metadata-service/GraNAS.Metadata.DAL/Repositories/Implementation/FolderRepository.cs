@@ -45,9 +45,4 @@ public class FolderRepository : IFolderRepository
       await _context.SaveChangesAsync();
     }
   }
-
-  public async Task<int> GetFilesCountAsync(Guid folderId)
-  {
-    return await _context.Files.CountAsync(f => f.FolderId == folderId);
-  }
 }
