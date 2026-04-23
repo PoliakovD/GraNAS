@@ -1,45 +1,28 @@
-version: '3.8'
-
-# Загружаем переменные окружения из dev.env
-# Используем базовый compose.yaml как основу, dev.env для переопределения
-
-# Все настройки берутся из compose.yaml, включая сервисы, сети и тома
-# Переменные из dev.env переопределяют значения в compose.yaml
-
-# Особенности dev-окружения:
-# - Локальные volume-ы для live reload
-# - Пониженные требования к памяти
-# - Development режим для .NET сервисов
-# - DOTNET_USE_POLLING_FILE_WATCHER для работы на Windows
-
-# infrastructure/docker-compose/compose.dev.yaml
+# Dev overrides on top of compose.yaml.
+# Usage:
+#   docker compose --env-file dev.env -f compose.yaml -f compose.dev.yaml up -d
 
 services:
-  rabbitmq:
-    image: rabbitmq:3.13.5-management
-    depends_on:
-      - rabbitmq
-
   auth-service:
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: ${DOTNET_USE_POLLING_FILE_WATCHER}
     volumes:
-      - ../services/auth-service:/src/services/auth-service
+      - ../../services/auth-service:/src/services/auth-service
       - ~/.nuget/packages:/root/.nuget/packages
       - ~/.dotnet:/root/.dotnet
 
   metadata-service:
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: ${DOTNET_USE_POLLING_FILE_WATCHER}
     volumes:
-      - ../services/metadata-service:/src/metadata-service
+      - ../../services/metadata-service:/src/services/metadata-service
       - ~/.nuget/packages:/root/.nuget/packages
       - ~/.dotnet:/root/.dotnet
 
-  postgres-auth:
-    depends_on:
-      - postgres-auth
-
-  postgres-metadata:
-    depends_on:
-      - postgres-metadata
-
-  elasticsearch:
-    depends_on:
-      - elasticsearch
+  log-service:
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: ${DOTNET_USE_POLLING_FILE_WATCHER}
+    volumes:
+      - ../../services/log-service:/src/services/log-service
+      - ~/.nuget/packages:/root/.nuget/packages
+      - ~/.dotnet:/root/.dotnet

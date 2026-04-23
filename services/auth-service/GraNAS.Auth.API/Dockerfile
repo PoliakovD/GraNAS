@@ -43,7 +43,7 @@ COPY --from=publish --chown=appuser:appgroup /app/publish .
 
 # Health check for orchestration systems
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
 
 USER appuser
 ENTRYPOINT ["dotnet", "GraNAS.Auth.API.dll"]

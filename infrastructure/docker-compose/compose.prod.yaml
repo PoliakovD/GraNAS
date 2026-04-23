@@ -1,88 +1,30 @@
-﻿services:
-  postgres:
-    container_name: ${PREFIX}_postgres_container
-    image: postgres:${POSTGRES_VERSION}
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "${POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 4G
-    networks:
-      - postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+# Prod overrides on top of compose.yaml.
+# Usage:
+#   docker compose --env-file prod.env -f compose.yaml -f compose.prod.yaml up -d
+#
+# All secrets/ports live in prod.env. Never commit a real prod.env.
 
-  redis:
-    container_name: ${PREFIX}_redis_container
-    image: redis:${REDIS_VERSION}
-    ports:
-      - "${REDIS_PORT_HOST}:${REDIS_PORT_CONTAINER}"
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    networks:
-      - postgres
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-
-  webapi:
-    container_name: ${PREFIX}_webapi_container
-    image: ${WEBAPI_IMAGE}:${WEBAPI_VERSION}
-    ports:
-      - "${WEBAPI_PORT_HOST}:443"
+services:
+  auth-service:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      Jwt__Secret: ${JWT_SECRET}
-      Jwt__Issuer: ${JWT_ISSUER}
-      Jwt__Audience: ${JWT_AUDIENCE}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 2G
-    networks:
-      - postgres
-    healthcheck:
-      test: [ "CMD", "curl", "-k", "-f", "https://localhost:443/health" ]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+    restart: always
 
-networks:
-  postgres:
-    driver: bridge
+  metadata-service:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    restart: always
 
-volumes:
-  postgres_data:
-  redis_data:
+  log-service:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    restart: always
+
+  elasticsearch:
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
+      - xpack.security.enabled=true
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}

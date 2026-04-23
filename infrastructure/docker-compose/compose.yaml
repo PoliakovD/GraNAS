@@ -1,6 +1,6 @@
-﻿services:
+services:
   postgres-auth:
-    container_name: ${PREFIX}_postgres_auth_container
+    container_name: ${PREFIX}_postgres_auth
     image: postgres:${POSTGRES_VERSION}
     environment:
       POSTGRES_DB: ${AUTH_POSTGRES_DB}
@@ -26,7 +26,7 @@
       - postgres_auth_data:/var/lib/postgresql/data
 
   postgres-metadata:
-    container_name: ${PREFIX}_postgres_metadata_container
+    container_name: ${PREFIX}_postgres_metadata
     image: postgres:${POSTGRES_VERSION}
     environment:
       POSTGRES_DB: ${METADATA_POSTGRES_DB}
@@ -51,13 +51,62 @@
     volumes:
       - postgres_metadata_data:/var/lib/postgresql/data
 
+  postgres-log:
+    container_name: ${PREFIX}_postgres_log
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${LOG_POSTGRES_DB}
+      POSTGRES_USER: ${LOG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${LOG_POSTGRES_PASSWORD}
+    ports:
+      - "${LOG_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${LOG_POSTGRES_USER} -d ${LOG_POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - db-network
+    volumes:
+      - postgres_log_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: ${PREFIX}_redis
+    image: redis:${REDIS_VERSION}
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT_HOST}:${REDIS_PORT_CONTAINER}"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - db-network
+    volumes:
+      - redis_data:/data
+
   elasticsearch:
-    container_name: ${PREFIX}_elasticsearch_container
+    container_name: ${PREFIX}_elasticsearch
     image: elasticsearch:${ELASTIC_VERSION}
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
       - xpack.security.enabled=false
     ulimits:
       memlock:
@@ -80,13 +129,16 @@
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
-      - "${ELASTIC_PORT_HOST}:9200"
+      - "${ELASTIC_PORT_HOST}:${ELASTIC_PORT_CONTAINER}"
 
   rabbitmq:
-    container_name: ${PREFIX}_rabbitmq_container
+    container_name: ${PREFIX}_rabbitmq
     image: rabbitmq:${RABBITMQ_VERSION}-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -102,23 +154,38 @@
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
-      - "${RABBITMQ_MANAGEMENT_PORT_HOST}:15672"
+      - "${RABBITMQ_AMQP_PORT_HOST}:${RABBITMQ_AMQP_PORT_CONTAINER}"
+      - "${RABBITMQ_MANAGEMENT_PORT_HOST}:${RABBITMQ_MANAGEMENT_PORT_CONTAINER}"
 
   auth-service:
-    container_name: ${PREFIX}_auth_service_container
+    container_name: ${PREFIX}_auth_service
     build:
       context: ../..
       dockerfile: services/auth-service/GraNAS.Auth.API/Dockerfile
     image: ${AUTH_SERVICE_IMAGE}:${AUTH_SERVICE_VERSION}
     environment:
-      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT}
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__Default: ${AUTH_DB_CONNECTION_STRING}
+      ConnectionStrings__Redis: ${REDIS_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__AccessTokenExpirationMinutes: ${JWT_ACCESS_MINUTES}
+      Jwt__RefreshTokenExpirationDays: ${JWT_REFRESH_DAYS}
+      Elasticsearch__Uri: ${ELASTIC_URI}
+      RabbitMQ__Host: ${RABBITMQ_HOST}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
     ports:
-      - "${AUTH_SERVICE_PORT_HOST}:8080"
+      - "${AUTH_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
     depends_on:
       postgres-auth:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       elasticsearch:
         condition: service_healthy
     restart: unless-stopped
@@ -132,27 +199,36 @@
       - db-network
       - messaging-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 20s
 
   metadata-service:
-    container_name: ${PREFIX}_metadata_service_container
+    container_name: ${PREFIX}_metadata_service
     build:
       context: ../..
       dockerfile: services/metadata-service/GraNAS.Metadata.API/Dockerfile
     image: ${METADATA_SERVICE_IMAGE}:${METADATA_SERVICE_VERSION}
     environment:
-      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT}
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__Default: ${METADATA_DB_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Elasticsearch__Uri: ${ELASTIC_URI}
+      RabbitMQ__Host: ${RABBITMQ_HOST}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
     ports:
-      - "${METADATA_SERVICE_PORT_HOST}:8080"
+      - "${METADATA_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
     depends_on:
       postgres-metadata:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       elasticsearch:
         condition: service_healthy
     restart: unless-stopped
@@ -166,11 +242,45 @@
       - db-network
       - messaging-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 20s
+
+  log-service:
+    container_name: ${PREFIX}_log_service
+    build:
+      context: ../..
+      dockerfile: services/log-service/GraNAS.LogService/Dockerfile
+    image: ${LOG_SERVICE_IMAGE}:${LOG_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__DefaultConnection: ${LOG_DB_CONNECTION_STRING}
+      Elasticsearch__Uri: ${ELASTIC_URI}
+      RabbitMQ__Host: ${RABBITMQ_HOST}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${LOG_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      postgres-log:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
 
 networks:
   db-network:
@@ -183,5 +293,7 @@ networks:
 volumes:
   postgres_auth_data:
   postgres_metadata_data:
+  postgres_log_data:
   elasticsearch_data:
   rabbitmq_data:
+  redis_data:
