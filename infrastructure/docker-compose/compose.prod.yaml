@@ -1,0 +1,30 @@
+# Prod overrides on top of compose.yaml.
+# Usage:
+#   docker compose --env-file prod.env -f compose.yaml -f compose.prod.yaml up -d
+#
+# All secrets/ports live in prod.env. Never commit a real prod.env.
+
+services:
+  auth-service:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    restart: always
+
+  metadata-service:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    restart: always
+
+  log-service:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    restart: always
+
+  elasticsearch:
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
+      - xpack.security.enabled=true
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}

@@ -1,0 +1,75 @@
+# Standalone log-service stack (useful for isolated local dev).
+# The canonical compose lives in infrastructure/docker-compose/compose.yaml.
+# Usage:
+#   docker compose --env-file ../../infrastructure/docker-compose/dev.env up -d
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: ${PREFIX}_log_postgres
+    environment:
+      POSTGRES_DB: ${LOG_POSTGRES_DB}
+      POSTGRES_USER: ${LOG_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${LOG_POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${LOG_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LOG_POSTGRES_USER} -d ${LOG_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION}-management
+    container_name: ${PREFIX}_log_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${RABBITMQ_AMQP_PORT_HOST}:${RABBITMQ_AMQP_PORT_CONTAINER}"
+      - "${RABBITMQ_MANAGEMENT_PORT_HOST}:${RABBITMQ_MANAGEMENT_PORT_CONTAINER}"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  logservice:
+    build:
+      context: ./GraNAS.LogService/
+      dockerfile: Dockerfile
+    container_name: ${PREFIX}_log_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=${POSTGRES_PORT_CONTAINER};Database=${LOG_POSTGRES_DB};Username=${LOG_POSTGRES_USER};Password=${LOG_POSTGRES_PASSWORD}
+      Elasticsearch__Uri: ${ELASTIC_URI}
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${LOG_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    restart: unless-stopped
+
+  react-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:${LOG_SERVICE_PORT_HOST}/api
+    container_name: ${PREFIX}_log_ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - logservice
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
