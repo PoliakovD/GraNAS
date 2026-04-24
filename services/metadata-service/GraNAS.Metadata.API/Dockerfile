@@ -18,23 +18,16 @@ COPY shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj ./shared/GraNAS.S
 # === Восстановление зависимостей ===
 RUN dotnet restore "services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj"
 
-# === Копируем всё остальное ===
+# === Копируем всё остальное и публикуем ===
 COPY . .
-
-# === Сборка ===
 WORKDIR /src/services/metadata-service/GraNAS.Metadata.API
-RUN dotnet build "GraNAS.Metadata.API.csproj" \
-    -c $BUILD_CONFIGURATION \
-    -o /app/build \
-    --no-restore
 
-# === Публикация ===
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "GraNAS.Metadata.API.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \
-    --no-build \
+    --no-restore \
     /p:UseAppHost=false \
     /p:DebugType=none \
     /p:DebugSymbols=false

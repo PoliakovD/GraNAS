@@ -15,16 +15,13 @@ COPY . .
 
 WORKDIR /src/services/log-service/GraNAS.LogService
 
-# Собираем (без повторного restore)
-RUN dotnet build "GraNAS.LogService.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
-
 # Этап публикации
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "GraNAS.LogService.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \
-    --no-build \
+    --no-restore \
     /p:UseAppHost=false \
     /p:DebugType=none \
     /p:DebugSymbols=false
