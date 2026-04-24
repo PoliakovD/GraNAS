@@ -258,6 +258,78 @@ services:
       - db-network
       - messaging-network
 
+  postgres-sharing:
+    container_name: ${PREFIX}_postgres_sharing
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${SHARING_POSTGRES_DB}
+      POSTGRES_USER: ${SHARING_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARING_POSTGRES_PASSWORD}
+    ports:
+      - "${SHARING_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SHARING_POSTGRES_USER} -d ${SHARING_POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - db-network
+    volumes:
+      - postgres_sharing_data:/var/lib/postgresql/data
+
+  sharing-service:
+    container_name: ${PREFIX}_sharing_service
+    build:
+      context: ../..
+      dockerfile: services/sharing-service/GraNAS.Sharing.API/Dockerfile
+    image: ${SHARING_SERVICE_IMAGE}:${SHARING_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__Default: ${SHARING_DB_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Elasticsearch__Uri: ${ELASTIC_URI}
+      MetadataService__BaseUrl: http://metadata-service:${SERVICE_PORT_CONTAINER}
+      RabbitMQ__Host: ${RABBITMQ_HOST}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${SHARING_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      postgres-sharing:
+        condition: service_healthy
+      metadata-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
 networks:
   db-network:
     driver: bridge
@@ -269,6 +341,7 @@ networks:
 volumes:
   postgres_auth_data:
   postgres_metadata_data:
+  postgres_sharing_data:
   elasticsearch_data:
   rabbitmq_data:
   redis_data:

@@ -238,7 +238,7 @@ public class PermissionsEndpointsTests : IClassFixture<MetadataWebApplicationFac
     // ──────────────── DELETE /api/folders/{id}/permissions/{userId} ────────────────
 
     [Fact]
-    public async Task Revoke_AsOwner_Returns204_SecondUserNoLongerSeesFolder()
+    public async Task Revoke_AsOwner_Returns200_SecondUserNoLongerSeesFolder()
     {
         var ownerA = Guid.NewGuid();
         var userB = Guid.NewGuid();
@@ -258,7 +258,7 @@ public class PermissionsEndpointsTests : IClassFixture<MetadataWebApplicationFac
 
         // Revoke
         var revokeResp = await clientA.DeleteAsync($"/api/folders/{folder.Id}/permissions/{userB}");
-        Assert.Equal(HttpStatusCode.NoContent, revokeResp.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, revokeResp.StatusCode);
 
         // Confirm userB no longer sees it
         var after = await clientB.GetAsync("/api/folders");
