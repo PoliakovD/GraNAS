@@ -26,6 +26,7 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "GraNAS.Auth.API.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \
+    --no-build \
     /p:UseAppHost=false \
     /p:DebugType=none \
     /p:DebugSymbols=false

@@ -2,86 +2,182 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/granas-webapi
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-test:
+  # ── 1. Build + Test + Coverage ───────────────────────────────────────────
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj
+      - name: Restore
+        run: dotnet restore GraNAS.slnx
 
       - name: Build
-        run: dotnet build Backend/GraNAS.WebAPI/GraNAS.WebAPI.csproj --configuration Release --no-restore
+        run: dotnet build GraNAS.slnx --configuration Release --no-restore
 
-      - name: Run tests
-        run: dotnet test Backend/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj --configuration Release --no-build --verbosity normal
+      - name: NuGet vulnerability audit
+        run: |
+          dotnet list tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj \
+            package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then
+            echo "::error::Vulnerable NuGet packages found"
+            exit 1
+          fi
 
-      - name: Verify Docker
-        run: docker --version
+      - name: Test with coverage
+        run: |
+          dotnet test tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj \
+            --configuration Release --no-build \
+            --collect:"XPlat Code Coverage" \
+            --settings tests/GraNAS.WebAPI.Tests/coverage.runsettings \
+            --results-directory ./coverage
 
-  publish:
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+      - name: Install reportgenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Coverage threshold check (≥70%)
+        run: |
+          reportgenerator \
+            -reports:"coverage/**/coverage.opencover.xml" \
+            -targetdir:"coverage/report" \
+            -reporttypes:"TextSummary" \
+            -assemblyfilters:"+GraNAS.Auth.*;+GraNAS.Metadata.*"
+          cat coverage/report/Summary.txt
+          LINE=$(grep "Line coverage:" coverage/report/Summary.txt | grep -oP '[\d.]+(?=%)' | head -1)
+          echo "Line coverage: ${LINE}%"
+          python3 -c "import sys; sys.exit(0 if float('${LINE}') >= 70 else 1)" \
+            || (echo "::error::Coverage ${LINE}% is below 70% threshold" && exit 1)
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/report/
+
+  # ── 2. Generate OpenAPI specs ─────────────────────────────────────────────
+  openapi:
     runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore & Build
+        run: |
+          dotnet restore GraNAS.slnx
+          dotnet build GraNAS.slnx --configuration Release --no-restore
+
+      - name: Restore dotnet tools
+        run: dotnet tool restore
+
+      - name: Generate auth-service OpenAPI spec
+        env:
+          ConnectionStrings__Default: ""
+          ConnectionStrings__Redis: ""
+          Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
+          Jwt__Issuer: "GraNAS"
+          Jwt__Audience: "GraNASClients"
+          RabbitMQ__Host: "localhost"
+          RabbitMQ__Username: "guest"
+          RabbitMQ__Password: "guest"
+          Elasticsearch__Uri: "http://localhost:9200"
+        run: |
+          mkdir -p docs/openapi
+          dotnet swagger tofile \
+            --output docs/openapi/auth-v1.json \
+            services/auth-service/GraNAS.Auth.API/bin/Release/net10.0/GraNAS.Auth.API.dll \
+            v1
+
+      - name: Generate metadata-service OpenAPI spec
+        env:
+          ConnectionStrings__Default: ""
+          Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
+          Jwt__Issuer: "GraNAS"
+          Jwt__Audience: "GraNASClients"
+          RabbitMQ__Host: "localhost"
+          RabbitMQ__Username: "guest"
+          RabbitMQ__Password: "guest"
+          Elasticsearch__Uri: "http://localhost:9200"
+        run: |
+          dotnet swagger tofile \
+            --output docs/openapi/metadata-v1.json \
+            services/metadata-service/GraNAS.Metadata.API/bin/Release/net10.0/GraNAS.Metadata.API.dll \
+            v1
+
+      - name: Upload OpenAPI specs
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-specs
+          path: docs/openapi/
+
+  # ── 3. Build & push Docker images ─────────────────────────────────────────
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     permissions:
       contents: read
       packages: write
-
+    strategy:
+      matrix:
+        include:
+          - service: auth-service
+            dockerfile: services/auth-service/GraNAS.Auth.API/Dockerfile
+            image: auth-service
+          - service: metadata-service
+            dockerfile: services/metadata-service/GraNAS.Metadata.API/Dockerfile
+            image: metadata-service
+          - service: log-service
+            dockerfile: services/log-service/GraNAS.LogService/Dockerfile
+            image: log-service
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
+      - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix=,format=short
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
-          file: Backend/GraNAS.WebAPI/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            BUILD_CONFIGURATION=Release
-            APP_UID=1001
 
+  # ── 4. Deploy staging ──────────────────────────────────────────────────────
   deploy-staging:
-    needs: publish
+    needs: docker
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     environment: staging
     steps:
-      - name: Deploy to staging server via SSH
-        uses: appleboy/ssh-action@v1.0.0
+      - uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}

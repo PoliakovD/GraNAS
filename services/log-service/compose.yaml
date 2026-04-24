@@ -38,8 +38,8 @@ services:
 
   logservice:
     build:
-      context: ./GraNAS.LogService/
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/log-service/GraNAS.LogService/Dockerfile
     container_name: ${PREFIX}_log_service
     depends_on:
       postgres:
@@ -56,19 +56,6 @@ services:
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
     ports:
       - "${LOG_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
-    restart: unless-stopped
-
-  react-ui:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: http://localhost:${LOG_SERVICE_PORT_HOST}/api
-    container_name: ${PREFIX}_log_ui
-    ports:
-      - "3000:80"
-    depends_on:
-      - logservice
     restart: unless-stopped
 
 volumes:
