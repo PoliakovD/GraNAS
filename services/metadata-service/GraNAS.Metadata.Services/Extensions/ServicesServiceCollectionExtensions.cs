@@ -9,6 +9,7 @@ public static class ServicesServiceCollectionExtensions
   public static IServiceCollection AddMetadataApplication(this IServiceCollection services)
   {
     services.AddScoped<IFolderService, FolderService>();
+    services.AddScoped<IPermissionService, PermissionService>();
     return services;
   }
 }

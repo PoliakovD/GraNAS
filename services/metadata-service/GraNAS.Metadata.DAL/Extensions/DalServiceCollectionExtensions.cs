@@ -9,6 +9,7 @@ public static class DalServiceCollectionExtensions
   public static IServiceCollection AddMetadataDal(this IServiceCollection services)
   {
     services.AddScoped<IFolderRepository, FolderRepository>();
+    services.AddScoped<IPermissionRepository, PermissionRepository>();
     return services;
   }
 }
