@@ -3,29 +3,37 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-COPY ["services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj", "services/metadata-service/GraNAS.Metadata.API/"]
-COPY ["services/metadata-service/GraNAS.Metadata.DAL/GraNAS.Metadata.DAL.csproj", "services/metadata-service/GraNAS.Metadata.DAL/"]
-COPY ["shared/GraNAS.Shared.Models/GraNAS.Shared.Models.csproj", "shared/GraNAS.Shared.Models/"]
-COPY ["shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj", "shared/GraNAS.Shared.Correlation/"]
-COPY ["shared/GraNAS.Shared.Infrastructure/GraNAS.Shared.Infrastructure.csproj", "shared/GraNAS.Shared.Infrastructure/"]
-COPY ["shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj", "shared/GraNAS.Shared.LoggingService/"]
-COPY ["shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj", "shared/GraNAS.Shared.Swagger/"]
+# === Копируем ВСЕ .csproj в правильные подпапки ===
+COPY services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj ./services/metadata-service/GraNAS.Metadata.API/
+COPY services/metadata-service/GraNAS.Metadata.Models/GraNAS.Metadata.Models.csproj ./services/metadata-service/GraNAS.Metadata.Models/
+COPY services/metadata-service/GraNAS.Metadata.Services/GraNAS.Metadata.Services.csproj ./services/metadata-service/GraNAS.Metadata.Services/
+COPY services/metadata-service/GraNAS.Metadata.DAL/GraNAS.Metadata.DAL.csproj ./services/metadata-service/GraNAS.Metadata.DAL/
+
+COPY shared/GraNAS.Shared.Models/GraNAS.Shared.Models.csproj ./shared/GraNAS.Shared.Models/
+COPY shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj ./shared/GraNAS.Shared.Correlation/
+COPY shared/GraNAS.Shared.Infrastructure/GraNAS.Shared.Infrastructure.csproj ./shared/GraNAS.Shared.Infrastructure/
+COPY shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj ./shared/GraNAS.Shared.LoggingService/
+COPY shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj ./shared/GraNAS.Shared.Swagger/
+
+# === Восстановление зависимостей ===
 RUN dotnet restore "services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj"
 
+# === Копируем всё остальное и публикуем ===
 COPY . .
-WORKDIR "/src/services/metadata-service/GraNAS.Metadata.API"
-RUN dotnet build "GraNAS.Metadata.API.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
+WORKDIR /src/services/metadata-service/GraNAS.Metadata.API
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "GraNAS.Metadata.API.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \
+    --no-restore \
     /p:UseAppHost=false \
     /p:DebugType=none \
     /p:DebugSymbols=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+# === Финальный образ ===
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 ARG APP_UID=1000
 RUN addgroup -g $APP_UID appgroup && adduser -D -u $APP_UID -G appgroup appuser
 

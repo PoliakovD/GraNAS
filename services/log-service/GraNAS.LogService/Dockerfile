@@ -3,23 +3,31 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-COPY ["services/log-service/GraNAS.LogService/GraNAS.LogService.csproj", "services/log-service/GraNAS.LogService/"]
+# Копируем все .csproj файлы, необходимые для восстановления зависимостей
+COPY services/log-service/GraNAS.LogService/GraNAS.LogService.csproj ./services/log-service/GraNAS.LogService/
+COPY shared/GraNAS.Shared.Models/GraNAS.Shared.Models.csproj ./shared/GraNAS.Shared.Models/
+
+# Восстанавливаем зависимости — теперь dotnet знает о всех проектах
 RUN dotnet restore "services/log-service/GraNAS.LogService/GraNAS.LogService.csproj"
 
+# Копируем всё остальное
 COPY . .
-WORKDIR "/src/services/log-service/GraNAS.LogService"
-RUN dotnet build "GraNAS.LogService.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
 
+WORKDIR /src/services/log-service/GraNAS.LogService
+
+# Этап публикации
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "GraNAS.LogService.csproj" \
     -c $BUILD_CONFIGURATION \
     -o /app/publish \
+    --no-restore \
     /p:UseAppHost=false \
     /p:DebugType=none \
     /p:DebugSymbols=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+# Финальный образ
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 ARG APP_UID=1000
 RUN addgroup -g $APP_UID appgroup && adduser -D -u $APP_UID -G appgroup appuser
 
