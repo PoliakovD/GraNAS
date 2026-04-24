@@ -1,11 +1,16 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
+using GraNAS.Metadata.API.Authorization;
+using GraNAS.Metadata.API.Infrastructure;
 using GraNAS.Metadata.DAL;
 using GraNAS.Metadata.DAL.Extensions;
+using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Services.Extensions;
+using GraNAS.Metadata.Services.Interfaces;
 using GraNAS.Shared.Correlation;
 using GraNAS.Shared.Infrastructure.Extensions;
 using GraNAS.Shared.Infrastructure.Middleware;
@@ -13,6 +18,7 @@ using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
@@ -132,8 +138,23 @@ public class Program
       options.HttpsPort = 44344;
     });
 
-    builder.Services.AddControllers();
-    builder.Services.AddAuthorization();
+    builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>(c =>
+    {
+      var baseUrl = builder.Configuration["AuthService:BaseUrl"]
+                    ?? throw new InvalidOperationException("AuthService:BaseUrl is not configured");
+      c.BaseAddress = new Uri(baseUrl);
+    });
+
+    builder.Services.AddControllers()
+      .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    builder.Services.AddAuthorization(options =>
+    {
+      options.AddPolicy("CanReadFolder",
+        p => p.Requirements.Add(new FolderAccessRequirement(AccessLevel.View)));
+      options.AddPolicy("CanWriteFolder",
+        p => p.Requirements.Add(new FolderAccessRequirement(AccessLevel.Full)));
+    });
+    builder.Services.AddScoped<IAuthorizationHandler, FolderAccessHandler>();
 
     builder.Services.AddRateLimiter(options =>
     {

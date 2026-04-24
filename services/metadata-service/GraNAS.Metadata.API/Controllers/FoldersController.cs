@@ -1,6 +1,7 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Services.Interfaces;
@@ -20,13 +21,20 @@ namespace GraNAS.Metadata.API.Controllers;
 public class FoldersController : ControllerBase
 {
   private readonly IFolderService _folderService;
+  private readonly IPermissionService _permissionService;
+  private readonly IAuthorizationService _authorizationService;
 
-  public FoldersController(IFolderService folderService)
+  public FoldersController(
+    IFolderService folderService,
+    IPermissionService permissionService,
+    IAuthorizationService authorizationService)
   {
     _folderService = folderService;
+    _permissionService = permissionService;
+    _authorizationService = authorizationService;
   }
 
-  /// <summary>Получить список всех папок текущего пользователя</summary>
+  /// <summary>Получить список папок текущего пользователя (свои + расшаренные)</summary>
   [HttpGet]
   [ProducesResponseType(typeof(FolderResponse[]), StatusCodes.Status200OK)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
@@ -69,7 +77,7 @@ public class FoldersController : ControllerBase
     };
   }
 
-  /// <summary>Удалить папку</summary>
+  /// <summary>Удалить папку (только владелец)</summary>
   [HttpDelete("{id}")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
@@ -93,6 +101,73 @@ public class FoldersController : ControllerBase
         ErrorDescription = "Folder not found."
       }),
       DeleteFolderError.Forbidden => Forbid(),
+      _ => StatusCode(StatusCodes.Status500InternalServerError)
+    };
+  }
+
+  /// <summary>Выдать права на папку другому пользователю</summary>
+  [HttpPost("{id}/permissions")]
+  [ProducesResponseType(typeof(PermissionResponse), StatusCodes.Status201Created)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+  public async Task<IActionResult> GrantPermission(
+    Guid id,
+    [FromBody] GrantPermissionRequest request,
+    CancellationToken ct)
+  {
+    if (!ModelState.IsValid)
+      return BadRequest(ModelState);
+
+    var userId = GetCurrentUserId();
+    if (userId == null)
+      return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
+
+    var result = await _permissionService.GrantAsync(userId.Value, id, request, ct);
+
+    return result.Error switch
+    {
+      GrantPermissionError.None => StatusCode(StatusCodes.Status201Created, result.Response),
+      GrantPermissionError.FolderNotFoundOrForbidden => NotFound(new ErrorResponse
+      {
+        Error = "folder_not_found",
+        ErrorDescription = "Folder not found or access denied."
+      }),
+      GrantPermissionError.UserNotFound => NotFound(new ErrorResponse
+      {
+        Error = "user_not_found",
+        ErrorDescription = "User with the specified email not found."
+      }),
+      _ => StatusCode(StatusCodes.Status500InternalServerError)
+    };
+  }
+
+  /// <summary>Отозвать права пользователя на папку</summary>
+  [HttpDelete("{id}/permissions/{userId:guid}")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+  public async Task<IActionResult> RevokePermission(Guid id, Guid userId)
+  {
+    var ownerId = GetCurrentUserId();
+    if (ownerId == null)
+      return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
+
+    var result = await _permissionService.RevokeAsync(ownerId.Value, id, userId);
+
+    return result.Error switch
+    {
+      RevokePermissionError.None => Ok("User`s access revoked"),
+      RevokePermissionError.FolderNotFoundOrForbidden => NotFound(new ErrorResponse
+      {
+        Error = "folder_not_found",
+        ErrorDescription = "Folder not found or access denied."
+      }),
+      RevokePermissionError.PermissionNotFound => NotFound(new ErrorResponse
+      {
+        Error = "permission_not_found",
+        ErrorDescription = "Permission not found for the specified user."
+      }),
       _ => StatusCode(StatusCodes.Status500InternalServerError)
     };
   }
