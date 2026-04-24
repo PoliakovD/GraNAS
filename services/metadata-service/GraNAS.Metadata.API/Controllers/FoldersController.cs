@@ -144,7 +144,7 @@ public class FoldersController : ControllerBase
 
   /// <summary>Отозвать права пользователя на папку</summary>
   [HttpDelete("{id}/permissions/{userId:guid}")]
-  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
   public async Task<IActionResult> RevokePermission(Guid id, Guid userId)
@@ -157,7 +157,7 @@ public class FoldersController : ControllerBase
 
     return result.Error switch
     {
-      RevokePermissionError.None => NoContent(),
+      RevokePermissionError.None => Ok("User`s access revoked"),
       RevokePermissionError.FolderNotFoundOrForbidden => NotFound(new ErrorResponse
       {
         Error = "folder_not_found",
