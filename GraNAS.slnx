@@ -36,6 +36,13 @@
     <Project Path="services/metadata-service/GraNAS.Metadata.Services/GraNAS.Metadata.Services.csproj" />
   </Folder>
 
+  <Folder Name="/Services/SharingService/">
+    <Project Path="services/sharing-service/GraNAS.Sharing.API/GraNAS.Sharing.API.csproj" />
+    <Project Path="services/sharing-service/GraNAS.Sharing.Models/GraNAS.Sharing.Models.csproj" />
+    <Project Path="services/sharing-service/GraNAS.Sharing.DAL/GraNAS.Sharing.DAL.csproj" />
+    <Project Path="services/sharing-service/GraNAS.Sharing.Services/GraNAS.Sharing.Services.csproj" />
+  </Folder>
+
   <Folder Name="/Tests/">
     <Project Path="tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj" />
   </Folder>

@@ -28,6 +28,7 @@
     <!-- Достаточно ссылки на API-проект — он тянет DAL, BL и Models транзитивно -->
     <ProjectReference Include="..\..\services\auth-service\GraNAS.Auth.API\GraNAS.Auth.API.csproj" />
     <ProjectReference Include="..\..\services\metadata-service\GraNAS.Metadata.API\GraNAS.Metadata.API.csproj" />
+    <ProjectReference Include="..\..\services\sharing-service\GraNAS.Sharing.API\GraNAS.Sharing.API.csproj" />
   </ItemGroup>
 
 </Project>
