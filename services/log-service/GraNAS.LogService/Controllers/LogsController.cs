@@ -1,12 +1,15 @@
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using GraNAS.LogService.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace GraNAS.LogService.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("api")]
 public class LogsController : ControllerBase
 {
   private const string IndexPattern = "granas-logs-*";
@@ -19,6 +22,8 @@ public class LogsController : ControllerBase
   /// Поиск логов с фильтрацией и пагинацией
   /// </summary>
   [HttpGet]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
   public async Task<IActionResult> GetLogs(
     [FromQuery] string? service,
     [FromQuery] string? level,

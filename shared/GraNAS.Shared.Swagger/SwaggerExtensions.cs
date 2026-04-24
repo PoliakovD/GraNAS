@@ -16,10 +16,9 @@ public static class SwaggerExtensions
       // 1. Базовая информация об API
       c.SwaggerDoc(apiVersion, new OpenApiInfo { Title = apiTitle, Version = apiVersion });
 
-      // 2. Путь к XML-файлу документации
-      var xmlFile = $"{System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name}.xml";
-      var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-      c.IncludeXmlComments(xmlPath);
+      // 2. XML-документация: сканируем все GraNAS-сборки в папке (GetEntryAssembly не работает в CLI-контексте)
+      foreach (var xmlPath in Directory.GetFiles(AppContext.BaseDirectory, "GraNAS.*.xml"))
+          c.IncludeXmlComments(xmlPath);
 
       // 3. Определение схемы безопасности Bearer
       c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
