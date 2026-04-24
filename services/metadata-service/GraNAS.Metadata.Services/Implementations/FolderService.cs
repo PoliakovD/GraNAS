@@ -12,32 +12,38 @@ namespace GraNAS.Metadata.Services.Implementations;
 public class FolderService : IFolderService
 {
   private readonly IFolderRepository _folderRepository;
+  private readonly IPermissionRepository _permissionRepository;
+  private readonly IPermissionService _permissionService;
 
-  public FolderService(IFolderRepository folderRepository)
+  public FolderService(
+    IFolderRepository folderRepository,
+    IPermissionRepository permissionRepository,
+    IPermissionService permissionService)
   {
     _folderRepository = folderRepository;
+    _permissionRepository = permissionRepository;
+    _permissionService = permissionService;
   }
 
   public async Task<IEnumerable<FolderResponse>> GetUserFoldersAsync(Guid userId)
   {
-    var folders = await _folderRepository.GetUserFoldersAsync(userId);
+    var ownedFolders = await _folderRepository.GetUserFoldersAsync(userId);
+    var owned = ownedFolders.Select(f => ToResponse(f, AccessLevel.Full, f.OwnerId, null));
 
-    return folders.Select(f => new FolderResponse
-    {
-      Id = f.Id,
-      ParentFolderId = f.ParentFolderId,
-      Name = f.Name,
-      CreatedAt = f.CreatedAt,
-      UpdatedAt = f.UpdatedAt
-    });
+    var permissions = await _permissionRepository.ListByUserAsync(userId);
+    var shared = permissions
+      .Where(p => p.Folder is not null && p.Folder.OwnerId != userId) // exclude if user is also owner
+      .Select(p => ToResponse(p.Folder!, p.AccessLevel, p.Folder!.OwnerId, p.Path));
+
+    return owned.Concat(shared).OrderByDescending(f => f.CreatedAt);
   }
 
   public async Task<CreateFolderResult> CreateFolderAsync(Guid userId, CreateFolderRequest request)
   {
     if (request.ParentFolderId is Guid parentId)
     {
-      var parent = await _folderRepository.GetByIdForOwnerAsync(parentId, userId);
-      if (parent == null)
+      var hasAccess = await _permissionService.HasAccessAsync(userId, parentId, AccessLevel.Full);
+      if (!hasAccess)
         return CreateFolderResult.ParentNotFoundOrForbidden();
     }
 
@@ -53,14 +59,7 @@ public class FolderService : IFolderService
 
     await _folderRepository.CreateAsync(folder);
 
-    return CreateFolderResult.Success(new FolderResponse
-    {
-      Id = folder.Id,
-      ParentFolderId = folder.ParentFolderId,
-      Name = folder.Name,
-      CreatedAt = folder.CreatedAt,
-      UpdatedAt = folder.UpdatedAt
-    });
+    return CreateFolderResult.Success(ToResponse(folder, AccessLevel.Full, userId, null));
   }
 
   public async Task<DeleteFolderResult> DeleteFolderAsync(Guid userId, Guid folderId)
@@ -75,4 +74,17 @@ public class FolderService : IFolderService
     await _folderRepository.DeleteAsync(folderId);
     return new DeleteFolderResult(DeleteFolderError.None);
   }
+
+  private static FolderResponse ToResponse(Folder f, AccessLevel accessLevel, Guid ownerId, string? path) =>
+    new()
+    {
+      Id = f.Id,
+      Name = f.Name,
+      ParentFolderId = f.ParentFolderId,
+      OwnerId = ownerId,
+      AccessLevel = accessLevel,
+      Path = path,
+      CreatedAt = f.CreatedAt,
+      UpdatedAt = f.UpdatedAt
+    };
 }

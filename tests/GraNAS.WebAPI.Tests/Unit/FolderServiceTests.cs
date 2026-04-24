@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Models.Repositories;
@@ -14,9 +13,18 @@ namespace GraNAS.WebAPI.Tests.Unit;
 public class FolderServiceTests
 {
     private readonly Mock<IFolderRepository> _repo = new();
+    private readonly Mock<IPermissionRepository> _permRepo = new();
+    private readonly Mock<IPermissionService> _permSvc = new();
     private readonly FolderService _sut;
 
-    public FolderServiceTests() => _sut = new FolderService(_repo.Object);
+    public FolderServiceTests()
+    {
+        // Default: no shared folders
+        _permRepo.Setup(r => r.ListByUserAsync(It.IsAny<Guid>()))
+                 .ReturnsAsync(Array.Empty<Permission>());
+
+        _sut = new FolderService(_repo.Object, _permRepo.Object, _permSvc.Object);
+    }
 
     // ──────────────── CreateFolderAsync ────────────────
 
@@ -41,8 +49,8 @@ public class FolderServiceTests
     {
         var userId = Guid.NewGuid();
         var parentId = Guid.NewGuid();
-        _repo.Setup(r => r.GetByIdForOwnerAsync(parentId, userId))
-             .ReturnsAsync(new Folder { Id = parentId, OwnerId = userId, Name = "Parent" });
+        _permSvc.Setup(s => s.HasAccessAsync(userId, parentId, AccessLevel.Full))
+                .ReturnsAsync(true);
         _repo.Setup(r => r.CreateAsync(It.IsAny<Folder>())).Returns(Task.CompletedTask);
 
         var result = await _sut.CreateFolderAsync(userId,
@@ -50,7 +58,6 @@ public class FolderServiceTests
 
         Assert.Equal(CreateFolderError.None, result.Error);
         Assert.Equal(parentId, result.Response!.ParentFolderId);
-        _repo.Verify(r => r.GetByIdForOwnerAsync(parentId, userId), Times.Once);
     }
 
     [Fact]
@@ -58,7 +65,8 @@ public class FolderServiceTests
     {
         var userId = Guid.NewGuid();
         var parentId = Guid.NewGuid();
-        _repo.Setup(r => r.GetByIdForOwnerAsync(parentId, userId)).ReturnsAsync((Folder?)null);
+        _permSvc.Setup(s => s.HasAccessAsync(userId, parentId, AccessLevel.Full))
+                .ReturnsAsync(false);
 
         var result = await _sut.CreateFolderAsync(userId,
             new CreateFolderRequest { Name = "Child", ParentFolderId = parentId });
@@ -72,10 +80,9 @@ public class FolderServiceTests
     public async Task Create_ParentOwnedByOtherUser_ReturnsParentNotFoundOrForbidden()
     {
         var userId = Guid.NewGuid();
-        var otherId = Guid.NewGuid();
         var parentId = Guid.NewGuid();
-        // repo returns null because owner filter doesn't match
-        _repo.Setup(r => r.GetByIdForOwnerAsync(parentId, userId)).ReturnsAsync((Folder?)null);
+        _permSvc.Setup(s => s.HasAccessAsync(userId, parentId, AccessLevel.Full))
+                .ReturnsAsync(false);
 
         var result = await _sut.CreateFolderAsync(userId,
             new CreateFolderRequest { Name = "Child", ParentFolderId = parentId });
@@ -147,5 +154,35 @@ public class FolderServiceTests
         Assert.Equal(2, result.Count);
         Assert.Null(result.First(f => f.Name == "Root").ParentFolderId);
         Assert.Equal(rootId, result.First(f => f.Name == "Child").ParentFolderId);
+    }
+
+    [Fact]
+    public async Task GetUserFolders_ReturnsOwnedAndSharedWithCorrectAccessLevel()
+    {
+        var userId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var ownedId = Guid.NewGuid();
+        var sharedId = Guid.NewGuid();
+
+        var sharedFolder = new Folder { Id = sharedId, OwnerId = ownerId, Name = "Shared" };
+
+        _repo.Setup(r => r.GetUserFoldersAsync(userId)).ReturnsAsync(new List<Folder>
+        {
+            new() { Id = ownedId, OwnerId = userId, Name = "Owned" }
+        });
+        _permRepo.Setup(r => r.ListByUserAsync(userId)).ReturnsAsync(new List<Permission>
+        {
+            new() { FolderId = sharedId, UserId = userId, AccessLevel = AccessLevel.View, Folder = sharedFolder }
+        });
+
+        var result = (await _sut.GetUserFoldersAsync(userId)).ToList();
+
+        Assert.Equal(2, result.Count);
+        var owned = result.Single(f => f.Id == ownedId);
+        var shared = result.Single(f => f.Id == sharedId);
+        Assert.Equal(AccessLevel.Full, owned.AccessLevel);
+        Assert.Equal(userId, owned.OwnerId);
+        Assert.Equal(AccessLevel.View, shared.AccessLevel);
+        Assert.Equal(ownerId, shared.OwnerId);
     }
 }

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using GraNAS.Metadata.API;
 using GraNAS.Metadata.DAL;
+using GraNAS.Metadata.Services.Interfaces;
 using GraNAS.Shared.LoggingService;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -23,6 +24,8 @@ public sealed class MetadataWebApplicationFactory : WebApplicationFactory<Progra
     .WithUsername("postgres")
     .WithPassword("postgres")
     .Build();
+
+  public Mock<IAuthServiceClient> AuthClientMock { get; } = new();
 
   public async Task InitializeAsync()
   {
@@ -50,6 +53,11 @@ public sealed class MetadataWebApplicationFactory : WebApplicationFactory<Progra
           new DbContextOptionsBuilder<MetadataDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
             .Options)));
+
+      // Replace IAuthServiceClient HttpClient with a mock (no real HTTP calls in tests)
+      var authClientDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IAuthServiceClient));
+      if (authClientDescriptor != null) services.Remove(authClientDescriptor);
+      services.AddSingleton<IAuthServiceClient>(_ => AuthClientMock.Object);
 
       var loggerDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ILoggerService));
       if (loggerDescriptor != null) services.Remove(loggerDescriptor);
