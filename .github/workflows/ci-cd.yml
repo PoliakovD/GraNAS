@@ -86,8 +86,8 @@ jobs:
 
       - name: Generate auth-service OpenAPI spec
         env:
-          ConnectionStrings__Default: ""
-          ConnectionStrings__Redis: ""
+          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
+          ConnectionStrings__Redis: "localhost:6379"
           Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
           Jwt__Issuer: "GraNAS"
           Jwt__Audience: "GraNASClients"
@@ -104,7 +104,7 @@ jobs:
 
       - name: Generate metadata-service OpenAPI spec
         env:
-          ConnectionStrings__Default: ""
+          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
           Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
           Jwt__Issuer: "GraNAS"
           Jwt__Audience: "GraNASClients"
