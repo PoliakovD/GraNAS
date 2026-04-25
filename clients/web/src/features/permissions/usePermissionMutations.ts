@@ -12,10 +12,11 @@ export function useGrantPermission(folderId: string) {
   return useMutation({
     mutationFn: (data: GrantPermissionRequest) =>
       permissionsApi.grant(folderId, data).then(r => r.data),
-    onSuccess: (perm: PermissionResponse) => {
-      // Optimistically add to cache; backend lacks GET listing endpoint
+    onSuccess: (perm: PermissionResponse, variables: GrantPermissionRequest) => {
+      // Optimistically add to cache; backend lacks GET listing endpoint.
+      // Store email from form input so it can be displayed instead of userId.
       qc.setQueryData<PermissionResponse[]>(permissionsKey(folderId), prev =>
-        [...(prev ?? []).filter(p => p.userId !== perm.userId), perm]
+        [...(prev ?? []).filter(p => p.userId !== perm.userId), { ...perm, email: variables.email }]
       );
       notification.success({ message: 'Права выданы' });
     },

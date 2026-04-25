@@ -37,7 +37,7 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <ConfigProvider locale={ruRU}>
+    <ConfigProvider locale={ruRU} theme={{ token: { colorPrimary: '#722ed1' } }}>
       <AntApp>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>

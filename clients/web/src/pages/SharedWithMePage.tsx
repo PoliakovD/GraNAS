@@ -1,4 +1,4 @@
-import { Table, Tag, Typography } from 'antd';
+import { Empty, Table, Tag, Typography } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '../auth/AuthContext';
@@ -14,7 +14,13 @@ export function SharedWithMePage() {
 
   const columns: ColumnType<FolderResponse>[] = [
     { title: 'Папка', dataIndex: 'name', key: 'name' },
-    { title: 'Владелец', dataIndex: 'ownerId', key: 'ownerId', ellipsis: true },
+    {
+      title: 'Владелец',
+      dataIndex: 'ownerId',
+      key: 'ownerId',
+      ellipsis: true,
+      // TODO: заменить на email после добавления GET /api/auth/me (backend-долг)
+    },
     {
       title: 'Уровень',
       dataIndex: 'accessLevel',
@@ -34,6 +40,7 @@ export function SharedWithMePage() {
         loading={isLoading}
         onRow={row => ({ onClick: () => navigate(`/folders/${row.id}`) })}
         style={{ cursor: 'pointer' }}
+        locale={{ emptyText: <Empty description="Никто не открыл вам доступ к папкам" /> }}
       />
     </>
   );

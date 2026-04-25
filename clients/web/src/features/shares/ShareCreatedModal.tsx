@@ -1,5 +1,5 @@
 import { CopyOutlined } from '@ant-design/icons';
-import { Alert, Button, Modal, Space, Typography } from 'antd';
+import { Alert, App, Button, Modal, Space, Typography } from 'antd';
 
 interface Props {
   open: boolean;
@@ -8,9 +8,14 @@ interface Props {
 }
 
 export function ShareCreatedModal({ open, token, onClose }: Props) {
+  const { notification } = App.useApp();
   const shareUrl = `${window.location.origin}/s/${token}`;
 
-  const copy = () => navigator.clipboard.writeText(shareUrl);
+  const copy = () => {
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => notification.success({ message: 'Ссылка скопирована' }))
+      .catch(() => notification.warning({ message: 'Не удалось скопировать', description: 'Скопируйте вручную' }));
+  };
 
   return (
     <Modal

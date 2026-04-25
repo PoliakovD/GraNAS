@@ -1,5 +1,5 @@
 import { DeleteOutlined, FolderAddOutlined, FolderOpenOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Empty, Space, Spin, Tree } from 'antd';
+import { App, Button, Dropdown, Empty, Skeleton, Space, Tree } from 'antd';
 import type { MenuProps } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +13,8 @@ export function FolderTree() {
   const { data: folders = [], isLoading } = useFoldersQuery();
   const deleteFolder = useDeleteFolder();
   const navigate = useNavigate();
-  const [modal, setModal] = useState<{ open: boolean; parentId?: string | null }>({ open: false });
+  const { modal } = App.useApp();
+  const [modalState, setModalState] = useState<{ open: boolean; parentId?: string | null }>({ open: false });
 
   const treeData = buildFolderTree(folders, user?.id ?? '');
 
@@ -22,7 +23,7 @@ export function FolderTree() {
       key: 'sub',
       icon: <FolderAddOutlined />,
       label: 'Создать подпапку',
-      onClick: () => setModal({ open: true, parentId: nodeId }),
+      onClick: () => setModalState({ open: true, parentId: nodeId }),
     },
     {
       key: 'open',
@@ -35,11 +36,18 @@ export function FolderTree() {
       icon: <DeleteOutlined />,
       label: 'Удалить',
       danger: true,
-      onClick: () => deleteFolder.mutate(nodeId),
+      onClick: () => modal.confirm({
+        title: 'Удалить папку и все вложенные?',
+        content: 'Это действие нельзя отменить.',
+        okText: 'Удалить',
+        okType: 'danger',
+        cancelText: 'Отмена',
+        onOk: () => deleteFolder.mutate(nodeId),
+      }),
     },
   ];
 
-  if (isLoading) return <Spin />;
+  if (isLoading) return <Skeleton active paragraph={{ rows: 4 }} />;
   if (treeData.length === 0) return <Empty description="Нет папок" />;
 
   return (
@@ -63,9 +71,9 @@ export function FolderTree() {
         defaultExpandAll
       />
       <CreateFolderModal
-        open={modal.open}
-        parentFolderId={modal.parentId}
-        onClose={() => setModal({ open: false })}
+        open={modalState.open}
+        parentFolderId={modalState.parentId}
+        onClose={() => setModalState({ open: false })}
       />
     </>
   );

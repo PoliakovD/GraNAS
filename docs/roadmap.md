@@ -9,7 +9,7 @@
 
 ---
 
-## Текущее состояние (2026-04-25)
+## Текущее состояние (2026-04-26)
 
 **Реализовано:**
 
@@ -18,7 +18,8 @@
 - `metadata-service` — CRUD папок с иерархией подпапок + permissions (Phase 2) + InternalFoldersController
 - `sharing-service` — share-ссылки для незарегистрированных (Phase 3): токены base64url+SHA256, 5 эндпоинтов, cleanup job, RabbitMQ publish
 - `log-service` — централизованный сбор логов через RabbitMQ
-- `clients/web/` — React 19 + Vite + AntD 6 веб-клиент (Phase 4): все экраны Phase 1–3, silent refresh, 10 Vitest тестов; UX-улучшения трекаются в [`docs/web-ux-roadmap.md`](web-ux-roadmap.md)
+- `clients/web/` — React 19 + Vite + AntD 6 веб-клиент (Phase 4): все экраны Phase 1–3, silent refresh, 10 Vitest тестов; UX-улучшения (все 5 спринтов) — [`docs/web-ux-roadmap.md`](web-ux-roadmap.md)
+- **EF migrations bundle** — Dockerfiles для auth, metadata, sharing содержат `bundle` stage; при старте контейнера `efbundle` применяет миграции до запуска приложения
 - Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, Serilog → Elasticsearch
 - Docker Compose для dev и prod (gateway на порту 8080)
 - CI/CD (GitHub Actions → GHCR → staging via SSH)

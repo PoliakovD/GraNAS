@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Space, Table, Tag } from 'antd';
+import { Button, Popconfirm, Space, Table, Tag } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import { useState } from 'react';
 import type { ShareLinkResponse } from '../../types/share';
@@ -33,9 +33,15 @@ export function ShareList({ folderId }: Props) {
       key: 'action',
       render: (_: unknown, row: ShareLinkResponse) =>
         !row.revoked && (
-          <Button danger size="small" onClick={() => revoke.mutate(row.id)}>
-            Отозвать
-          </Button>
+          <Popconfirm
+            title="Отозвать ссылку?"
+            okText="Отозвать"
+            okType="danger"
+            cancelText="Отмена"
+            onConfirm={() => revoke.mutate(row.id)}
+          >
+            <Button danger size="small">Отозвать</Button>
+          </Popconfirm>
         ),
     },
   ];

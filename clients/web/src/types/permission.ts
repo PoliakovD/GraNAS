@@ -2,6 +2,7 @@ import type { AccessLevel } from './folder';
 
 export interface PermissionResponse {
   userId: string;
+  email?: string;
   accessLevel: AccessLevel;
   path: string | null;
   createdAt: string;

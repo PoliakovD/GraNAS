@@ -1,4 +1,4 @@
-import { Button, Table, Tag } from 'antd';
+import { Button, Popconfirm, Table, Tag } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PermissionResponse } from '../../types/permission';
@@ -13,7 +13,12 @@ export function PermissionList({ folderId }: Props) {
   const revoke = useRevokePermission(folderId);
 
   const columns: ColumnType<PermissionResponse>[] = [
-    { title: 'Пользователь', dataIndex: 'userId', key: 'userId', ellipsis: true },
+    {
+      title: 'Пользователь',
+      key: 'userId',
+      ellipsis: true,
+      render: (_: unknown, row: PermissionResponse) => row.email ?? row.userId,
+    },
     {
       title: 'Уровень',
       dataIndex: 'accessLevel',
@@ -25,9 +30,15 @@ export function PermissionList({ folderId }: Props) {
       title: '',
       key: 'action',
       render: (_: unknown, row: PermissionResponse) => (
-        <Button danger size="small" onClick={() => revoke.mutate(row.userId)}>
-          Отозвать
-        </Button>
+        <Popconfirm
+          title="Отозвать доступ?"
+          okText="Отозвать"
+          okType="danger"
+          cancelText="Отмена"
+          onConfirm={() => revoke.mutate(row.userId)}
+        >
+          <Button danger size="small">Отозвать</Button>
+        </Popconfirm>
       ),
     },
   ];
