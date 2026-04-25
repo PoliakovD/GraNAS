@@ -31,7 +31,8 @@ RUN dotnet publish "GraNAS.Sharing.API.csproj" \
 
 FROM build AS bundle
 RUN dotnet tool install --global dotnet-ef --version 10.0.4
-RUN /root/.dotnet/tools/dotnet-ef migrations bundle \
+RUN ConnectionStrings__Default="Host=localhost;Database=build;Username=build;Password=build" \
+    /root/.dotnet/tools/dotnet-ef migrations bundle \
     --project ../GraNAS.Sharing.DAL/GraNAS.Sharing.DAL.csproj \
     --self-contained -r linux-musl-x64 \
     -o /app/efbundle && \
