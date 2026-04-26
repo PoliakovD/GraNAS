@@ -86,6 +86,15 @@ public class AuthService : IAuthService
     return new LogoutResult(LogoutError.MissingParameters, null);
   }
 
+  public async Task<MeResponse?> GetMeAsync(Guid userId)
+  {
+    var user = await _userRepository.GetByIdAsync(userId);
+    if (user is null)
+      return null;
+
+    return new MeResponse { Id = user.Id, Email = user.Email, IsAdmin = user.IsAdmin };
+  }
+
   private static bool IsPasswordStrong(string password)
   {
     if (password.Length < 6)

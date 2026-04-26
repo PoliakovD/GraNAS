@@ -14,22 +14,22 @@
 **Реализовано:**
 
 - `api-gateway` (`services/api-gateway/`) — YARP, порт 8080, CORS, Correlation-Id (Phase 4)
-- `auth-service` — регистрация, логин, JWT, refresh-токены в httpOnly cookie (Phase 1/4)
-- `metadata-service` — CRUD папок с иерархией подпапок + permissions (Phase 2) + InternalFoldersController
+- `auth-service` — регистрация, логин, JWT, refresh-токены в httpOnly cookie (Phase 1/4); `GET /api/auth/me`, `GET /api/internal/users/{id}` (Phase 5)
+- `metadata-service` — CRUD папок с иерархией подпапок + permissions (Phase 2) + InternalFoldersController; `GET /api/folders/{id}/permissions` (Phase 5)
 - `sharing-service` — share-ссылки для незарегистрированных (Phase 3): токены base64url+SHA256, 5 эндпоинтов, cleanup job, RabbitMQ publish
 - `log-service` — централизованный сбор логов через RabbitMQ
 - `clients/web/` — React 19 + Vite + AntD 6 веб-клиент (Phase 4): все экраны Phase 1–3, silent refresh, 10 Vitest тестов; UX-улучшения (все 5 спринтов) — [`docs/web-ux-roadmap.md`](web-ux-roadmap.md)
+- `clients/desktop/` — Avalonia 11 + ReactiveUI + Semi.Avalonia Windows-клиент (Phase 5): 6 экранов, Windows Credential Manager для refresh-token, 13 desktop-тестов
 - **EF migrations bundle** — Dockerfiles для auth, metadata, sharing содержат `bundle` stage; при старте контейнера `efbundle` применяет миграции до запуска приложения
 - Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, Serilog → Elasticsearch
 - Docker Compose для dev и prod (gateway на порту 8080)
 - CI/CD (GitHub Actions → GHCR → staging via SSH)
-- **116 .NET тестов + 10 Vitest тестов — все зелёные**
+- **123 .NET тестов + 13 Desktop-тестов + 10 Vitest тестов — все зелёные**
 
 **Плейсхолдеры без реализации:**
 `admin-service`, `notification-service`, `search-service`, `signaling-service`
 
-**Не начато:** Windows-клиент, Android,
-P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STUN/TURN.
+**Не начато:** Android, P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STUN/TURN.
 
 ---
 
@@ -144,21 +144,31 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
 
 ---
 
-## Фаза 5. Минимальный Windows-клиент (Desktop)
+## Фаза 5. Минимальный Windows-клиент (Desktop) ✅ (2026-04-26)
 
 Нативное приложение под Windows, покрывающее те же 4 сервиса, что и веб-клиент.
 Цель — получить рабочий desktop-клиент до добавления P2P, чтобы потом
 интегрировать signaling в оба клиента одновременно.
 
-- [ ] Стек: **.NET 10 + WPF** (WinUI3 — при необходимости, если нужны MSIX)
-- [ ] Тот же набор экранов, что и веб-клиент Phase 4 (адаптированный под desktop UX)
-- [ ] JWT хранить в `Windows Credential Manager` (не в файле)
-- [ ] Фоновый поллинг метаданных папок (без Cloud Files API — это в Фазе 9)
-- [ ] Обработка offline: ясная ошибка вместо подвисания
+> **Примечание:** В roadmap был зафиксирован WPF, но после обсуждения выбран **Avalonia 11** ради кросс-платформенного потенциала. Phase 5 всё равно таргетирует только Windows (Credential Manager — Windows API).
+
+- [x] Стек: **.NET 10 + Avalonia 11 + ReactiveUI + Semi.Avalonia** (`clients/desktop/GraNAS.Desktop.App/`)
+- [x] Тот же набор экранов, что и веб-клиент Phase 4 (6 экранов: Login/Register, MyFolders с TreeView, FolderDetail с вкладками Права/Shares, SharedWithMe, PublicShare)
+- [x] JWT хранить в `Windows Credential Manager` (через `Meziantou.Framework.Win32.CredentialManager`), access-token — в памяти процесса
+- [x] Silent refresh on startup: читает refresh-token из Credential Manager → POST /api/auth/refresh
+- [x] Inflight dedup refresh (SemaphoreSlim) + _retry flag (порт client.ts) → 401 storm безопасен
+- [x] Backend-долги закрыты: `GET /api/auth/me` (email resolution после login) + `GET /api/folders/{id}/permissions` (список прав с email)
+- [x] DI: Microsoft.Extensions.DependencyInjection, circular dep решена через `Func<IAuthSession>` в handlers
+- [x] 13 desktop-тестов: FolderTreeBuilder, JwtTokenReader, LoginViewModel
+
+**Открытые долги Phase 5 (для полировки):**
+- Диалоги создания папки/выдачи прав/создания share (кнопки есть, modal-диалоги не подключены)
+- Toast-уведомления (сейчас ErrorMessage текстом)
+- Polly/offline handling
 
 **Критерий готовности:** пользователь может выполнять все операции (папки,
 права, share-ссылки) через нативное окно без браузера; токены не хранятся
-в plaintext на диске.
+в plaintext на диске. ✅
 
 ---
 

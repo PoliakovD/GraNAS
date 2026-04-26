@@ -161,6 +161,35 @@ public class AuthController : ControllerBase
     });
   }
 
+  /// <summary>Получить профиль текущего пользователя</summary>
+  [Authorize]
+  [HttpGet("me")]
+  [EnableRateLimiting("auth")]
+  [ProducesResponseType(typeof(MeResponse), StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> Me()
+  {
+    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+    if (!Guid.TryParse(userIdClaim, out var userId))
+      return Unauthorized(new ErrorResponse
+      {
+        Error = "invalid_token",
+        ErrorDescription = "Invalid user identifier."
+      });
+
+    var me = await _authService.GetMeAsync(userId);
+    if (me is null)
+      return Unauthorized(new ErrorResponse
+      {
+        Error = "user_not_found",
+        ErrorDescription = "User not found."
+      });
+
+    return Ok(me);
+  }
+
   /// <summary>Выход из системы</summary>
   [Authorize]
   [HttpPost("logout")]

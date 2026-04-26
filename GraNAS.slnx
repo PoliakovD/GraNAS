@@ -48,6 +48,13 @@
 
   <Folder Name="/Tests/">
     <Project Path="tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj" />
+    <Project Path="tests/GraNAS.Desktop.Tests/GraNAS.Desktop.Tests.csproj" />
+  </Folder>
+
+  <Folder Name="/Clients/" />
+  <Folder Name="/Clients/Desktop/">
+    <Project Path="clients/desktop/GraNAS.Desktop.App/GraNAS.Desktop.App.csproj" />
+    <Project Path="clients/desktop/GraNAS.Desktop.Contracts/GraNAS.Desktop.Contracts.csproj" />
   </Folder>
 
   <Folder Name="/Shared/">

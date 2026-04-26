@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             xmlns:svc="using:GraNAS.Desktop.App.Services.Folders"
+             x:DataType="vm:MyFoldersViewModel"
+             x:Class="GraNAS.Desktop.App.Views.MyFoldersView">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="16,12">
+            <TextBlock Text="Мои папки" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Content="+ Создать папку"
+                    Command="{Binding CreateRootCommand}"
+                    Background="#722ed1"
+                    Foreground="White"
+                    Margin="8,0,0,0" />
+            <Button Content="↻"
+                    Command="{Binding LoadCommand}"
+                    ToolTip.Tip="Обновить" />
+        </StackPanel>
+
+        <!-- Folder tree -->
+        <ScrollViewer Grid.Row="1" Margin="16,0">
+            <TreeView ItemsSource="{Binding Roots}"
+                      SelectedItem="{Binding SelectedNode}">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate DataType="svc:FolderNode"
+                                      ItemsSource="{Binding Children}">
+                        <Grid ColumnDefinitions="*,Auto" Margin="2">
+                            <TextBlock Text="{Binding Folder.Name}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                <Button Content="Открыть"
+                                        Command="{Binding $parent[TreeView].((vm:MyFoldersViewModel)DataContext).OpenCommand}"
+                                        CommandParameter="{Binding}"
+                                        Padding="6,2" />
+                                <Button Content="✕"
+                                        Command="{Binding $parent[TreeView].((vm:MyFoldersViewModel)DataContext).DeleteCommand}"
+                                        CommandParameter="{Binding}"
+                                        Foreground="Red"
+                                        Background="Transparent"
+                                        Padding="6,2"
+                                        ToolTip.Tip="Удалить папку и все вложенные" />
+                            </StackPanel>
+                        </Grid>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </ScrollViewer>
+
+        <!-- Error / loading -->
+        <StackPanel Grid.Row="2" Margin="16,8">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="Red"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="Загрузка..."
+                       IsVisible="{Binding IsLoading}"
+                       Foreground="Gray" />
+        </StackPanel>
+
+    </Grid>
+</UserControl>

@@ -105,6 +105,31 @@ public class FoldersController : ControllerBase
     };
   }
 
+  /// <summary>Получить список прав на папку (только владелец)</summary>
+  [HttpGet("{id}/permissions")]
+  [ProducesResponseType(typeof(PermissionResponse[]), StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+  public async Task<IActionResult> GetFolderPermissions(Guid id, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId == null)
+      return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
+
+    var result = await _permissionService.ListByFolderAsync(userId.Value, id, ct);
+
+    if (result is null)
+      return NotFound(new ErrorResponse
+      {
+        Error = "folder_not_found",
+        ErrorDescription = "Folder not found or access denied."
+      });
+
+    return Ok(result);
+  }
+
   /// <summary>Выдать права на папку другому пользователю</summary>
   [HttpPost("{id}/permissions")]
   [ProducesResponseType(typeof(PermissionResponse), StatusCodes.Status201Created)]

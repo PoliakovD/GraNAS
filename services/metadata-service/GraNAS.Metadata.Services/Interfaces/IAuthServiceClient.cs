@@ -9,4 +9,5 @@ public record UserInfo(Guid Id, string Email);
 public interface IAuthServiceClient
 {
   Task<UserInfo?> GetUserByEmailAsync(string email, CancellationToken ct = default);
+  Task<UserInfo?> GetUserByIdAsync(Guid id, CancellationToken ct = default);
 }

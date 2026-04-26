@@ -326,4 +326,85 @@ public class PermissionsEndpointsTests : IClassFixture<MetadataWebApplicationFac
         var dbAfter = scopeAfter.ServiceProvider.GetRequiredService<MetadataDbContext>();
         Assert.False(await dbAfter.Permissions.AnyAsync(p => p.FolderId == folder.Id));
     }
+
+    // ──────────────── GET /api/folders/{id}/permissions ────────────────
+
+    [Fact]
+    public async Task ListPermissions_AsOwner_EmptyFolder_Returns200EmptyArray()
+    {
+        var ownerId = Guid.NewGuid();
+        var client = ClientFor(ownerId);
+
+        var folder = await CreateFolderAsync(client, "EmptyPermsFolder");
+
+        var resp = await client.GetAsync($"/api/folders/{folder.Id}/permissions");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var list = await resp.Content.ReadFromJsonAsync<PermissionResponse[]>();
+        Assert.NotNull(list);
+        Assert.Empty(list!);
+    }
+
+    [Fact]
+    public async Task ListPermissions_AsOwner_WithGrantedUser_Returns200WithEmailAndLevel()
+    {
+        var ownerA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        var clientA = ClientFor(ownerA);
+
+        var folder = await CreateFolderAsync(clientA, "ListPermsFolder");
+        SetupAuthStub("listed@test.com", userB);
+        SetupAuthStubById(userB, "listed@test.com");
+
+        await clientA.PostAsJsonAsync($"/api/folders/{folder.Id}/permissions",
+            new { email = "listed@test.com", accessLevel = "View" });
+
+        var resp = await clientA.GetAsync($"/api/folders/{folder.Id}/permissions");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var list = await resp.Content.ReadFromJsonAsync<PermissionResponse[]>();
+        Assert.NotNull(list);
+        Assert.Single(list!);
+        Assert.Equal(userB, list![0].UserId);
+        Assert.Equal("listed@test.com", list[0].Email);
+        Assert.Equal("View", list[0].AccessLevel.ToString());
+    }
+
+    [Fact]
+    public async Task ListPermissions_AsNonOwner_Returns404()
+    {
+        var ownerA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        var clientA = ClientFor(ownerA);
+        var clientB = ClientFor(userB);
+
+        var folder = await CreateFolderAsync(clientA, "ForbiddenListFolder");
+
+        var resp = await clientB.GetAsync($"/api/folders/{folder.Id}/permissions");
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+        var err = await resp.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("folder_not_found", err!.Error);
+    }
+
+    [Fact]
+    public async Task ListPermissions_WithoutAuth_Returns401()
+    {
+        var ownerId = Guid.NewGuid();
+        var client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost")
+        });
+
+        var resp = await client.GetAsync($"/api/folders/{Guid.NewGuid()}/permissions");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    private void SetupAuthStubById(Guid userId, string email)
+    {
+        _factory.AuthClientMock
+            .Setup(c => c.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserInfo(userId, email));
+    }
 }

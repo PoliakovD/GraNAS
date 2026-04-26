@@ -60,6 +60,7 @@ public class PermissionService : IPermissionService
     return GrantPermissionResult.Success(new PermissionResponse
     {
       UserId = user.Id,
+      Email = user.Email,
       AccessLevel = req.AccessLevel,
       Path = req.Path,
       CreatedAt = permission.CreatedAt
@@ -74,6 +75,32 @@ public class PermissionService : IPermissionService
 
     var deleted = await _permissions.DeleteAsync(folderId, targetUserId);
     return new RevokePermissionResult(deleted ? RevokePermissionError.None : RevokePermissionError.PermissionNotFound);
+  }
+
+  public async Task<IReadOnlyList<PermissionResponse>?> ListByFolderAsync(
+    Guid ownerId, Guid folderId, CancellationToken ct = default)
+  {
+    var folder = await _folders.GetByIdForOwnerAsync(folderId, ownerId);
+    if (folder is null)
+      return null;
+
+    var permissions = await _permissions.ListByFolderAsync(folderId);
+
+    var result = new List<PermissionResponse>();
+    foreach (var p in permissions)
+    {
+      var user = await _authClient.GetUserByIdAsync(p.UserId, ct);
+      result.Add(new PermissionResponse
+      {
+        UserId = p.UserId,
+        Email = user?.Email,
+        AccessLevel = p.AccessLevel,
+        Path = p.Path,
+        CreatedAt = p.CreatedAt
+      });
+    }
+
+    return result;
   }
 
   public async Task<bool> HasAccessAsync(Guid userId, Guid folderId, AccessLevel required)

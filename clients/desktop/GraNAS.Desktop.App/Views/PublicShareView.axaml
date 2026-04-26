@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             x:DataType="vm:PublicShareViewModel"
+             x:Class="GraNAS.Desktop.App.Views.PublicShareView">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Width="500" Margin="0,40,0,0">
+        <StackPanel Spacing="16">
+
+            <TextBlock Text="Открыть папку по share-ссылке"
+                       FontSize="18"
+                       FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBox Text="{Binding Token}"
+                         Watermark="Вставьте токен ссылки..."
+                         Width="380" />
+                <Button Content="Открыть"
+                        Command="{Binding LookupCommand}"
+                        Background="#722ed1"
+                        Foreground="White" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="Red"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <!-- Result card -->
+            <Border Background="#f9f0ff"
+                    CornerRadius="8"
+                    Padding="16"
+                    IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding Details.FolderName}"
+                               FontSize="16"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Details.OwnerId, StringFormat='Владелец (ID): {0}'}"
+                               Foreground="Gray" />
+                    <TextBlock Text="{Binding Details.ExpiresAt, StringFormat='Истекает: {0:g}'}"
+                               Foreground="Gray" />
+                    <TextBlock Text="{Binding Details.Path, StringFormat='Путь: {0}'}"
+                               IsVisible="{Binding Details.Path, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               Foreground="Gray" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </Grid>
+</UserControl>

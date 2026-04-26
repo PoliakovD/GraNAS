@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Models.Repositories;
@@ -17,6 +18,24 @@ public class InternalUsersController : ControllerBase
   private readonly IUserRepository _users;
 
   public InternalUsersController(IUserRepository users) => _users = users;
+
+  /// <summary>Поиск пользователя по id (межсервисный вызов из metadata-service)</summary>
+  [HttpGet("{id:guid}")]
+  [ProducesResponseType(typeof(UserLookupResponse), StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> GetById(Guid id)
+  {
+    var user = await _users.GetByIdAsync(id);
+    if (user is null)
+      return NotFound(new ErrorResponse
+      {
+        Error = "user_not_found",
+        ErrorDescription = $"User with id '{id}' not found."
+      });
+
+    return Ok(new UserLookupResponse { Id = user.Id, Email = user.Email });
+  }
 
   /// <summary>Поиск пользователя по email (межсервисный вызов из metadata-service)</summary>
   [HttpGet("by-email/{email}")]

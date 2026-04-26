@@ -26,9 +26,7 @@ public class AuthServiceClient : IAuthServiceClient
       HttpMethod.Get,
       $"api/internal/users/by-email/{Uri.EscapeDataString(email)}");
 
-    var authorization = _accessor.HttpContext?.Request.Headers["Authorization"].ToString();
-    if (!string.IsNullOrEmpty(authorization))
-      request.Headers.TryAddWithoutValidation("Authorization", authorization);
+    ForwardAuthorization(request);
 
     var response = await _http.SendAsync(request, ct);
 
@@ -37,5 +35,26 @@ public class AuthServiceClient : IAuthServiceClient
 
     response.EnsureSuccessStatusCode();
     return await response.Content.ReadFromJsonAsync<UserInfo>(ct);
+  }
+
+  public async Task<UserInfo?> GetUserByIdAsync(Guid id, CancellationToken ct = default)
+  {
+    var request = new HttpRequestMessage(HttpMethod.Get, $"api/internal/users/{id}");
+    ForwardAuthorization(request);
+
+    var response = await _http.SendAsync(request, ct);
+
+    if (response.StatusCode == HttpStatusCode.NotFound)
+      return null;
+
+    response.EnsureSuccessStatusCode();
+    return await response.Content.ReadFromJsonAsync<UserInfo>(ct);
+  }
+
+  private void ForwardAuthorization(HttpRequestMessage request)
+  {
+    var authorization = _accessor.HttpContext?.Request.Headers["Authorization"].ToString();
+    if (!string.IsNullOrEmpty(authorization))
+      request.Headers.TryAddWithoutValidation("Authorization", authorization);
   }
 }

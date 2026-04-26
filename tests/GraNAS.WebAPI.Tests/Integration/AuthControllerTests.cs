@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -308,6 +309,45 @@ public class AuthControllerTests : IClassFixture<AuthWebApplicationFactory>
         Assert.Contains("refresh_token=", setCookie);
     }
 
+    // ─────────────────────── GET /api/auth/me ──────────────────────────────
+
+    [Fact]
+    public async Task Me_Authenticated_Returns200WithEmailAndId()
+    {
+        var email = UniqueEmail();
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "ValidPass1" });
+        var (accessToken, _) = await RegisterAndLoginWith(email);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<MeResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(email, body!.Email);
+        Assert.NotEqual(Guid.Empty, body.Id);
+        Assert.False(body.IsAdmin);
+    }
+
+    [Fact]
+    public async Task Me_WithoutToken_Returns401()
+    {
+        var response = await _client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_WithInvalidToken_Returns401()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not.a.valid.jwt");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     // ─────────────────────── helpers ───────────────────────────────────────
 
     private async Task<(string AccessToken, string RefreshToken)> RegisterAndLogin()
@@ -318,6 +358,16 @@ public class AuthControllerTests : IClassFixture<AuthWebApplicationFactory>
         var loginResp = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
         var body      = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
 
+        return (
+            body.GetProperty("access_token").GetString()!,
+            body.GetProperty("refresh_token").GetString()!
+        );
+    }
+
+    private async Task<(string AccessToken, string RefreshToken)> RegisterAndLoginWith(string email)
+    {
+        var loginResp = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
+        var body      = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
         return (
             body.GetProperty("access_token").GetString()!,
             body.GetProperty("refresh_token").GetString()!

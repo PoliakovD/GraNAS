@@ -1,0 +1,129 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             x:DataType="vm:FolderDetailViewModel"
+             x:Class="GraNAS.Desktop.App.Views.FolderDetailView">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="16,12" Spacing="4">
+            <TextBlock Text="{Binding Folder.Name}"
+                       FontSize="20"
+                       FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Folder.Id, StringFormat='ID: {0}'}"
+                       Foreground="Gray"
+                       FontSize="11" />
+        </StackPanel>
+
+        <!-- Tabs -->
+        <TabControl Grid.Row="1">
+
+            <!-- Permissions tab -->
+            <TabItem Header="Доступ">
+                <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                        <TextBlock Text="Пользователи с доступом"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <Button Content="+ Выдать доступ"
+                                Background="#722ed1"
+                                Foreground="White" />
+                        <Button Content="↻"
+                                Command="{Binding Permissions.LoadCommand}" />
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Permissions.Permissions}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                    <TextBlock Text="{Binding Email}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding UserId}"
+                                               Foreground="Gray"
+                                               FontSize="11"
+                                               IsVisible="{Binding Email, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+                                               VerticalAlignment="Center"
+                                               Margin="8,0" />
+                                    <Border Grid.Column="2"
+                                            Background="#f0e6ff"
+                                            CornerRadius="4"
+                                            Padding="6,2"
+                                            Margin="8,0">
+                                        <TextBlock Text="{Binding AccessLevel}"
+                                                   Foreground="#722ed1"
+                                                   FontSize="11" />
+                                    </Border>
+                                    <Button Grid.Column="3"
+                                            Content="Отозвать"
+                                            Command="{Binding $parent[ListBox].((vm:PermissionsListViewModel)DataContext).RevokeCommand}"
+                                            CommandParameter="{Binding}"
+                                            Foreground="Red"
+                                            Background="Transparent" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Grid.Row="2"
+                               Text="{Binding Permissions.ErrorMessage}"
+                               Foreground="Red"
+                               IsVisible="{Binding Permissions.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               Margin="0,8,0,0" />
+
+                </Grid>
+            </TabItem>
+
+            <!-- Shares tab -->
+            <TabItem Header="Share-ссылки">
+                <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                        <TextBlock Text="Ссылки для общего доступа"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <Button Content="+ Создать ссылку"
+                                Background="#722ed1"
+                                Foreground="White" />
+                        <Button Content="↻"
+                                Command="{Binding Shares.LoadCommand}" />
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Shares.Shares}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding ExpiresAt, StringFormat='Истекает: {0:d}'}" />
+                                        <TextBlock Text="[отозвана]"
+                                                   Foreground="Red"
+                                                   FontSize="11"
+                                                   IsVisible="{Binding Revoked}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2"
+                                            Content="Отозвать"
+                                            Command="{Binding $parent[ListBox].((vm:SharesListViewModel)DataContext).RevokeCommand}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding !Revoked}"
+                                            Foreground="Red"
+                                            Background="Transparent" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Grid.Row="2"
+                               Text="{Binding Shares.ErrorMessage}"
+                               Foreground="Red"
+                               IsVisible="{Binding Shares.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               Margin="0,8,0,0" />
+
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</UserControl>
