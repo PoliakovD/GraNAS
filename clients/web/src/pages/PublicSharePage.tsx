@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Card, Descriptions, Result, Spin, Typography } from 'antd';
+import { Card, Descriptions, Result, Spin } from 'antd';
 import { useParams } from 'react-router-dom';
 import { sharesApi } from '../api/shares.api';
+import { FileListPanel } from '../features/p2p/FileListPanel';
 
 export function PublicSharePage() {
   const { token } = useParams<{ token: string }>();
@@ -41,24 +42,20 @@ export function PublicSharePage() {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '40px auto' }}>
-      <Card>
-        <Typography.Title level={3}>{data.folderName}</Typography.Title>
-        <Alert
-          type="info"
-          message="Просмотр содержимого папки станет доступен после Phase 6 (P2P)."
-          style={{ marginBottom: 16 }}
-        />
+    <div style={{ maxWidth: 700, margin: '40px auto' }}>
+      <Card title={data.folderName} style={{ marginBottom: 16 }}>
         <Descriptions column={1} bordered size="small">
           <Descriptions.Item label="ID папки">{data.folderId}</Descriptions.Item>
-          <Descriptions.Item label="Владелец">{data.ownerId}</Descriptions.Item>
-          {data.path && <Descriptions.Item label="Путь">{data.path}</Descriptions.Item>}
+          {data.path && <Descriptions.Item label="Путь доступа">{data.path}</Descriptions.Item>}
           {data.expiresAt && (
             <Descriptions.Item label="Истекает">
               {new Date(data.expiresAt).toLocaleString('ru')}
             </Descriptions.Item>
           )}
         </Descriptions>
+      </Card>
+      <Card title="Файлы">
+        <FileListPanel folderId={data.folderId} shareToken={token} />
       </Card>
     </div>
   );

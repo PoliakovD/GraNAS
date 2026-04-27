@@ -304,31 +304,20 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         var sha256 = await FileChunker.ComputeSha256HexAsync(safePath);
         var size = FileChunker.GetFileSize(safePath);
 
+        // One header at start; chunks are self-contained (nonce+ciphertext+tag or raw)
+        SendText(session, ProtocolSerializer.Serialize(
+            new FileHeaderMessage(ProtocolMessageType.FileHeader,
+                relativePath, size, sha256, string.Empty)));
+
         if (session.Ecdh?.IsReady == true)
         {
-            // Encrypted transfer: send header with IV, then encrypted chunks
+            // Encrypted: each chunk = nonce(12) + ciphertext + tag(16)
             await foreach (var chunk in FileChunker.ReadChunksAsync(safePath))
-            {
-                var (encrypted, ivBase64) = session.Ecdh.EncryptWithIv(chunk);
-
-                // First chunk: send header first
-                if (ivBase64 is not null)
-                {
-                    SendText(session, ProtocolSerializer.Serialize(
-                        new FileHeaderMessage(ProtocolMessageType.FileHeader,
-                            relativePath, size, sha256, ivBase64)));
-                }
-
-                SendBinary(session, encrypted);
-            }
+                SendBinary(session, session.Ecdh.Encrypt(chunk));
         }
         else
         {
-            // Unencrypted fallback (ECDH not completed yet)
-            SendText(session, ProtocolSerializer.Serialize(
-                new FileHeaderMessage(ProtocolMessageType.FileHeader,
-                    relativePath, size, sha256, string.Empty)));
-
+            // Unencrypted fallback (ECDH not yet complete)
             await foreach (var chunk in FileChunker.ReadChunksAsync(safePath))
                 SendBinary(session, chunk);
         }

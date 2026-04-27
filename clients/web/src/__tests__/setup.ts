@@ -23,7 +23,7 @@ class ResizeObserverMock {
   unobserve() {}
   disconnect() {}
 }
-global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+window.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 
 // Ant Design Dropdown / Select use IntersectionObserver — not in jsdom
 class IntersectionObserverMock {
@@ -31,8 +31,7 @@ class IntersectionObserverMock {
   unobserve() {}
   disconnect() {}
 }
-global.IntersectionObserver =
-  IntersectionObserverMock as unknown as typeof IntersectionObserver;
+window.IntersectionObserver = IntersectionObserverMock as unknown as typeof IntersectionObserver;
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
