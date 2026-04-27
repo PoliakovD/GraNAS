@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             xmlns:dg="using:Avalonia.Controls"
+             x:DataType="vm:SharedWithMeViewModel"
+             x:Class="GraNAS.Desktop.App.Views.SharedWithMeView">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="16,12">
+            <TextBlock Text="Доступные папки" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Content="↻" Command="{Binding LoadCommand}" />
+        </StackPanel>
+
+        <DataGrid Grid.Row="1"
+                  Margin="16,0"
+                  ItemsSource="{Binding Folders}"
+                  IsReadOnly="True"
+                  GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Папка" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Владелец (ID)" Binding="{Binding OwnerId}" Width="280" />
+                <DataGridTextColumn Header="Уровень доступа" Binding="{Binding AccessLevel}" Width="140" />
+                <DataGridTextColumn Header="Путь" Binding="{Binding Path}" Width="200" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="2"
+                   Text="Загрузка..."
+                   IsVisible="{Binding IsLoading}"
+                   Foreground="Gray"
+                   Margin="16,8" />
+
+    </Grid>
+</UserControl>

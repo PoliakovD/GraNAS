@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             x:DataType="vm:LoginViewModel"
+             x:Class="GraNAS.Desktop.App.Views.LoginView">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
+        <StackPanel Spacing="16">
+
+            <TextBlock Text="GraNAS"
+                       FontSize="28"
+                       FontWeight="Bold"
+                       Foreground="#722ed1"
+                       HorizontalAlignment="Center" />
+
+            <TextBlock Text="Вход в аккаунт"
+                       FontSize="16"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,8" />
+
+            <TextBox Text="{Binding Email}"
+                     Watermark="Email"
+                     KeyboardNavigation.TabIndex="0" />
+
+            <TextBox Text="{Binding Password}"
+                     PasswordChar="•"
+                     Watermark="Пароль"
+                     KeyboardNavigation.TabIndex="1" />
+
+
+            <Button Content="Войти"
+                    Command="{Binding SignInCommand}"
+                    IsEnabled="{Binding !IsLoading}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Background="#722ed1"
+                    Foreground="White" />
+
+            <Button Content="Нет аккаунта? Зарегистрироваться"
+                    Command="{Binding GoToRegisterCommand}"
+                    Background="Transparent"
+                    HorizontalAlignment="Center" />
+
+        </StackPanel>
+    </Grid>
+</UserControl>

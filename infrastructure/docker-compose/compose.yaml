@@ -330,6 +330,43 @@ services:
       retries: 3
       start_period: 20s
 
+  api-gateway:
+    container_name: ${PREFIX}_api_gateway
+    build:
+      context: ../..
+      dockerfile: services/api-gateway/GraNAS.Gateway/Dockerfile
+    image: ${GATEWAY_SERVICE_IMAGE}:${GATEWAY_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      Cors__AllowedOrigins__0: ${WEB_CLIENT_ORIGIN}
+      ReverseProxy__Clusters__auth__Destinations__d1__Address: http://auth-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__metadata__Destinations__d1__Address: http://metadata-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__sharing__Destinations__d1__Address: http://sharing-service:${SERVICE_PORT_CONTAINER}
+    ports:
+      - "${GATEWAY_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      metadata-service:
+        condition: service_healthy
+      sharing-service:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
 networks:
   db-network:
     driver: bridge

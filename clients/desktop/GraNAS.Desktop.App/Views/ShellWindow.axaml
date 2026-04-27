@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+        xmlns:views="using:GraNAS.Desktop.App.Views"
+        x:DataType="vm:ShellViewModel"
+        x:Class="GraNAS.Desktop.App.Views.ShellWindow"
+        Title="GraNAS"
+        Width="1100"
+        Height="720"
+        MinWidth="800"
+        MinHeight="500">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header bar (hidden when not authenticated) -->
+        <Border Grid.Row="0"
+                Background="#722ed1"
+                Padding="16,10"
+                IsVisible="{Binding Session.IsAuthenticated}">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <Button Content="Мои папки"
+                            Command="{Binding NavFoldersCommand}"
+                            Classes="header-nav"
+                            Background="Transparent"
+                            Foreground="White" />
+                    <Button Content="Доступные папки"
+                            Command="{Binding NavSharedCommand}"
+                            Classes="header-nav"
+                            Background="Transparent"
+                            Foreground="White" />
+                    <Button Content="Открыть по ссылке"
+                            Command="{Binding NavPublicShareCommand}"
+                            Classes="header-nav"
+                            Background="Transparent"
+                            Foreground="White" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="{Binding Session.CurrentUserEmail}"
+                               Foreground="White"
+                               VerticalAlignment="Center" />
+                    <Button Content="Выйти"
+                            Command="{Binding LogoutCommand}"
+                            Background="Transparent"
+                            Foreground="White" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Page content -->
+        <ContentControl Grid.Row="1"
+                        Content="{Binding CurrentPage}">
+            <ContentControl.DataTemplates>
+                <DataTemplate DataType="vm:LoginViewModel">
+                    <views:LoginView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:RegisterViewModel">
+                    <views:RegisterView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:MyFoldersViewModel">
+                    <views:MyFoldersView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:FolderDetailViewModel">
+                    <views:FolderDetailView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:SharedWithMeViewModel">
+                    <views:SharedWithMeView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:PublicShareViewModel">
+                    <views:PublicShareView />
+                </DataTemplate>
+            </ContentControl.DataTemplates>
+        </ContentControl>
+
+    </Grid>
+</Window>

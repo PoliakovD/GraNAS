@@ -7,9 +7,12 @@ using GraNAS.Auth.Services.Interfaces;
 using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Hosting;
 
 namespace GraNAS.Auth.API.Controllers;
 
@@ -18,13 +21,38 @@ namespace GraNAS.Auth.API.Controllers;
 [Produces("application/json")]
 public class AuthController : ControllerBase
 {
+  private const string RefreshTokenCookieName = "refresh_token";
+  private const string RefreshTokenCookiePath = "/api/auth";
+
   private readonly IAuthService _authService;
   private readonly ILoggerService _logger;
+  private readonly IWebHostEnvironment _env;
 
-  public AuthController(IAuthService authService, ILoggerService logger)
+  public AuthController(IAuthService authService, ILoggerService logger, IWebHostEnvironment env)
   {
     _authService = authService;
     _logger = logger;
+    _env = env;
+  }
+
+  private void SetRefreshTokenCookie(string token)
+  {
+    Response.Cookies.Append(RefreshTokenCookieName, token, new CookieOptions
+    {
+      HttpOnly = true,
+      Secure = !_env.IsDevelopment(),
+      SameSite = SameSiteMode.Lax,
+      Path = RefreshTokenCookiePath,
+      Expires = DateTimeOffset.UtcNow.AddDays(7)
+    });
+  }
+
+  private void DeleteRefreshTokenCookie()
+  {
+    Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
+    {
+      Path = RefreshTokenCookiePath
+    });
   }
 
   /// <summary>Регистрация нового пользователя</summary>
@@ -85,6 +113,7 @@ public class AuthController : ControllerBase
 
     await _logger.LogInfo($"User {request.Email} logged in");
 
+    SetRefreshTokenCookie(tokens.RefreshToken);
     return Ok(new
     {
       access_token = tokens.AccessToken,
@@ -101,12 +130,18 @@ public class AuthController : ControllerBase
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-  public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
+  public async Task<IActionResult> Refresh(
+    [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? request)
   {
-    if (!ModelState.IsValid)
-      return BadRequest(ModelState);
+    var refreshToken = Request.Cookies[RefreshTokenCookieName] ?? request?.RefreshToken;
+    if (string.IsNullOrEmpty(refreshToken))
+      return BadRequest(new ErrorResponse
+      {
+        Error = "invalid_request",
+        ErrorDescription = "Refresh token is required."
+      });
 
-    var tokens = await _authService.RefreshAsync(request.RefreshToken);
+    var tokens = await _authService.RefreshAsync(refreshToken);
     if (tokens == null)
     {
       return Unauthorized(new ErrorResponse
@@ -116,6 +151,7 @@ public class AuthController : ControllerBase
       });
     }
 
+    SetRefreshTokenCookie(tokens.RefreshToken);
     return Ok(new
     {
       access_token = tokens.AccessToken,
@@ -125,13 +161,13 @@ public class AuthController : ControllerBase
     });
   }
 
-  /// <summary>Выход из системы</summary>
+  /// <summary>Получить профиль текущего пользователя</summary>
   [Authorize]
-  [HttpPost("logout")]
-  [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+  [HttpGet("me")]
+  [EnableRateLimiting("auth")]
+  [ProducesResponseType(typeof(MeResponse), StatusCodes.Status200OK)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-  public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+  public async Task<IActionResult> Me()
   {
     var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                       ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
@@ -143,7 +179,47 @@ public class AuthController : ControllerBase
         ErrorDescription = "Invalid user identifier."
       });
 
+    var me = await _authService.GetMeAsync(userId);
+    if (me is null)
+      return Unauthorized(new ErrorResponse
+      {
+        Error = "user_not_found",
+        ErrorDescription = "User not found."
+      });
+
+    return Ok(me);
+  }
+
+  /// <summary>Выход из системы</summary>
+  [Authorize]
+  [HttpPost("logout")]
+  [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> Logout(
+    [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LogoutRequest? request)
+  {
+    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+    if (!Guid.TryParse(userIdClaim, out var userId))
+      return Unauthorized(new ErrorResponse
+      {
+        Error = "invalid_token",
+        ErrorDescription = "Invalid user identifier."
+      });
+
+    request ??= new LogoutRequest();
+
+    // cookie takes priority; supplement body if RefreshToken not provided
+    var cookieToken = Request.Cookies[RefreshTokenCookieName];
+    if (cookieToken != null && string.IsNullOrEmpty(request.RefreshToken))
+      request.RefreshToken = cookieToken;
+
     var result = await _authService.LogoutAsync(userId, request);
+
+    if (result.Error == LogoutError.None)
+      DeleteRefreshTokenCookie();
 
     return result.Error switch
     {

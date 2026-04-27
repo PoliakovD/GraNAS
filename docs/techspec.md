@@ -13,9 +13,10 @@
 
 ### 🔧 Backend
 
+- **API Gateway** (`services/api-gateway/`, YARP) — единая точка входа для браузерных клиентов на порту 8080. Централизованный CORS (`WithOrigins + AllowCredentials`), прозрачный проброс Cookie/Authorization заголовков, Correlation-Id. JWT-валидация и rate-limiting остаются на каждом сервисе.
 - **Центральный REST API** для всех клиентов (Web, Android, Windows)
 - **PostgreSQL** – хранение метаданных (пользователи, папки, файлы, права, ссылки, события)
-- **Аутентификация** – OAuth 2.0 (парольный поток для внутренних клиентов)
+- **Аутентификация** – email/пароль, JWT access-token (Bearer) + refresh-token в httpOnly cookie (см. раздел Безопасность)
 - **Безопасность** – все действия через **HTTPS**
 - **Управление сессиями** и токенами доступа
 - **Генерация криптоустойчивых токенов** для share‑ссылок, хранение только хэшей
@@ -53,7 +54,15 @@
 
 ### 📱 Frontend (Web, Android, Windows)
 
-- Вход и регистрация через email/пароль (OAuth 2.0)
+**Web-клиент** (`clients/web/`) — реализован в Phase 4:
+- Стек: **React 19 + Vite + TypeScript**, Ant Design 6, TanStack Query v5, React Router v7, axios
+- Единая точка входа: API Gateway `http://localhost:8080` (dev), все запросы через один origin
+- Экраны: Регистрация/Логин/Выход, Мои папки (дерево иерархии), Управление правами, Управление share-ссылками, Доступные папки, Публичная страница share-ссылки
+- Silent refresh сессии через httpOnly cookie при перезагрузке страницы
+- MSW-тесты (Vitest + Testing Library)
+
+**Общие требования ко всем клиентам:**
+- Вход и регистрация через email/пароль
 - Просмотр, создание, удаление папок и файлов, загрузка файлов (метаданные)
 - Интерфейс назначения прав доступа зарегистрированным пользователям
 - Генерация и управление ссылками с указанием срока действия
@@ -94,9 +103,11 @@
 ### 🛡️ Безопасность
 
 - **Только HTTPS** для сигнального/REST-трафика
-- **OAuth 2.0** + управление сессиями
+- **email/пароль** аутентификация; JWT access-token (Bearer, 15 мин) + refresh-token
+- **refresh-token** хранится в браузере как **httpOnly cookie** (SameSite=Lax, Secure в prod, Path=/api/auth) — недоступен JavaScript, устойчив к XSS
+- **Access-token** хранится только в памяти JavaScript (не в localStorage/sessionStorage)
 - Проверка прав на **каждом запросе**
-- Криптостойкие токены для ссылок
+- Криптостойкие токены для ссылок (base64url, хранение только SHA-256 хэшей)
 - Мгновенное прекращение доступа при отзыве прав или ссылки
 - Файлы **не хранятся** на сервере
 - **DTLS** обязательно шифрует WebRTC data-channel между пирами
@@ -146,14 +157,17 @@
 
 ## 🔗 Связанные компоненты (репозитории)
 
-- **backend-rest-api** – центральный REST API, бизнес-логика, интеграция с БД
-- **signaling-service** – WebRTC signaling (SignalR hub, выдача TURN-кредов)
-- **turn-infra** – развёрнутый coturn, публичные STUN берём как есть
-- **web-client-react** – веб-интерфейс (React) с нативным WebRTC P2P-слоем
-- **android-client** – Android-приложение (`google-webrtc`)
-- **windows-client** – Windows-клиент + Shell Extension + SIPSorcery для P2P
-- **db-migrations** – миграции и схемы PostgreSQL
-- **notifications-service** – обработка email и webhook-уведомлений
+- **api-gateway** (`services/api-gateway/`) – YARP reverse proxy, единая точка входа на порт 8080, CORS, Correlation-Id ✅ Phase 4
+- **auth-service** (`services/auth-service/`) – регистрация, логин, JWT, refresh-token (httpOnly cookie) ✅ Phase 1/4
+- **metadata-service** (`services/metadata-service/`) – CRUD папок, иерархия, permissions ✅ Phase 1/2
+- **sharing-service** (`services/sharing-service/`) – share-ссылки, токены, cleanup job ✅ Phase 3
+- **web-client-react** (`clients/web/`) – React 19 + Vite + AntD 6, TanStack Query v5, React Router v7 ✅ Phase 4
+- **signaling-service** – WebRTC signaling (SignalR hub, выдача TURN-кредов) ⏳ Phase 6
+- **turn-infra** – развёрнутый coturn, публичные STUN берём как есть ⏳ Phase 6
+- **android-client** – Android-приложение (`google-webrtc`) ⏳ Phase 11
+- **windows-client** – Windows-клиент + Shell Extension + SIPSorcery для P2P ⏳ Phase 5/10
+- **db-migrations** – миграции и схемы PostgreSQL (в каждом сервисе через EF Core)
+- **notifications-service** – обработка email и webhook-уведомлений ⏳ Phase 7
 
 ---
 

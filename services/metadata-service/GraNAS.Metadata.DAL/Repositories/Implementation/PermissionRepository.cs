@@ -27,6 +27,13 @@ public class PermissionRepository : IPermissionRepository
       .ToListAsync();
   }
 
+  public async Task<IEnumerable<Permission>> ListByFolderAsync(Guid folderId)
+  {
+    return await _context.Permissions
+      .Where(p => p.FolderId == folderId)
+      .ToListAsync();
+  }
+
   public async Task UpsertAsync(Permission permission)
   {
     var existing = await GetAsync(permission.FolderId, permission.UserId);

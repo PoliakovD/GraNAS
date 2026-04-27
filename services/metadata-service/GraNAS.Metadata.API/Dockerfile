@@ -32,6 +32,15 @@ RUN dotnet publish "GraNAS.Metadata.API.csproj" \
     /p:DebugType=none \
     /p:DebugSymbols=false
 
+FROM build AS bundle
+RUN dotnet tool install --global dotnet-ef --version 10.0.4
+RUN ConnectionStrings__Default="Host=localhost;Database=build;Username=build;Password=build" \
+    /root/.dotnet/tools/dotnet-ef migrations bundle \
+    --project ../GraNAS.Metadata.DAL/GraNAS.Metadata.DAL.csproj \
+    --self-contained -r linux-musl-x64 \
+    -o /app/efbundle && \
+    chmod +x /app/efbundle
+
 # === Финальный образ ===
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 ARG APP_UID=1000
@@ -41,9 +50,10 @@ WORKDIR /app
 EXPOSE 8080
 
 COPY --from=publish --chown=appuser:appgroup /app/publish .
+COPY --from=bundle --chown=appuser:appgroup /app/efbundle ./efbundle
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
 
 USER appuser
-ENTRYPOINT ["dotnet", "GraNAS.Metadata.API.dll"]
+ENTRYPOINT ["/bin/sh", "-c", "./efbundle && exec dotnet GraNAS.Metadata.API.dll"]
