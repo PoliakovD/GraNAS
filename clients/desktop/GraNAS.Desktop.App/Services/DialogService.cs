@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using GraNAS.Desktop.App.ViewModels.Dialogs;
 using GraNAS.Desktop.App.Views.Dialogs;
 using GraNAS.Desktop.Contracts.Metadata;
@@ -38,5 +39,13 @@ public class DialogService : IDialogService
     var vm = new ShareCreatedDialogViewModel(token);
     var dlg = new ShareCreatedDialog { DataContext = vm };
     await dlg.ShowDialog(Owner!);
+  }
+
+  public async Task<string?> ShowFolderPickerAsync(string title = "Выберите папку")
+  {
+    if (Owner is null) return null;
+    var results = await Owner.StorageProvider.OpenFolderPickerAsync(
+      new FolderPickerOpenOptions { Title = title, AllowMultiple = false });
+    return results.Count > 0 ? results[0].TryGetLocalPath() : null;
   }
 }

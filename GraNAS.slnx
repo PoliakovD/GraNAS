@@ -46,6 +46,12 @@
     <Project Path="services/sharing-service/GraNAS.Sharing.Services/GraNAS.Sharing.Services.csproj" />
   </Folder>
 
+  <Folder Name="/Services/SignalingService/">
+    <Project Path="services/signaling-service/GraNAS.Signaling.API/GraNAS.Signaling.API.csproj" />
+    <Project Path="services/signaling-service/GraNAS.Signaling.Models/GraNAS.Signaling.Models.csproj" />
+    <Project Path="services/signaling-service/GraNAS.Signaling.Services/GraNAS.Signaling.Services.csproj" />
+  </Folder>
+
   <Folder Name="/Tests/">
     <Project Path="tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj" />
     <Project Path="tests/GraNAS.Desktop.Tests/GraNAS.Desktop.Tests.csproj" />

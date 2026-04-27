@@ -45,6 +45,11 @@
                                         Background="Transparent"
                                         Padding="6,2"
                                         ToolTip.Tip="Удалить папку и все вложенные" />
+                                <Button Content="📁 P2P"
+                                        Command="{Binding $parent[TreeView].((vm:MyFoldersViewModel)DataContext).BindLocalFolderCommand}"
+                                        CommandParameter="{Binding}"
+                                        Padding="6,2"
+                                        ToolTip.Tip="Привязать локальную папку для P2P-доступа" />
                             </StackPanel>
                         </Grid>
                     </TreeDataTemplate>

@@ -36,6 +36,21 @@
                             Foreground="White" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                    <!-- P2P online/offline toggle -->
+                    <Button Command="{Binding OnlineToggleCommand}"
+                            Background="Transparent"
+                            Foreground="White">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Ellipse Width="10" Height="10" Fill="#4caf50"
+                                     IsVisible="{Binding IsOnline}" />
+                            <TextBlock Text="Online" IsVisible="{Binding IsOnline}"
+                                       VerticalAlignment="Center" />
+                            <Ellipse Width="10" Height="10" Fill="#9e9e9e"
+                                     IsVisible="{Binding !IsOnline}" />
+                            <TextBlock Text="Offline" IsVisible="{Binding !IsOnline}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <TextBlock Text="{Binding Session.CurrentUserEmail}"
                                Foreground="White"
                                VerticalAlignment="Center" />

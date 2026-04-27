@@ -16,8 +16,13 @@ namespace GraNAS.Metadata.API.Controllers;
 public class InternalFoldersController : ControllerBase
 {
     private readonly IFolderRepository _folders;
+    private readonly IPermissionRepository _permissions;
 
-    public InternalFoldersController(IFolderRepository folders) => _folders = folders;
+    public InternalFoldersController(IFolderRepository folders, IPermissionRepository permissions)
+    {
+        _folders = folders;
+        _permissions = permissions;
+    }
 
     /// <summary>Получить метаданные папки (межсервисный вызов)</summary>
     [HttpGet("{id:guid}")]
@@ -40,6 +45,27 @@ public class InternalFoldersController : ControllerBase
             Name = folder.Name,
             OwnerId = folder.OwnerId
         });
+    }
+
+    /// <summary>Проверить доступ пользователя к папке (для signaling-service)</summary>
+    [HttpGet("{id:guid}/access")]
+    [ProducesResponseType(typeof(FolderAccessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetAccess(Guid id, [FromQuery] Guid userId)
+    {
+        var folder = await _folders.GetByIdAsync(id);
+        if (folder is null)
+            return NotFound(new ErrorResponse { Error = "folder_not_found", ErrorDescription = $"Folder '{id}' not found." });
+
+        if (folder.OwnerId == userId)
+            return Ok(new FolderAccessResponse { FolderId = folder.Id, OwnerId = folder.OwnerId, ScopePath = null });
+
+        var permission = await _permissions.GetAsync(id, userId);
+        if (permission is not null)
+            return Ok(new FolderAccessResponse { FolderId = folder.Id, OwnerId = folder.OwnerId, ScopePath = permission.Path });
+
+        return NotFound(new ErrorResponse { Error = "access_denied", ErrorDescription = $"User '{userId}' has no access to folder '{id}'." });
     }
 
     /// <summary>Проверить владение папкой (межсервисный вызов из sharing-service)</summary>

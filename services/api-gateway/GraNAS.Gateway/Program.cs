@@ -64,6 +64,7 @@ public class Program
         }
 
         app.UseCors(corsPolicyName);
+        app.UseWebSockets();
 
         app.MapHealthChecks("/health", new HealthCheckOptions
         {

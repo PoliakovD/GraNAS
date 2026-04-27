@@ -7,6 +7,7 @@ using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
 using GraNAS.Desktop.App.Services.Http;
+using GraNAS.Desktop.App.Services.P2P;
 using GraNAS.Desktop.App.ViewModels;
 using GraNAS.Desktop.App.Views;
 using Microsoft.Extensions.Configuration;
@@ -50,7 +51,20 @@ public partial class App : Application
 
       window.Opened += async (_, _) =>
       {
-        try { await session.TryRestoreAsync(); }
+        try
+        {
+          await session.TryRestoreAsync();
+          // Auto-connect P2P on restore (ShouldBeOnline defaults to true)
+          if (session.IsAuthenticated)
+          {
+            var p2pHost = _services.GetRequiredService<IP2PHost>();
+            if (p2pHost.ShouldBeOnline)
+            {
+              try { await p2pHost.ConnectAsync(); }
+              catch { /* non-fatal: P2P is optional at startup */ }
+            }
+          }
+        }
         catch { /* IsAuthenticated stays false → ShellViewModel already showing Login */ }
       };
     }
@@ -108,6 +122,23 @@ public partial class App : Application
       .AddHttpMessageHandler<BearerTokenHandler>()
       .AddHttpMessageHandler<RefreshOn401Handler>()
       .AddPolicyHandler(retry);
+
+    // P2P services
+    services.AddSingleton<IFolderShareRegistry, FolderShareRegistry>();
+
+    services.AddHttpClient<ISignalingApi, SignalingApi>(c => c.BaseAddress = baseUri)
+      .AddHttpMessageHandler<BearerTokenHandler>()
+      .AddHttpMessageHandler<RefreshOn401Handler>()
+      .AddPolicyHandler(retry);
+
+    var signalingHubPath = _config["Signaling:HubPath"] ?? "/hubs/signaling";
+    var hubUrl = apiSettings.BaseUrl.TrimEnd('/') + signalingHubPath;
+    services.AddSingleton<IP2PHost>(sp => new P2PHost(
+      sp.GetRequiredService<IFolderShareRegistry>(),
+      sp.GetRequiredService<IAuthSession>(),
+      sp.GetRequiredService<ISignalingApi>(),
+      sp.GetRequiredService<INotificationService>(),
+      hubUrl));
 
     services.AddSingleton<ShellViewModel>();
 

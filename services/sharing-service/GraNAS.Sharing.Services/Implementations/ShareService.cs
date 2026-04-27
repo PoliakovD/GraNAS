@@ -127,6 +127,9 @@ public class ShareService : IShareService
         return _repository.DeleteExpiredAsync(DateTime.UtcNow);
     }
 
+    public Task<ShareLink?> GetByTokenHashInternalAsync(string tokenHash, CancellationToken ct = default)
+        => _repository.GetByTokenHashAsync(tokenHash);
+
     private async Task<RevokeShareResult> RevokeShareLinkAsync(ShareLink shareLink)
     {
         shareLink.Revoked = true;
