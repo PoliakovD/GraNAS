@@ -25,12 +25,11 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <StackPanel Grid.Row="2" Margin="16,8">
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Foreground="Red"
-                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-            <TextBlock Text="Загрузка..." IsVisible="{Binding IsLoading}" Foreground="Gray" />
-        </StackPanel>
+        <TextBlock Grid.Row="2"
+                   Text="Загрузка..."
+                   IsVisible="{Binding IsLoading}"
+                   Foreground="Gray"
+                   Margin="16,8" />
 
     </Grid>
 </UserControl>

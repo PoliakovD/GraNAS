@@ -28,6 +28,7 @@
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center" />
                         <Button Content="+ Выдать доступ"
+                                Command="{Binding Permissions.GrantCommand}"
                                 Background="#722ed1"
                                 Foreground="White" />
                         <Button Content="↻"
@@ -67,12 +68,6 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <TextBlock Grid.Row="2"
-                               Text="{Binding Permissions.ErrorMessage}"
-                               Foreground="Red"
-                               IsVisible="{Binding Permissions.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               Margin="0,8,0,0" />
-
                 </Grid>
             </TabItem>
 
@@ -85,6 +80,7 @@
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center" />
                         <Button Content="+ Создать ссылку"
+                                Command="{Binding Shares.CreateCommand}"
                                 Background="#722ed1"
                                 Foreground="White" />
                         <Button Content="↻"
@@ -114,12 +110,6 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-
-                    <TextBlock Grid.Row="2"
-                               Text="{Binding Shares.ErrorMessage}"
-                               Foreground="Red"
-                               IsVisible="{Binding Shares.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               Margin="0,8,0,0" />
 
                 </Grid>
             </TabItem>

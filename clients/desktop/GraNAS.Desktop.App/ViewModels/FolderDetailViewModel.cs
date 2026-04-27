@@ -1,3 +1,4 @@
+using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.Contracts.Metadata;
 using ReactiveUI;
@@ -13,10 +14,12 @@ public class FolderDetailViewModel : ViewModelBase
   public FolderDetailViewModel(
     FolderResponse folder,
     IPermissionsApi permissionsApi,
-    ISharesApi sharesApi)
+    ISharesApi sharesApi,
+    IDialogService dialogs,
+    INotificationService notifications)
   {
     Folder = folder;
-    Permissions = new PermissionsListViewModel(permissionsApi, folder.Id);
-    Shares = new SharesListViewModel(sharesApi, folder.Id);
+    Permissions = new PermissionsListViewModel(permissionsApi, folder.Id, dialogs, notifications);
+    Shares = new SharesListViewModel(sharesApi, folder.Id, dialogs, notifications);
   }
 }

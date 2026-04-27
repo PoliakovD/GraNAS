@@ -22,11 +22,6 @@
 
             <TextBox Text="{Binding Password}" PasswordChar="•" Watermark="Пароль (мин. 6 символов)" />
 
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Foreground="Red"
-                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       TextWrapping="Wrap" />
-
             <Button Content="Зарегистрироваться"
                     Command="{Binding RegisterCommand}"
                     IsEnabled="{Binding !IsLoading}"

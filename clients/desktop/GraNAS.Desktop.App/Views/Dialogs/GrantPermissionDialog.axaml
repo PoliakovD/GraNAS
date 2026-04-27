@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GraNAS.Desktop.App.ViewModels.Dialogs"
+        x:DataType="vm:GrantPermissionDialogViewModel"
+        x:Class="GraNAS.Desktop.App.Views.Dialogs.GrantPermissionDialog"
+        Title="Выдать доступ"
+        Width="400" Height="190"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+    <StackPanel Margin="20" Spacing="14">
+        <TextBox Text="{Binding Email}"
+                 Watermark="Email пользователя" />
+
+        <ComboBox ItemsSource="{Binding Levels}"
+                  SelectedItem="{Binding AccessLevel}"
+                  HorizontalAlignment="Stretch" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Отмена" Command="{Binding CancelCommand}" Width="90" />
+            <Button Content="Выдать"
+                    Command="{Binding ConfirmCommand}"
+                    Background="#722ed1"
+                    Foreground="White"
+                    Width="90" />
+        </StackPanel>
+    </StackPanel>
+</Window>

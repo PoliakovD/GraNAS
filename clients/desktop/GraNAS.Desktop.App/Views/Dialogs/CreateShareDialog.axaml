@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GraNAS.Desktop.App.ViewModels.Dialogs"
+        x:DataType="vm:CreateShareDialogViewModel"
+        x:Class="GraNAS.Desktop.App.Views.Dialogs.CreateShareDialog"
+        Title="Создать share-ссылку"
+        Width="400" Height="170"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+    <StackPanel Margin="20" Spacing="14">
+        <StackPanel Spacing="6">
+            <TextBlock Text="Дата истечения:" />
+            <CalendarDatePicker SelectedDate="{Binding ExpiresAt}"
+                                DisplayDateStart="{Binding MinDate}"
+                                HorizontalAlignment="Stretch" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Отмена" Command="{Binding CancelCommand}" Width="90" />
+            <Button Content="Создать"
+                    Command="{Binding ConfirmCommand}"
+                    Background="#722ed1"
+                    Foreground="White"
+                    Width="90" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -21,10 +21,6 @@
                         Foreground="White" />
             </StackPanel>
 
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Foreground="Red"
-                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-
             <!-- Result card -->
             <Border Background="#f9f0ff"
                     CornerRadius="8"

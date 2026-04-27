@@ -5,4 +5,8 @@ namespace GraNAS.Desktop.App.Views;
 
 public partial class MyFoldersView : ReactiveUserControl<MyFoldersViewModel>
 {
+  public MyFoldersView()
+  {
+    InitializeComponent();
+  }
 }

@@ -27,10 +27,6 @@
                      Watermark="Пароль"
                      KeyboardNavigation.TabIndex="1" />
 
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Foreground="Red"
-                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       TextWrapping="Wrap" />
 
             <Button Content="Войти"
                     Command="{Binding SignInCommand}"

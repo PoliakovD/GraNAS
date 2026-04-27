@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using FluentAssertions;
+using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
 using GraNAS.Desktop.App.ViewModels;
@@ -12,8 +13,9 @@ public class LoginViewModelTests
 {
   private readonly Mock<IAuthApi> _authApi = new();
   private readonly Mock<IAuthSession> _session = new();
+  private readonly Mock<INotificationService> _notifications = new();
 
-  private LoginViewModel CreateVm() => new(_authApi.Object, _session.Object);
+  private LoginViewModel CreateVm() => new(_authApi.Object, _session.Object, _notifications.Object);
 
   [Fact]
   public async Task SignIn_ValidCredentials_CallsSignInAsync()
@@ -29,11 +31,11 @@ public class LoginViewModelTests
     await vm.SignInCommand.Execute().FirstAsync();
 
     _session.Verify(s => s.SignInAsync(tokens, default), Times.Once);
-    vm.ErrorMessage.Should().BeNullOrEmpty();
+    _notifications.Verify(n => n.Error(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
   }
 
   [Fact]
-  public async Task SignIn_InvalidCredentials_SetsErrorMessage()
+  public async Task SignIn_InvalidCredentials_ShowsErrorNotification()
   {
     _authApi.Setup(a => a.LoginAsync(It.IsAny<LoginRequest>(), default))
             .ReturnsAsync((TokenResponse?)null);
@@ -44,12 +46,12 @@ public class LoginViewModelTests
 
     await vm.SignInCommand.Execute().FirstAsync();
 
-    vm.ErrorMessage.Should().NotBeNullOrEmpty();
+    _notifications.Verify(n => n.Error(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     _session.Verify(s => s.SignInAsync(It.IsAny<TokenResponse>(), default), Times.Never);
   }
 
   [Fact]
-  public async Task SignIn_ApiThrows_SetsErrorMessage()
+  public async Task SignIn_ApiThrows_ShowsErrorNotification()
   {
     _authApi.Setup(a => a.LoginAsync(It.IsAny<LoginRequest>(), default))
             .ThrowsAsync(new ApiException(429, null));
@@ -60,7 +62,7 @@ public class LoginViewModelTests
 
     await vm.SignInCommand.Execute().FirstAsync();
 
-    vm.ErrorMessage.Should().NotBeNullOrEmpty();
+    _notifications.Verify(n => n.Error(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
   }
 
   [Fact]

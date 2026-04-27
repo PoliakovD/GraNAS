@@ -1,4 +1,5 @@
 using System.Reactive;
+using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.Contracts.Sharing;
 using ReactiveUI;
@@ -8,11 +9,11 @@ namespace GraNAS.Desktop.App.ViewModels;
 public class PublicShareViewModel : ViewModelBase
 {
   private readonly ISharesApi _sharesApi;
+  private readonly INotificationService _notifications;
 
   private string _token = string.Empty;
   private ShareDetailsResponse? _details;
   private bool _isLoading;
-  private string? _errorMessage;
 
   public string Token
   {
@@ -32,17 +33,12 @@ public class PublicShareViewModel : ViewModelBase
     set => this.RaiseAndSetIfChanged(ref _isLoading, value);
   }
 
-  public string? ErrorMessage
-  {
-    get => _errorMessage;
-    set => this.RaiseAndSetIfChanged(ref _errorMessage, value);
-  }
-
   public ReactiveCommand<Unit, Unit> LookupCommand { get; }
 
-  public PublicShareViewModel(ISharesApi sharesApi)
+  public PublicShareViewModel(ISharesApi sharesApi, INotificationService notifications)
   {
     _sharesApi = sharesApi;
+    _notifications = notifications;
 
     var canLookup = this.WhenAnyValue(x => x.Token, x => x.IsLoading,
       (t, loading) => !string.IsNullOrWhiteSpace(t) && !loading);
@@ -52,22 +48,23 @@ public class PublicShareViewModel : ViewModelBase
 
   private async Task LookupAsync()
   {
-    ErrorMessage = null;
     Details = null;
     IsLoading = true;
     try
     {
       Details = await _sharesApi.GetShareDetailsAsync(Token.Trim());
     }
-    catch (ApiException ex)
+    catch (ApiException ex) when (ex.StatusCode == 404)
     {
-      ErrorMessage = ex.StatusCode == 404
-        ? "Ссылка не найдена или истекла."
-        : ex.Message;
+      _notifications.Error("Ссылка не найдена или истекла.");
     }
-    catch (Exception ex)
+    catch (ApiException ex) when (ex.StatusCode == 410)
     {
-      ErrorMessage = ex.Message;
+      _notifications.Error("Ссылка была отозвана владельцем.");
+    }
+    catch
+    {
+      _notifications.Error("Нет соединения с сервером.");
     }
     finally
     {

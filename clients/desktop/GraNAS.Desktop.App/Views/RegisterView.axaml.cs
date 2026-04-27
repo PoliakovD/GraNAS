@@ -5,4 +5,8 @@ namespace GraNAS.Desktop.App.Views;
 
 public partial class RegisterView : ReactiveUserControl<RegisterViewModel>
 {
+  public RegisterView()
+  {
+    InitializeComponent();
+  }
 }

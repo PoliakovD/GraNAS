@@ -1,4 +1,6 @@
 using System.Reactive;
+using System.Reactive.Linq;
+using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
 using GraNAS.Desktop.Contracts.Metadata;
@@ -13,6 +15,8 @@ public class ShellViewModel : ViewModelBase
   private readonly IFoldersApi _foldersApi;
   private readonly IPermissionsApi _permissionsApi;
   private readonly ISharesApi _sharesApi;
+  private readonly IDialogService _dialogs;
+  private readonly INotificationService _notifications;
 
   private ViewModelBase? _currentPage;
   private string _currentNav = "folders";
@@ -41,25 +45,42 @@ public class ShellViewModel : ViewModelBase
     IAuthApi authApi,
     IFoldersApi foldersApi,
     IPermissionsApi permissionsApi,
-    ISharesApi sharesApi)
+    ISharesApi sharesApi,
+    IDialogService dialogs,
+    INotificationService notifications)
   {
     _session = session;
     _authApi = authApi;
     _foldersApi = foldersApi;
     _permissionsApi = permissionsApi;
     _sharesApi = sharesApi;
+    _dialogs = dialogs;
+    _notifications = notifications;
 
     LogoutCommand = ReactiveCommand.CreateFromTask(LogoutAsync);
     NavFoldersCommand = ReactiveCommand.Create(() => ShowFolders());
     NavSharedCommand = ReactiveCommand.Create(() => ShowSharedWithMe());
     NavPublicShareCommand = ReactiveCommand.Create(() => ShowPublicShare());
 
-    ShowFolders();
+    // React to auth state changes: login/restore → Folders; logout/expire → Login.
+    // Skip(1) ignores the initial false emission at subscription time.
+    _session.WhenAnyValue(s => s.IsAuthenticated)
+      .Skip(1)
+      .DistinctUntilChanged()
+      .ObserveOn(RxApp.MainThreadScheduler)
+      .Subscribe(isAuth =>
+      {
+        if (isAuth) ShowFolders();
+        else ShowLogin();
+      });
+
+    // Default state: Login. window.Opened triggers TryRestoreAsync which updates IsAuthenticated.
+    ShowLogin();
   }
 
   public void ShowLogin()
   {
-    var vm = new LoginViewModel(_authApi, _session);
+    var vm = new LoginViewModel(_authApi, _session, _notifications);
     vm.NavigateToRegister += (_, _) => ShowRegister();
     CurrentPage = vm;
     CurrentNav = "login";
@@ -67,7 +88,7 @@ public class ShellViewModel : ViewModelBase
 
   public void ShowRegister()
   {
-    var vm = new RegisterViewModel(_authApi);
+    var vm = new RegisterViewModel(_authApi, _notifications);
     vm.NavigateToLogin += (_, _) => ShowLogin();
     vm.RegistrationSuccess += (_, _) => ShowLogin();
     CurrentPage = vm;
@@ -76,7 +97,7 @@ public class ShellViewModel : ViewModelBase
 
   public void ShowFolders()
   {
-    var vm = new MyFoldersViewModel(_foldersApi, _session);
+    var vm = new MyFoldersViewModel(_foldersApi, _session, _dialogs, _notifications);
     vm.FolderOpened += (_, folder) => ShowFolderDetail(folder);
     CurrentPage = vm;
     CurrentNav = "folders";
@@ -84,34 +105,30 @@ public class ShellViewModel : ViewModelBase
 
   public void ShowFolderDetail(FolderResponse folder)
   {
-    CurrentPage = new FolderDetailViewModel(folder, _permissionsApi, _sharesApi);
+    CurrentPage = new FolderDetailViewModel(folder, _permissionsApi, _sharesApi, _dialogs, _notifications);
     CurrentNav = "folder-detail";
   }
 
   public void ShowSharedWithMe()
   {
-    CurrentPage = new SharedWithMeViewModel(_foldersApi, _session);
+    CurrentPage = new SharedWithMeViewModel(_foldersApi, _session, _notifications);
     CurrentNav = "shared";
   }
 
   public void ShowPublicShare()
   {
-    CurrentPage = new PublicShareViewModel(_sharesApi);
+    CurrentPage = new PublicShareViewModel(_sharesApi, _notifications);
     CurrentNav = "public-share";
   }
 
   private async Task LogoutAsync()
   {
-    try
-    {
-      var token = _session.AccessToken;
-      await _authApi.LogoutAsync(null);
-    }
+    try { await _authApi.LogoutAsync(null); }
     catch { /* best-effort */ }
     finally
     {
+      // SignOutAsync sets IsAuthenticated = false → WhenAnyValue subscription calls ShowLogin()
       await _session.SignOutAsync();
-      ShowLogin();
     }
   }
 }

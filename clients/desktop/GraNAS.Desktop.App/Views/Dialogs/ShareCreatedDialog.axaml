@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GraNAS.Desktop.App.ViewModels.Dialogs"
+        x:DataType="vm:ShareCreatedDialogViewModel"
+        x:Class="GraNAS.Desktop.App.Views.Dialogs.ShareCreatedDialog"
+        Title="Ссылка создана"
+        Width="480" Height="200"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+    <StackPanel Margin="20" Spacing="12">
+        <TextBlock Text="Сохраните токен — после закрытия он не показывается."
+                   TextWrapping="Wrap"
+                   Foreground="#d46b08" />
+
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBox Text="{Binding Token}"
+                     IsReadOnly="True"
+                     FontFamily="Consolas,Courier New,monospace" />
+            <Button Grid.Column="1"
+                    Content="Копировать"
+                    Command="{Binding CopyCommand}"
+                    Margin="8,0,0,0"
+                    Background="#722ed1"
+                    Foreground="White" />
+        </Grid>
+
+        <Button Content="Закрыть"
+                Command="{Binding CloseCommand}"
+                HorizontalAlignment="Right"
+                Width="100" />
+    </StackPanel>
+</Window>

@@ -160,15 +160,18 @@
 - [x] Backend-долги закрыты: `GET /api/auth/me` (email resolution после login) + `GET /api/folders/{id}/permissions` (список прав с email)
 - [x] DI: Microsoft.Extensions.DependencyInjection, circular dep решена через `Func<IAuthSession>` в handlers
 - [x] 13 desktop-тестов: FolderTreeBuilder, JwtTokenReader, LoginViewModel
-
-**Открытые долги Phase 5 (для полировки):**
-- Диалоги создания папки/выдачи прав/создания share (кнопки есть, modal-диалоги не подключены)
-- Toast-уведомления (сейчас ErrorMessage текстом)
-- Polly/offline handling
+- [x] Modal-диалоги: `CreateFolderDialog`, `GrantPermissionDialog`, `CreateShareDialog`, `ShareCreatedDialog` (одноразовый токен + Copy в буфер); `IDialogService / DialogService`
+- [x] Toast-уведомления: `INotificationService` / `NotificationService` поверх Avalonia `WindowNotificationManager` (BottomRight, 4 с); все `ErrorMessage` TextBlock-и заменены на тосты
+- [x] Polly retry: `Microsoft.Extensions.Http.Polly`, 2 попытки (1с/3с) на транзиентных ошибках (5xx, timeout); добавлено на все 4 HttpClient-а
+- [x] `CorrelationIdDelegatingHandler` реализован локально (без зависимости от `GraNAS.Shared.Correlation` / ASP.NET)
 
 **Критерий готовности:** пользователь может выполнять все операции (папки,
 права, share-ссылки) через нативное окно без браузера; токены не хранятся
 в plaintext на диске. ✅
+
+**Остаток для Phase 10 / Phase 6:**
+- WebRTC/P2P (Phase 6)
+- Shell Extension / Cloud Files API (Phase 10)
 
 ---
 

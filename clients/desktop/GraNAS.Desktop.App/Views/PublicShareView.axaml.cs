@@ -5,4 +5,8 @@ namespace GraNAS.Desktop.App.Views;
 
 public partial class PublicShareView : ReactiveUserControl<PublicShareViewModel>
 {
+  public PublicShareView()
+  {
+    InitializeComponent();
+  }
 }

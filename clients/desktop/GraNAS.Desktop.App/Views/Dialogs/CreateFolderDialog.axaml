@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GraNAS.Desktop.App.ViewModels.Dialogs"
+        x:DataType="vm:CreateFolderDialogViewModel"
+        x:Class="GraNAS.Desktop.App.Views.Dialogs.CreateFolderDialog"
+        Title="Создать папку"
+        Width="380" Height="160"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+
+    <StackPanel Margin="20" Spacing="16">
+        <TextBox Text="{Binding Name}"
+                 Watermark="Название папки"
+                 KeyboardNavigation.TabIndex="0" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Отмена"
+                    Command="{Binding CancelCommand}"
+                    Width="90" />
+            <Button Content="Создать"
+                    Command="{Binding ConfirmCommand}"
+                    Background="#722ed1"
+                    Foreground="White"
+                    Width="90" />
+        </StackPanel>
+    </StackPanel>
+</Window>

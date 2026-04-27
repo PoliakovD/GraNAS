@@ -1,15 +1,19 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Notifications;
 using Avalonia.Markup.Xaml;
 using GraNAS.Desktop.App.Models;
+using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
 using GraNAS.Desktop.App.Services.Http;
 using GraNAS.Desktop.App.ViewModels;
 using GraNAS.Desktop.App.Views;
-using GraNAS.Shared.Correlation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
+using Polly;
+using Polly.Extensions.Http;
 
 namespace GraNAS.Desktop.App;
 
@@ -17,6 +21,7 @@ public partial class App : Application
 {
   private readonly IConfiguration _config;
   private IServiceProvider? _services;
+  public IServiceProvider? Services => _services;
 
   public App(IConfiguration config)
   {
@@ -37,17 +42,16 @@ public partial class App : Application
       var shell = _services.GetRequiredService<ShellViewModel>();
       var session = _services.GetRequiredService<IAuthSession>();
 
-      session.SessionExpired += (_, _) =>
-        Avalonia.Threading.Dispatcher.UIThread.Post(shell.ShowLogin);
+      // Navigation is fully reactive via ShellViewModel.WhenAnyValue(IsAuthenticated).
+      // window.Opened only triggers the restore attempt; navigation follows automatically.
 
       var window = new ShellWindow { DataContext = shell };
       desktop.MainWindow = window;
 
       window.Opened += async (_, _) =>
       {
-        var restored = await session.TryRestoreAsync();
-        if (!restored)
-          shell.ShowLogin();
+        try { await session.TryRestoreAsync(); }
+        catch { /* IsAuthenticated stays false → ShellViewModel already showing Login */ }
       };
     }
 
@@ -63,6 +67,9 @@ public partial class App : Application
     var baseUri = new Uri(apiSettings.BaseUrl);
 
     services.AddSingleton<ICredentialStore, WindowsCredentialStore>();
+    services.AddSingleton<NotificationService>();
+    services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
+    services.AddSingleton<IDialogService, DialogService>();
 
     // AuthSession registered as singleton; delegates are wired after SP is built
     // to break the circular dep: AuthSession → AuthApi → BearerHandler → AuthSession
@@ -77,29 +84,30 @@ public partial class App : Application
     });
 
     // DelegatingHandlers use Func<IAuthSession> to break circular dep
-    services.AddTransient<CorrelationIdDelegatingHandler>();
     services.AddTransient(sp => new BearerTokenHandler(() => sp.GetRequiredService<IAuthSession>()));
     services.AddTransient(sp => new RefreshOn401Handler(() => sp.GetRequiredService<IAuthSession>()));
 
+    var retry = RetryPolicy.Build();
+
     // AuthApi: no refresh handler (login/refresh/me don't need 401-retry)
     services.AddHttpClient<IAuthApi, AuthApi>(c => c.BaseAddress = baseUri)
-      .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
-      .AddHttpMessageHandler<BearerTokenHandler>();
+      .AddHttpMessageHandler<BearerTokenHandler>()
+      .AddPolicyHandler(retry);
 
     services.AddHttpClient<IFoldersApi, FoldersApi>(c => c.BaseAddress = baseUri)
-      .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
       .AddHttpMessageHandler<BearerTokenHandler>()
-      .AddHttpMessageHandler<RefreshOn401Handler>();
+      .AddHttpMessageHandler<RefreshOn401Handler>()
+      .AddPolicyHandler(retry);
 
     services.AddHttpClient<IPermissionsApi, PermissionsApi>(c => c.BaseAddress = baseUri)
-      .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
       .AddHttpMessageHandler<BearerTokenHandler>()
-      .AddHttpMessageHandler<RefreshOn401Handler>();
+      .AddHttpMessageHandler<RefreshOn401Handler>()
+      .AddPolicyHandler(retry);
 
     services.AddHttpClient<ISharesApi, SharesApi>(c => c.BaseAddress = baseUri)
-      .AddHttpMessageHandler<CorrelationIdDelegatingHandler>()
       .AddHttpMessageHandler<BearerTokenHandler>()
-      .AddHttpMessageHandler<RefreshOn401Handler>();
+      .AddHttpMessageHandler<RefreshOn401Handler>()
+      .AddPolicyHandler(retry);
 
     services.AddSingleton<ShellViewModel>();
 
