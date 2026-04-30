@@ -13,6 +13,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
     private readonly IFolderShareRegistry _registry;
     private readonly IAuthSession _session;
     private readonly ISignalingApi _signalingApi;
+    private readonly IDeviceIdentity _deviceIdentity;
     private readonly INotificationService _notifications;
     private readonly string _hubUrl;
 
@@ -28,12 +29,14 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         IFolderShareRegistry registry,
         IAuthSession session,
         ISignalingApi signalingApi,
+        IDeviceIdentity deviceIdentity,
         INotificationService notifications,
         string hubUrl)
     {
         _registry = registry;
         _session = session;
         _signalingApi = signalingApi;
+        _deviceIdentity = deviceIdentity;
         _notifications = notifications;
         _hubUrl = hubUrl;
     }
@@ -41,6 +44,10 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
     public async Task ConnectAsync(CancellationToken ct = default)
     {
         if (_hub?.State == HubConnectionState.Connected) return;
+
+        // Register/update device in the backend before hub connect
+        await _signalingApi.RegisterDeviceAsync(
+            new DeviceRegistrationRequest(_deviceIdentity.DeviceId, _deviceIdentity.DeviceName, _deviceIdentity.Platform), ct);
 
         _turnCredentials = await _signalingApi.GetTurnCredentialsAsync(ct);
 
@@ -56,17 +63,20 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         _hub.On<string, Guid, string?>("IncomingPeerRequest", HandleIncomingPeerRequestAsync);
         _hub.On<string, string>("Answer", HandleAnswerAsync);
         _hub.On<string, string, string?, int?>("IceCandidate", HandleIceCandidateAsync);
+        _hub.On("ForceDisconnect", HandleForceDisconnectAsync);
 
         _hub.Reconnected += async _ =>
         {
             _turnCredentials = await _signalingApi.GetTurnCredentialsAsync();
+            await RegisterDeviceInHubAsync();
             await JoinAllFoldersAsync();
         };
 
         await _hub.StartAsync(ct);
+        await RegisterDeviceInHubAsync(ct);
         _isOnline = true;
         await JoinAllFoldersAsync(ct);
-        Log.Information("P2PHost connected to signaling hub");
+        Log.Information("P2PHost connected to signaling hub (device {DeviceId})", _deviceIdentity.DeviceId);
     }
 
     public async Task DisconnectAsync()
@@ -103,6 +113,28 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         if (_hub?.State != HubConnectionState.Connected) return;
         try { await _hub.InvokeAsync("LeaveAsOwner", folderId); }
         catch (Exception ex) { Log.Warning(ex, "LeaveAsOwner failed for folder {FolderId}", folderId); }
+    }
+
+    private async Task RegisterDeviceInHubAsync(CancellationToken ct = default)
+    {
+        if (_hub?.State != HubConnectionState.Connected) return;
+        try
+        {
+            await _hub.InvokeAsync("RegisterDevice", _deviceIdentity.DeviceId, ct);
+            Log.Information("Device {DeviceId} registered in hub", _deviceIdentity.DeviceId);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "RegisterDevice failed for device {DeviceId}", _deviceIdentity.DeviceId);
+        }
+    }
+
+    private async void HandleForceDisconnectAsync()
+    {
+        Log.Warning("ForceDisconnect received from server — disconnecting");
+        ShouldBeOnline = false;
+        _notifications.Info("Ваша сессия была принудительно завершена.", "Сессия завершена");
+        await DisconnectAsync();
     }
 
     private async Task JoinAllFoldersAsync(CancellationToken ct = default)

@@ -49,6 +49,7 @@
   <Folder Name="/Services/SignalingService/">
     <Project Path="services/signaling-service/GraNAS.Signaling.API/GraNAS.Signaling.API.csproj" />
     <Project Path="services/signaling-service/GraNAS.Signaling.Models/GraNAS.Signaling.Models.csproj" />
+    <Project Path="services/signaling-service/GraNAS.Signaling.DAL/GraNAS.Signaling.DAL.csproj" />
     <Project Path="services/signaling-service/GraNAS.Signaling.Services/GraNAS.Signaling.Services.csproj" />
   </Folder>
 

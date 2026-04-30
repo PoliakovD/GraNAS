@@ -125,6 +125,7 @@ public partial class App : Application
 
     // P2P services
     services.AddSingleton<IFolderShareRegistry, FolderShareRegistry>();
+    services.AddSingleton<IDeviceIdentity, DeviceIdentity>();
 
     services.AddHttpClient<ISignalingApi, SignalingApi>(c => c.BaseAddress = baseUri)
       .AddHttpMessageHandler<BearerTokenHandler>()
@@ -137,6 +138,7 @@ public partial class App : Application
       sp.GetRequiredService<IFolderShareRegistry>(),
       sp.GetRequiredService<IAuthSession>(),
       sp.GetRequiredService<ISignalingApi>(),
+      sp.GetRequiredService<IDeviceIdentity>(),
       sp.GetRequiredService<INotificationService>(),
       hubUrl));
 

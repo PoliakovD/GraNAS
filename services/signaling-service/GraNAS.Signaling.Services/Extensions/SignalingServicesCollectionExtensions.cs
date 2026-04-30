@@ -11,6 +11,7 @@ public static class SignalingServicesCollectionExtensions
         services.AddSingleton<ITurnCredentialService, TurnCredentialService>();
         services.AddSingleton<ISessionStore, RedisSessionStore>();
         services.AddScoped<IAccessChecker, AccessChecker>();
+        services.AddScoped<IDeviceService, DeviceService>();
         return services;
     }
 }

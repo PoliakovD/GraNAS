@@ -52,9 +52,11 @@ public class Program
             });
         }
 
+        builder.Services.AddCorrelationId();
+
         var app = builder.Build();
 
-        app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseCorrelationId();
         app.UseSerilogRequestLogging();
 
         if (!app.Environment.IsDevelopment())
