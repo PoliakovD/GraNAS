@@ -8,7 +8,7 @@ export const setAccessToken = (token: string | null): void => { _accessToken = t
 export const getAccessToken = (): string | null => _accessToken;
 export const registerLogoutCallback = (cb: () => void): void => { _onLogout = cb; };
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8080';
 
 export const api = axios.create({
   baseURL: BASE_URL,

@@ -67,6 +67,12 @@ export const handlers = [
   http.delete(`${BASE}/api/sharing/share-links/:id`, () =>
     new HttpResponse(null, { status: 204 })),
 
+  // signaling (stub — WebSocket not supported in jsdom tests)
+  http.post(`${BASE}/hubs/signaling/negotiate`, () =>
+    new HttpResponse(null, { status: 400 })),
+  http.get(`${BASE}/api/signaling/turn/credentials`, () =>
+    HttpResponse.json({ username: 'test', credential: 'test', uris: [], ttl: 600 })),
+
   // public share
   http.get(`${BASE}/api/sharing/share/:token`, ({ params }) => {
     if (params.token === 'revoked') return new HttpResponse(null, { status: 410 });

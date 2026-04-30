@@ -18,6 +18,7 @@
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.3" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="3.10.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="3.10.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -29,6 +30,7 @@
     <ProjectReference Include="..\..\services\auth-service\GraNAS.Auth.API\GraNAS.Auth.API.csproj" />
     <ProjectReference Include="..\..\services\metadata-service\GraNAS.Metadata.API\GraNAS.Metadata.API.csproj" />
     <ProjectReference Include="..\..\services\sharing-service\GraNAS.Sharing.API\GraNAS.Sharing.API.csproj" />
+    <ProjectReference Include="..\..\services\signaling-service\GraNAS.Signaling.API\GraNAS.Signaling.API.csproj" />
   </ItemGroup>
 
 </Project>

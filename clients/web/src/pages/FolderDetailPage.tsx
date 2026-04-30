@@ -4,6 +4,7 @@ import { useCurrentUser } from '../auth/AuthContext';
 import { PermissionList } from '../features/permissions/PermissionList';
 import { useFoldersQuery } from '../features/folders/useFoldersQuery';
 import { ShareList } from '../features/shares/ShareList';
+import { FileListPanel } from '../features/p2p/FileListPanel';
 import type { FolderResponse } from '../types/folder';
 
 function buildAncestors(folders: FolderResponse[], folderId: string): FolderResponse[] {
@@ -60,6 +61,11 @@ export function FolderDetailPage() {
       children: isOwner
         ? <ShareList folderId={id} />
         : <Typography.Text type="secondary">Только владелец может управлять ссылками</Typography.Text>,
+    },
+    {
+      key: 'files',
+      label: 'Файлы',
+      children: <FileListPanel folderId={id} />,
     },
   ];
 

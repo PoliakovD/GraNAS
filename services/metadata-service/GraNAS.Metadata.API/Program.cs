@@ -4,11 +4,9 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
-using GraNAS.Metadata.API.Authorization;
 using GraNAS.Metadata.API.Infrastructure;
 using GraNAS.Metadata.DAL;
 using GraNAS.Metadata.DAL.Extensions;
-using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Services.Extensions;
 using GraNAS.Metadata.Services.Interfaces;
 using GraNAS.Shared.Correlation;
@@ -18,7 +16,6 @@ using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
@@ -139,22 +136,15 @@ public class Program
     });
 
     builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>(c =>
-    {
-      var baseUrl = builder.Configuration["AuthService:BaseUrl"]
-                    ?? throw new InvalidOperationException("AuthService:BaseUrl is not configured");
-      c.BaseAddress = new Uri(baseUrl);
-    });
+      {
+        var baseUrl = builder.Configuration["AuthService:BaseUrl"]
+                      ?? throw new InvalidOperationException("AuthService:BaseUrl is not configured");
+        c.BaseAddress = new Uri(baseUrl);
+      })
+      .AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
     builder.Services.AddControllers()
       .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-    builder.Services.AddAuthorization(options =>
-    {
-      options.AddPolicy("CanReadFolder",
-        p => p.Requirements.Add(new FolderAccessRequirement(AccessLevel.View)));
-      options.AddPolicy("CanWriteFolder",
-        p => p.Requirements.Add(new FolderAccessRequirement(AccessLevel.Full)));
-    });
-    builder.Services.AddScoped<IAuthorizationHandler, FolderAccessHandler>();
 
     builder.Services.AddRateLimiter(options =>
     {
@@ -195,17 +185,21 @@ public class Program
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerWithJwt(apiTitle, versionApi);
 
-    WebApplication app = builder.Build();
+    builder.Services.AddCorrelationId();
 
-    app.UseMiddleware<ExceptionHandlingMiddleware>();
-    app.UseMiddleware<CorrelationIdMiddleware>();
-    app.UseSerilogRequestLogging();
+    WebApplication app = builder.Build();
 
     if (!app.Environment.IsDevelopment())
     {
       app.UseHttpsRedirection();
       app.UseHsts();
     }
+
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseCorrelationId();
+    app.UseSerilogRequestLogging();
+
+
 
     app.UseSecurityHeaders(policy =>
     {

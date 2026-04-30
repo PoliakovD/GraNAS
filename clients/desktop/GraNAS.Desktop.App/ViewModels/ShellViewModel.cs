@@ -3,6 +3,7 @@ using System.Reactive.Linq;
 using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
+using GraNAS.Desktop.App.Services.P2P;
 using GraNAS.Desktop.Contracts.Metadata;
 using ReactiveUI;
 
@@ -17,9 +18,12 @@ public class ShellViewModel : ViewModelBase
   private readonly ISharesApi _sharesApi;
   private readonly IDialogService _dialogs;
   private readonly INotificationService _notifications;
+  private readonly IP2PHost _p2pHost;
+  private readonly IFolderShareRegistry _registry;
 
   private ViewModelBase? _currentPage;
   private string _currentNav = "folders";
+  private bool _isOnline;
 
   public ViewModelBase? CurrentPage
   {
@@ -33,12 +37,19 @@ public class ShellViewModel : ViewModelBase
     set => this.RaiseAndSetIfChanged(ref _currentNav, value);
   }
 
+  public bool IsOnline
+  {
+    get => _isOnline;
+    private set => this.RaiseAndSetIfChanged(ref _isOnline, value);
+  }
+
   public IAuthSession Session => _session;
 
   public ReactiveCommand<Unit, Unit> LogoutCommand { get; }
   public ReactiveCommand<Unit, Unit> NavFoldersCommand { get; }
   public ReactiveCommand<Unit, Unit> NavSharedCommand { get; }
   public ReactiveCommand<Unit, Unit> NavPublicShareCommand { get; }
+  public ReactiveCommand<Unit, Unit> OnlineToggleCommand { get; }
 
   public ShellViewModel(
     IAuthSession session,
@@ -47,7 +58,9 @@ public class ShellViewModel : ViewModelBase
     IPermissionsApi permissionsApi,
     ISharesApi sharesApi,
     IDialogService dialogs,
-    INotificationService notifications)
+    INotificationService notifications,
+    IP2PHost p2pHost,
+    IFolderShareRegistry registry)
   {
     _session = session;
     _authApi = authApi;
@@ -56,26 +69,71 @@ public class ShellViewModel : ViewModelBase
     _sharesApi = sharesApi;
     _dialogs = dialogs;
     _notifications = notifications;
+    _p2pHost = p2pHost;
+    _registry = registry;
 
     LogoutCommand = ReactiveCommand.CreateFromTask(LogoutAsync);
     NavFoldersCommand = ReactiveCommand.Create(() => ShowFolders());
     NavSharedCommand = ReactiveCommand.Create(() => ShowSharedWithMe());
     NavPublicShareCommand = ReactiveCommand.Create(() => ShowPublicShare());
+    OnlineToggleCommand = ReactiveCommand.CreateFromTask(ToggleOnlineAsync);
 
     // React to auth state changes: login/restore → Folders; logout/expire → Login.
-    // Skip(1) ignores the initial false emission at subscription time.
     _session.WhenAnyValue(s => s.IsAuthenticated)
       .Skip(1)
       .DistinctUntilChanged()
       .ObserveOn(RxApp.MainThreadScheduler)
       .Subscribe(isAuth =>
       {
-        if (isAuth) ShowFolders();
-        else ShowLogin();
+        if (isAuth)
+        {
+          ShowFolders();
+          if (_p2pHost.ShouldBeOnline)
+            Task.Run(() => ConnectP2PAsync()).ConfigureAwait(false);
+        }
+        else
+        {
+          ShowLogin();
+          IsOnline = false;
+          Task.Run(() => _p2pHost.DisconnectAsync()).ConfigureAwait(false);
+        }
       });
 
     // Default state: Login. window.Opened triggers TryRestoreAsync which updates IsAuthenticated.
     ShowLogin();
+  }
+
+  private async Task ConnectP2PAsync()
+  {
+    try
+    {
+      await _p2pHost.ConnectAsync();
+      IsOnline = _p2pHost.IsOnline;
+    }
+    catch (Exception ex)
+    {
+      Serilog.Log.Warning(ex, "P2P connect failed");
+    }
+  }
+
+  private async Task ToggleOnlineAsync()
+  {
+    if (_p2pHost.IsOnline)
+    {
+      _p2pHost.ShouldBeOnline = false;
+      await _p2pHost.DisconnectAsync();
+      IsOnline = false;
+      _notifications.Info("P2P-доступ к файлам отключён.");
+    }
+    else
+    {
+      _p2pHost.ShouldBeOnline = true;
+      await ConnectP2PAsync();
+      if (IsOnline)
+        _notifications.Success("P2P-доступ к файлам включён.");
+      else
+        _notifications.Error("Не удалось подключиться к signaling-серверу.");
+    }
   }
 
   public void ShowLogin()
@@ -97,7 +155,7 @@ public class ShellViewModel : ViewModelBase
 
   public void ShowFolders()
   {
-    var vm = new MyFoldersViewModel(_foldersApi, _session, _dialogs, _notifications);
+    var vm = new MyFoldersViewModel(_foldersApi, _session, _dialogs, _notifications, _registry, _p2pHost);
     vm.FolderOpened += (_, folder) => ShowFolderDetail(folder);
     CurrentPage = vm;
     CurrentNav = "folders";

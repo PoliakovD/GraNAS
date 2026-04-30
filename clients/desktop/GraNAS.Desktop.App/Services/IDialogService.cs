@@ -8,4 +8,5 @@ public interface IDialogService
   Task<(string Email, AccessLevel Level)?> ShowGrantPermissionAsync();
   Task<DateTime?> ShowCreateShareAsync();
   Task ShowShareCreatedAsync(string token);
+  Task<string?> ShowFolderPickerAsync(string title = "Выберите папку");
 }

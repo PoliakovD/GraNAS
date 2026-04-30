@@ -284,6 +284,32 @@ services:
     volumes:
       - postgres_sharing_data:/var/lib/postgresql/data
 
+  postgres-signaling:
+    container_name: ${PREFIX}_postgres_signaling
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${SIGNALING_POSTGRES_DB}
+      POSTGRES_USER: ${SIGNALING_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SIGNALING_POSTGRES_PASSWORD}
+    ports:
+      - "${SIGNALING_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SIGNALING_POSTGRES_USER} -d ${SIGNALING_POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - db-network
+    volumes:
+      - postgres_signaling_data:/var/lib/postgresql/data
+
   sharing-service:
     container_name: ${PREFIX}_sharing_service
     build:
@@ -330,6 +356,77 @@ services:
       retries: 3
       start_period: 20s
 
+  signaling-service:
+    container_name: ${PREFIX}_signaling_service
+    build:
+      context: ../..
+      dockerfile: services/signaling-service/GraNAS.Signaling.API/Dockerfile
+    image: ${SIGNALING_SERVICE_IMAGE}:${SIGNALING_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__Redis: ${SIGNALING_REDIS_CONNECTION_STRING}
+      ConnectionStrings__SignalingDb: ${SIGNALING_DB_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Elasticsearch__Uri: ${ELASTIC_URI}
+      MetadataService__BaseUrl: http://metadata-service:${SERVICE_PORT_CONTAINER}
+      SharingService__BaseUrl: http://sharing-service:${SERVICE_PORT_CONTAINER}
+      Turn__StaticAuthSecret: ${TURN_SECRET}
+      Turn__Realm: ${TURN_REALM}
+      Turn__Uris__0: turn:${TURN_HOST}:${TURN_PORT}?transport=udp
+      Turn__Uris__1: turn:${TURN_HOST}:${TURN_PORT}?transport=tcp
+      Turn__TtlSeconds: 600
+    ports:
+      - "${SIGNALING_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-signaling:
+        condition: service_healthy
+      metadata-service:
+        condition: service_healthy
+      sharing-service:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  coturn:
+    container_name: ${PREFIX}_coturn
+    image: coturn/coturn:latest
+    ports:
+      - "${TURN_PORT}:3478/udp"
+      - "${TURN_PORT}:3478/tcp"
+      - "49152-49252:49152-49252/udp"
+    command:
+      - "--use-auth-secret"
+      - "--static-auth-secret=${TURN_SECRET}"
+      - "--realm=${TURN_REALM}"
+      - "--no-tls"
+      - "--fingerprint"
+      - "--min-port=49152"
+      - "--max-port=49252"
+      - "--total-quota=100"
+      - "--stale-nonce=600"
+    restart: unless-stopped
+    networks:
+      - app-network
+
   api-gateway:
     container_name: ${PREFIX}_api_gateway
     build:
@@ -343,6 +440,7 @@ services:
       ReverseProxy__Clusters__auth__Destinations__d1__Address: http://auth-service:${SERVICE_PORT_CONTAINER}
       ReverseProxy__Clusters__metadata__Destinations__d1__Address: http://metadata-service:${SERVICE_PORT_CONTAINER}
       ReverseProxy__Clusters__sharing__Destinations__d1__Address: http://sharing-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__signaling__Destinations__d1__Address: http://signaling-service:${SERVICE_PORT_CONTAINER}
     ports:
       - "${GATEWAY_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
     depends_on:
@@ -351,6 +449,8 @@ services:
       metadata-service:
         condition: service_healthy
       sharing-service:
+        condition: service_healthy
+      signaling-service:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -379,6 +479,7 @@ volumes:
   postgres_auth_data:
   postgres_metadata_data:
   postgres_sharing_data:
+  postgres_signaling_data:
   elasticsearch_data:
   rabbitmq_data:
   redis_data:

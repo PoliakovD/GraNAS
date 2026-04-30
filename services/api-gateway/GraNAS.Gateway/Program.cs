@@ -52,9 +52,11 @@ public class Program
             });
         }
 
+        builder.Services.AddCorrelationId();
+
         var app = builder.Build();
 
-        app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseCorrelationId();
         app.UseSerilogRequestLogging();
 
         if (!app.Environment.IsDevelopment())
@@ -64,6 +66,7 @@ public class Program
         }
 
         app.UseCors(corsPolicyName);
+        app.UseWebSockets();
 
         app.MapHealthChecks("/health", new HealthCheckOptions
         {

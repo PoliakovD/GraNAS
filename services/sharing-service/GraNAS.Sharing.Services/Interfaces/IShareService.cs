@@ -1,3 +1,4 @@
+using GraNAS.Sharing.Models;
 using GraNAS.Sharing.Models.DTO;
 
 namespace GraNAS.Sharing.Services.Interfaces;
@@ -11,4 +12,5 @@ public interface IShareService
     Task<RevokeShareResult> RevokeByTokenAsync(Guid ownerId, string token);
     Task<RevokeShareResult> RevokeByIdAsync(Guid ownerId, Guid id);
     Task<int> DeleteExpiredAsync(CancellationToken ct = default);
+    Task<ShareLink?> GetByTokenHashInternalAsync(string tokenHash, CancellationToken ct = default);
 }

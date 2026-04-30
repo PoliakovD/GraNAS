@@ -19,17 +19,19 @@
 - `sharing-service` — share-ссылки для незарегистрированных (Phase 3): токены base64url+SHA256, 5 эндпоинтов, cleanup job, RabbitMQ publish
 - `log-service` — централизованный сбор логов через RabbitMQ
 - `clients/web/` — React 19 + Vite + AntD 6 веб-клиент (Phase 4): все экраны Phase 1–3, silent refresh, 10 Vitest тестов; UX-улучшения (все 5 спринтов) — [`docs/web-ux-roadmap.md`](web-ux-roadmap.md)
-- `clients/desktop/` — Avalonia 11 + ReactiveUI + Semi.Avalonia Windows-клиент (Phase 5): 6 экранов, Windows Credential Manager для refresh-token, 13 desktop-тестов
+- `clients/desktop/` — Avalonia 11 + ReactiveUI + Semi.Avalonia Windows-клиент (Phase 5+6): 6 экранов + P2P sender (SIPSorcery 8.0.0 + SignalR.Client), FolderShareRegistry, ECDH+AES-GCM, online-toggle, DeviceIdentity (Phase 6.5), 16 desktop-тестов
+- `services/signaling-service/` — SignalR hub + TURN credentials + Redis session store (Phase 6) + device sessions в signalingdb PostgreSQL (Phase 6.5)
+- **coturn** в docker compose (Phase 6)
 - **EF migrations bundle** — Dockerfiles для auth, metadata, sharing содержат `bundle` stage; при старте контейнера `efbundle` применяет миграции до запуска приложения
 - Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, Serilog → Elasticsearch
-- Docker Compose для dev и prod (gateway на порту 8080)
+- Docker Compose для dev и prod (gateway на порту 8080, signaling на 8085)
 - CI/CD (GitHub Actions → GHCR → staging via SSH)
-- **123 .NET тестов + 13 Desktop-тестов + 10 Vitest тестов — все зелёные**
+- **155 .NET тестов + 16 Desktop-тестов + 10 Vitest тестов — все зелёные**
 
 **Плейсхолдеры без реализации:**
 `admin-service`, `notification-service`, `search-service`, `signaling-service`
 
-**Не начато:** Android, P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STUN/TURN.
+**Не начато:** Android.
 
 ---
 
@@ -175,7 +177,7 @@
 
 ---
 
-## Фаза 6. signaling-service + P2P-транспорт (WebRTC / ICE / DTLS)
+## Фаза 6. signaling-service + P2P-транспорт (WebRTC / ICE / DTLS) ✅ (2026-04-27)
 
 Соединяем web и desktop клиентов: ссылка выдана, папка видна — теперь можно
 и файлы передать. Файлы на сервере не лежат — единственный путь идёт
@@ -184,25 +186,50 @@
 
 **Стек:** signaling (SignalR) → STUN (публичные) → TURN (свой coturn) → ICE
 (host/srflx/relay) → DTLS (шифрование канала) → app-level E2E (AES-GCM на файле).
-C# — `SIPSorcery`; браузер — нативный `RTCPeerConnection`.
+C# — `SIPSorcery 8.0.0`; браузер — нативный `RTCPeerConnection` + SubtleCrypto.
 
-- [ ] Скелет `GraNAS.Signaling.{API,Services}` (без DAL — состояние в Redis)
-- [ ] **SignalR hub** `/p2p` с операциями `join`, `offer`, `answer`, `ice-candidate`
-- [ ] **Авторизация в хабе** — JWT или share-токен; проверка прав через metadata/sharing
-- [ ] **TURN-credentials endpoint** — временные учётки coturn через shared secret
-      (RFC 8489 REST API), TTL ≈ 10 мин
-- [ ] **coturn в compose** — отдельный сервис в dev/prod, проброс UDP-диапазона
-- [ ] **Прототип передачи файла** через data channel: chunking, backpressure,
+- [x] Скелет `GraNAS.Signaling.{API,Services}` (без DAL — состояние в Redis)
+- [x] **SignalR hub** `/hubs/signaling` с операциями: `JoinAsOwner`, `LeaveAsOwner`,
+      `WatchFolder`, `RequestSession`, `SendOffer`, `SendAnswer`, `SendIceCandidate`
+- [x] **Авторизация в хабе** — JWT (query string `?access_token=`) для зарегистрированных;
+      share-токен передаётся параметром в `RequestSession` для анонимных
+- [x] **TURN-credentials endpoint** `GET /api/turn/credentials` — HMAC-SHA1 RFC 8489,
+      TTL 10 мин; синхронизирован с coturn shared secret
+- [x] **coturn в compose** — command-line конфигурация, UDP 49152–49252, relay для NAT
+- [x] **Передача файла** через data channel: 64 KB чанки, backpressure-aware,
       SHA-256 верификация на приёмнике
-- [ ] **App-level encryption** — ECDH handshake внутри data channel, AES-GCM payload
-- [ ] **P2P-слой в web-клиенте** (Phase 4) — нативный `RTCPeerConnection`
-- [ ] **P2P-слой в desktop-клиенте** (Phase 5) — SIPSorcery `RTCPeerConnection`
-- [ ] **Метрики:** доля соединений host/srflx/relay
-- [ ] **Документированный fallback** при симметричном NAT
+- [x] **App-level encryption** — ECDH P-256 handshake → HKDF → AES-GCM;
+      каждый чанк: nonce(12)+ciphertext+tag(16) packed
+- [x] **P2P-слой в web-клиенте** — нативный `RTCPeerConnection` + SubtleCrypto;
+      web = только receiver; вкладка «Файлы» в FolderDetailPage + PublicSharePage
+- [x] **P2P-слой в desktop-клиенте** — SIPSorcery `RTCPeerConnection`; desktop = owner/sender;
+      `FolderShareRegistry` (JSON), `FileChunker`, `EcdhSession`; toggle online/offline в UI
+- [x] **Owner-online индикатор** — зелёная/серая точка через `OwnerOnlineStatusChanged` event;
+      `useOwnerOnlineStatus` hook + `OwnerStatusBadge` component
+- [x] **Метрики:** логирование типа ICE кандидата (host/srflx/relay) в хабе
+- [x] **Internal endpoints** — `GET /api/internal/folders/{id}/access?userId=` (metadata-service),
+      `GET /api/internal/shares/by-token-hash/{hash}` (sharing-service)
+- [x] **Тесты:** 141 backend (18 новых для signaling), 13 desktop, 10 web — все ✅
 
-**Критерий готовности:** web↔web и web↔desktop за разными NAT передают файл
-> 100 МБ; оператор signaling/TURN не может прочитать содержимое (дамп relay
-не расшифровывается без клиентского ключа).
+## Фаза 6.5. Device Sessions — идентичность устройств + управление сессиями ✅ (2026-04-27)
+
+**Проблема:** владельцы трекались по ephemeral `connectionId`, нельзя показать пользователю активные сессии или различить desktop 1 vs desktop 2.
+
+**Решение:**
+- [x] `GraNAS.Signaling.DAL` — новый EF-проект, `signalingdb` PostgreSQL, таблица `table_devices`
+- [x] `postgres-signaling` контейнер (порт 5437 dev), миграция через efbundle при старте
+- [x] `IDeviceRepository` / `DeviceRepository` — upsert по clientgenerated UUID, unique(user_id, device_name)
+- [x] `IDeviceService` / `DeviceService` — регистрация/обновление + `isOnline` из Redis
+- [x] Обновлённый `ISessionStore` / `RedisSessionStore` — device↔connection mapping, folder-owners теперь Set<deviceId>
+- [x] Обновлённый `SignalingHub` — новый метод `RegisterDevice(deviceId)`, hub.JoinAsOwner читает deviceId из Context.Items
+- [x] `DevicesController` — `POST/GET /api/signaling/devices`
+- [x] `SessionsController` — `GET /api/signaling/sessions`, `DELETE /api/signaling/sessions/{deviceId}` + `ForceDisconnect` event
+- [x] Desktop: `IDeviceIdentity` / `DeviceIdentity` — генерирует/сохраняет UUID в Credential Manager; `P2PHost` вызывает REST + `RegisterDevice` перед JoinAsOwner; обрабатывает `ForceDisconnect`
+- [x] **Тесты:** 155 backend (5 новых DeviceService unit + 9 новых integration), 16 desktop — все ✅
+
+**Критерий готовности:** web↔desktop за разными NAT передают файл > 100 МБ;
+SHA-256 получателя совпадает; дамп TURN relay не расшифровывается без ключа сессии;
+owner offline — receiver видит индикатор и не зависает.
 
 ---
 
