@@ -6,6 +6,7 @@ using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Controllers;
 
@@ -16,8 +17,13 @@ namespace GraNAS.Signaling.API.Controllers;
 public class TurnController : ControllerBase
 {
     private readonly ITurnCredentialService _turnService;
+    private readonly ILogger<TurnController> _logger;
 
-    public TurnController(ITurnCredentialService turnService) => _turnService = turnService;
+    public TurnController(ITurnCredentialService turnService, ILogger<TurnController> logger)
+    {
+        _turnService = turnService;
+        _logger = logger;
+    }
 
     /// <summary>Получить временные TURN-учётки для WebRTC (TTL ≈ 10 мин, RFC 8489)</summary>
     [HttpGet("credentials")]
@@ -30,6 +36,7 @@ public class TurnController : ControllerBase
                      ?? "anonymous";
 
         var creds = _turnService.Generate(userId);
+        _logger.LogDebug("TURN credentials issued for userId={UserId}", userId);
         return Ok(new TurnCredentialsResponse(creds.Username, creds.Credential, creds.Uris, creds.Ttl));
     }
 }

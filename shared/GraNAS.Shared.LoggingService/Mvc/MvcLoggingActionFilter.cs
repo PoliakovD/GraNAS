@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Serilog.Context;
@@ -12,9 +13,13 @@ public sealed class MvcLoggingActionFilter : IAsyncActionFilter
         var httpMethod = context.HttpContext.Request.Method;
         var parameters = SafeCopyArguments(context.ActionArguments);
 
+        var userIdClaim = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? context.HttpContext.User.FindFirst("sub")?.Value;
+
         using var _1 = LogContext.PushProperty("ActionName", actionName);
         using var _2 = LogContext.PushProperty("Method", httpMethod);
         using var _3 = LogContext.PushProperty("Parameters", parameters, destructureObjects: true);
+        using var _4 = userIdClaim is null ? null : LogContext.PushProperty("UserId", userIdClaim);
 
         await next();
     }

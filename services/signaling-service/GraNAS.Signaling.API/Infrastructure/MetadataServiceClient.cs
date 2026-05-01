@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using GraNAS.Signaling.Models.DTO;
 using GraNAS.Signaling.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Infrastructure;
 
@@ -14,23 +15,39 @@ public class MetadataServiceClient : IMetadataServiceClient
 {
     private readonly HttpClient _http;
     private readonly IHttpContextAccessor _accessor;
+    private readonly ILogger<MetadataServiceClient> _logger;
 
-    public MetadataServiceClient(HttpClient http, IHttpContextAccessor accessor)
+    public MetadataServiceClient(HttpClient http, IHttpContextAccessor accessor, ILogger<MetadataServiceClient> logger)
     {
         _http = http;
         _accessor = accessor;
+        _logger = logger;
     }
 
     public async Task<FolderAccessInfo?> GetFolderAccessAsync(Guid folderId, Guid userId, CancellationToken ct = default)
     {
-        var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"api/internal/folders/{folderId}/access?userId={userId}");
+        var path = $"api/internal/folders/{folderId}/access?userId={userId}";
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
         ForwardAuthorization(request);
-        var response = await _http.SendAsync(request, ct);
-        if (response.StatusCode == HttpStatusCode.NotFound) return null;
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<FolderAccessInfo>(ct);
+
+        try
+        {
+            var response = await _http.SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound) return null;
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("MetadataClient: GET {Path} returned {StatusCode}", path, (int)response.StatusCode);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<FolderAccessInfo>(ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "MetadataClient: request to {Path} failed", path);
+            throw;
+        }
     }
 
     private void ForwardAuthorization(HttpRequestMessage request)

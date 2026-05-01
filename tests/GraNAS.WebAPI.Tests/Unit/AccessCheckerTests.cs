@@ -3,6 +3,7 @@ using System.Text;
 using GraNAS.Signaling.Models.DTO;
 using GraNAS.Signaling.Services.Implementations;
 using GraNAS.Signaling.Services.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -15,7 +16,7 @@ public class AccessCheckerTests
 
     public AccessCheckerTests()
     {
-        _sut = new AccessChecker(_metadata.Object, _sharing.Object);
+        _sut = new AccessChecker(_metadata.Object, _sharing.Object, NullLogger<AccessChecker>.Instance);
     }
 
     // ──────────── CheckJwtAccessAsync ────────────

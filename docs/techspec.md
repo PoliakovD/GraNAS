@@ -14,7 +14,7 @@
 ### 🔧 Backend
 
 - **API Gateway** (`services/api-gateway/`, YARP) — единая точка входа для браузерных клиентов на порту 8080. Централизованный CORS (`WithOrigins + AllowCredentials`), прозрачный проброс Cookie/Authorization заголовков, Correlation-Id. JWT-валидация и rate-limiting остаются на каждом сервисе.
-- **Централизованное логирование** — все API-сервисы пишут в `RabbitMQ logs_exchange` (topic) через `GraNAS.Shared.LoggingService.RabbitMqLogSink`; `log-service` — единственный consumer, индексирует события в OpenSearch. Маскирование чувствительных данных в Production через `SensitiveDataEnricher`. Авто-обогащение ActionName/Method/Parameters через `MvcLoggingActionFilter`. Console — fallback при недоступности RabbitMQ.
+- **Централизованное логирование** — все API-сервисы пишут в `RabbitMQ logs_exchange` (topic) через `GraNAS.Shared.LoggingService.RabbitMqLogSink`; `log-service` — единственный consumer, индексирует события в OpenSearch. Маскирование чувствительных данных в Production через `SensitiveDataEnricher`. Авто-обогащение `ActionName`/`Method`/`Parameters`/`UserId` через `MvcLoggingActionFilter`. Все контроллеры и доменные сервисы покрыты структурированными логами на уровнях Debug/Information/Warning/Error. Console — fallback при недоступности RabbitMQ.
 - **Центральный REST API** для всех клиентов (Web, Android, Windows)
 - **PostgreSQL** – хранение метаданных (пользователи, папки, файлы, права, ссылки, события)
 - **Аутентификация** – email/пароль, JWT access-token (Bearer) + refresh-token в httpOnly cookie (см. раздел Безопасность)

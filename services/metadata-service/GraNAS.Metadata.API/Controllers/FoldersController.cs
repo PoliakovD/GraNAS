@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Metadata.API.Controllers;
 
@@ -23,15 +24,18 @@ public class FoldersController : ControllerBase
   private readonly IFolderService _folderService;
   private readonly IPermissionService _permissionService;
   private readonly IAuthorizationService _authorizationService;
+  private readonly ILogger<FoldersController> _logger;
 
   public FoldersController(
     IFolderService folderService,
     IPermissionService permissionService,
-    IAuthorizationService authorizationService)
+    IAuthorizationService authorizationService,
+    ILogger<FoldersController> logger)
   {
     _folderService = folderService;
     _permissionService = permissionService;
     _authorizationService = authorizationService;
+    _logger = logger;
   }
 
   /// <summary>Получить список папок текущего пользователя (свои + расшаренные)</summary>
@@ -65,16 +69,23 @@ public class FoldersController : ControllerBase
 
     var result = await _folderService.CreateFolderAsync(userId.Value, request);
 
-    return result.Error switch
+    if (result.Error == CreateFolderError.ParentNotFoundOrForbidden)
     {
-      CreateFolderError.None => CreatedAtAction(nameof(GetFolders), new { id = result.Response!.Id }, result.Response),
-      CreateFolderError.ParentNotFoundOrForbidden => NotFound(new ErrorResponse
+      _logger.LogWarning("Folder create rejected: parent {ParentFolderId} not found or not owned (userId={UserId})",
+        request.ParentFolderId, userId);
+      return NotFound(new ErrorResponse
       {
         Error = "parent_folder_not_found",
         ErrorDescription = "Parent folder not found or access denied."
-      }),
-      _ => StatusCode(StatusCodes.Status500InternalServerError)
-    };
+      });
+    }
+
+    if (result.Error != CreateFolderError.None)
+      return StatusCode(StatusCodes.Status500InternalServerError);
+
+    _logger.LogInformation("Folder created: id={FolderId} parent={ParentFolderId} userId={UserId}",
+      result.Response!.Id, request.ParentFolderId, userId);
+    return CreatedAtAction(nameof(GetFolders), new { id = result.Response.Id }, result.Response);
   }
 
   /// <summary>Удалить папку (только владелец)</summary>
@@ -92,17 +103,27 @@ public class FoldersController : ControllerBase
 
     var result = await _folderService.DeleteFolderAsync(userId.Value, id);
 
-    return result.Error switch
+    if (result.Error == DeleteFolderError.NotFound)
     {
-      DeleteFolderError.None => NoContent(),
-      DeleteFolderError.NotFound => NotFound(new ErrorResponse
+      _logger.LogWarning("Folder delete rejected: {FolderId} not found (userId={UserId})", id, userId);
+      return NotFound(new ErrorResponse
       {
         Error = "folder_not_found",
         ErrorDescription = "Folder not found."
-      }),
-      DeleteFolderError.Forbidden => Forbid(),
-      _ => StatusCode(StatusCodes.Status500InternalServerError)
-    };
+      });
+    }
+
+    if (result.Error == DeleteFolderError.Forbidden)
+    {
+      _logger.LogWarning("Folder delete rejected: {FolderId} not owned by userId={UserId}", id, userId);
+      return Forbid();
+    }
+
+    if (result.Error != DeleteFolderError.None)
+      return StatusCode(StatusCodes.Status500InternalServerError);
+
+    _logger.LogInformation("Folder deleted: id={FolderId} userId={UserId}", id, userId);
+    return NoContent();
   }
 
   /// <summary>Получить список прав на папку (только владелец)</summary>
@@ -121,11 +142,14 @@ public class FoldersController : ControllerBase
     var result = await _permissionService.ListByFolderAsync(userId.Value, id, ct);
 
     if (result is null)
+    {
+      _logger.LogWarning("List permissions denied: not owner of folder {FolderId} (userId={UserId})", id, userId);
       return NotFound(new ErrorResponse
       {
         Error = "folder_not_found",
         ErrorDescription = "Folder not found or access denied."
       });
+    }
 
     return Ok(result);
   }
@@ -150,21 +174,32 @@ public class FoldersController : ControllerBase
 
     var result = await _permissionService.GrantAsync(userId.Value, id, request, ct);
 
-    return result.Error switch
+    if (result.Error == GrantPermissionError.FolderNotFoundOrForbidden)
     {
-      GrantPermissionError.None => StatusCode(StatusCodes.Status201Created, result.Response),
-      GrantPermissionError.FolderNotFoundOrForbidden => NotFound(new ErrorResponse
+      _logger.LogWarning("Permission grant rejected: folder {FolderId} not found or not owned (userId={UserId})", id, userId);
+      return NotFound(new ErrorResponse
       {
         Error = "folder_not_found",
         ErrorDescription = "Folder not found or access denied."
-      }),
-      GrantPermissionError.UserNotFound => NotFound(new ErrorResponse
+      });
+    }
+
+    if (result.Error == GrantPermissionError.UserNotFound)
+    {
+      _logger.LogWarning("Permission grant rejected: target user {Email} not found (folder={FolderId})", request.Email, id);
+      return NotFound(new ErrorResponse
       {
         Error = "user_not_found",
         ErrorDescription = "User with the specified email not found."
-      }),
-      _ => StatusCode(StatusCodes.Status500InternalServerError)
-    };
+      });
+    }
+
+    if (result.Error != GrantPermissionError.None)
+      return StatusCode(StatusCodes.Status500InternalServerError);
+
+    _logger.LogInformation("Permission granted on folder {FolderId} to {Email} ({AccessLevel}) by userId={UserId}",
+      id, request.Email, request.AccessLevel, userId);
+    return StatusCode(StatusCodes.Status201Created, result.Response);
   }
 
   /// <summary>Отозвать права пользователя на папку</summary>
@@ -180,21 +215,32 @@ public class FoldersController : ControllerBase
 
     var result = await _permissionService.RevokeAsync(ownerId.Value, id, userId);
 
-    return result.Error switch
+    if (result.Error == RevokePermissionError.FolderNotFoundOrForbidden)
     {
-      RevokePermissionError.None => Ok("User`s access revoked"),
-      RevokePermissionError.FolderNotFoundOrForbidden => NotFound(new ErrorResponse
+      _logger.LogWarning("Permission revoke rejected: folder {FolderId} not found or not owned (ownerId={OwnerId})", id, ownerId);
+      return NotFound(new ErrorResponse
       {
         Error = "folder_not_found",
         ErrorDescription = "Folder not found or access denied."
-      }),
-      RevokePermissionError.PermissionNotFound => NotFound(new ErrorResponse
+      });
+    }
+
+    if (result.Error == RevokePermissionError.PermissionNotFound)
+    {
+      _logger.LogWarning("Permission revoke rejected: no permission for user {TargetUserId} on folder {FolderId}", userId, id);
+      return NotFound(new ErrorResponse
       {
         Error = "permission_not_found",
         ErrorDescription = "Permission not found for the specified user."
-      }),
-      _ => StatusCode(StatusCodes.Status500InternalServerError)
-    };
+      });
+    }
+
+    if (result.Error != RevokePermissionError.None)
+      return StatusCode(StatusCodes.Status500InternalServerError);
+
+    _logger.LogInformation("Permission revoked on folder {FolderId} from user {TargetUserId} by ownerId={OwnerId}",
+      id, userId, ownerId);
+    return Ok("User`s access revoked");
   }
 
   private Guid? GetCurrentUserId()

@@ -1,8 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using GraNAS.Signaling.Models;
 using GraNAS.Signaling.Models.DTO;
-using GraNAS.Signaling.Models.Enums;
 using GraNAS.Signaling.Models.Repositories;
 using GraNAS.Signaling.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.Services.Implementations;
 
@@ -10,11 +14,13 @@ public class DeviceService : IDeviceService
 {
     private readonly IDeviceRepository _repo;
     private readonly ISessionStore _sessions;
+    private readonly ILogger<DeviceService> _logger;
 
-    public DeviceService(IDeviceRepository repo, ISessionStore sessions)
+    public DeviceService(IDeviceRepository repo, ISessionStore sessions, ILogger<DeviceService> logger)
     {
         _repo = repo;
         _sessions = sessions;
+        _logger = logger;
     }
 
     public async Task<DeviceResponse> RegisterOrUpdateAsync(Guid userId, DeviceRegistrationRequest req, CancellationToken ct = default)
@@ -29,6 +35,12 @@ public class DeviceService : IDeviceService
 
         var result = await _repo.UpsertAsync(device, ct);
         var isOnline = await _sessions.IsDeviceOnlineAsync(result.Id, ct);
+
+        if (result.CreatedAt == result.LastSeenAt || result.LastSeenAt == default)
+            _logger.LogInformation("Device registered: id={DeviceId} user={UserId} platform={Platform}",
+                result.Id, userId, req.Platform);
+        else
+            _logger.LogDebug("Device updated: id={DeviceId} user={UserId}", result.Id, userId);
 
         return MapToResponse(result, isOnline);
     }
@@ -47,8 +59,13 @@ public class DeviceService : IDeviceService
         return responses;
     }
 
-    public Task<bool> BelongsToUserAsync(Guid deviceId, Guid userId, CancellationToken ct = default)
-        => _repo.BelongsToUserAsync(deviceId, userId, ct);
+    public async Task<bool> BelongsToUserAsync(Guid deviceId, Guid userId, CancellationToken ct = default)
+    {
+        var belongs = await _repo.BelongsToUserAsync(deviceId, userId, ct);
+        if (!belongs)
+            _logger.LogDebug("BelongsToUser: device {DeviceId} not owned by {UserId}", deviceId, userId);
+        return belongs;
+    }
 
     private static DeviceResponse MapToResponse(Device d, bool isOnline) => new()
     {

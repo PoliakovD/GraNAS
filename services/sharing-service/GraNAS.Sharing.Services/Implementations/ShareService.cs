@@ -2,6 +2,7 @@ using GraNAS.Sharing.Models;
 using GraNAS.Sharing.Models.DTO;
 using GraNAS.Sharing.Models.Repositories;
 using GraNAS.Sharing.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Sharing.Services.Implementations;
 
@@ -11,17 +12,20 @@ public class ShareService : IShareService
     private readonly ITokenGenerator _tokenGenerator;
     private readonly IMetadataServiceClient _metadataClient;
     private readonly IShareEventPublisher _eventPublisher;
+    private readonly ILogger<ShareService> _logger;
 
     public ShareService(
         IShareLinkRepository repository,
         ITokenGenerator tokenGenerator,
         IMetadataServiceClient metadataClient,
-        IShareEventPublisher eventPublisher)
+        IShareEventPublisher eventPublisher,
+        ILogger<ShareService> logger)
     {
         _repository = repository;
         _tokenGenerator = tokenGenerator;
         _metadataClient = metadataClient;
         _eventPublisher = eventPublisher;
+        _logger = logger;
     }
 
     public async Task<CreateShareResult> CreateAsync(
@@ -29,7 +33,10 @@ public class ShareService : IShareService
     {
         var folder = await _metadataClient.GetFolderForOwnerAsync(folderId, ownerId, ct);
         if (folder is null)
+        {
+            _logger.LogWarning("CreateShare: folder {FolderId} not owned by {OwnerId}", folderId, ownerId);
             return CreateShareResult.FolderNotFoundOrForbidden();
+        }
 
         var token = _tokenGenerator.GenerateToken();
         var tokenHash = _tokenGenerator.ComputeHash(token);
@@ -47,6 +54,9 @@ public class ShareService : IShareService
         };
 
         await _repository.CreateAsync(shareLink);
+        _logger.LogInformation(
+            "CreateShare: created share link {ShareLinkId} folder={FolderId} owner={OwnerId} expires={ExpiresAt}",
+            shareLink.Id, folderId, ownerId, shareLink.ExpiresAt);
 
         return CreateShareResult.Success(new CreateShareResponse
         {
@@ -64,12 +74,25 @@ public class ShareService : IShareService
         var tokenHash = _tokenGenerator.ComputeHash(token);
         var shareLink = await _repository.GetByTokenHashAsync(tokenHash);
 
-        if (shareLink is null || shareLink.ExpiresAt < DateTime.UtcNow)
+        if (shareLink is null)
+        {
+            _logger.LogDebug("GetShareByToken: not found");
             return null;
+        }
+
+        if (shareLink.ExpiresAt < DateTime.UtcNow)
+        {
+            _logger.LogWarning("GetShareByToken: expired (id={ShareLinkId})", shareLink.Id);
+            return null;
+        }
 
         var folder = await _metadataClient.GetFolderAsync(shareLink.FolderId, ct);
         if (folder is null)
+        {
+            _logger.LogWarning("GetShareByToken: folder {FolderId} not found for share link {ShareLinkId}",
+                shareLink.FolderId, shareLink.Id);
             return null;
+        }
 
         return new ShareDetailsResponse
         {
@@ -108,7 +131,10 @@ public class ShareService : IShareService
         var shareLink = await _repository.GetByTokenHashAsync(tokenHash);
 
         if (shareLink is null || shareLink.OwnerId != ownerId)
+        {
+            _logger.LogWarning("Revoke: share link not found or not owned by {OwnerId}", ownerId);
             return new RevokeShareResult(RevokeShareError.NotFoundOrForbidden);
+        }
 
         return await RevokeShareLinkAsync(shareLink);
     }
@@ -117,7 +143,10 @@ public class ShareService : IShareService
     {
         var shareLink = await _repository.GetByIdForOwnerAsync(id, ownerId);
         if (shareLink is null)
+        {
+            _logger.LogWarning("Revoke: share link {ShareLinkId} not found or not owned by {OwnerId}", id, ownerId);
             return new RevokeShareResult(RevokeShareError.NotFoundOrForbidden);
+        }
 
         return await RevokeShareLinkAsync(shareLink);
     }
@@ -136,6 +165,7 @@ public class ShareService : IShareService
         shareLink.UpdatedAt = DateTime.UtcNow;
         await _repository.UpdateAsync(shareLink);
 
+        _logger.LogInformation("Revoke: share link {ShareLinkId} revoked by {OwnerId}", shareLink.Id, shareLink.OwnerId);
         await _eventPublisher.PublishShareRevokedAsync(shareLink.Id, shareLink.FolderId, shareLink.OwnerId);
 
         return new RevokeShareResult(RevokeShareError.None);

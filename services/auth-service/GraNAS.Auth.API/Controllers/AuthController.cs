@@ -4,7 +4,6 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Services.Interfaces;
-using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -13,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Auth.API.Controllers;
 
@@ -25,14 +25,14 @@ public class AuthController : ControllerBase
   private const string RefreshTokenCookiePath = "/api/auth";
 
   private readonly IAuthService _authService;
-  private readonly ILoggerService _logger;
   private readonly IWebHostEnvironment _env;
+  private readonly ILogger<AuthController> _logger;
 
-  public AuthController(IAuthService authService, ILoggerService logger, IWebHostEnvironment env)
+  public AuthController(IAuthService authService, IWebHostEnvironment env, ILogger<AuthController> logger)
   {
     _authService = authService;
-    _logger = logger;
     _env = env;
+    _logger = logger;
   }
 
   private void SetRefreshTokenCookie(string token)
@@ -72,12 +72,14 @@ public class AuthController : ControllerBase
     switch (result.Error)
     {
       case RegisterError.WeakPassword:
+        _logger.LogWarning("Registration rejected for {Email}: weak password", request.Email);
         return BadRequest(new ErrorResponse
         {
           Error = "weak_password",
           ErrorDescription = "Password must contain at least one uppercase letter, one lowercase letter, and one digit."
         });
       case RegisterError.EmailAlreadyExists:
+        _logger.LogWarning("Registration rejected for {Email}: email already exists", request.Email);
         return Conflict(new ErrorResponse
         {
           Error = "email_already_exists",
@@ -85,7 +87,7 @@ public class AuthController : ControllerBase
         });
     }
 
-    await _logger.LogInfo($"New user registered: {request.Email}", userId: result.Response!.UserId.ToString());
+    _logger.LogInformation("User registered: {Email} (id={UserId})", request.Email, result.Response!.UserId);
     return Ok(result.Response);
   }
 
@@ -104,6 +106,7 @@ public class AuthController : ControllerBase
     var tokens = await _authService.LoginAsync(request);
     if (tokens == null)
     {
+      _logger.LogWarning("Login failed for {Email}: invalid credentials", request.Email);
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_grant",
@@ -111,7 +114,7 @@ public class AuthController : ControllerBase
       });
     }
 
-    await _logger.LogInfo($"User {request.Email} logged in");
+    _logger.LogInformation("User logged in: {Email}", request.Email);
 
     SetRefreshTokenCookie(tokens.RefreshToken);
     return Ok(new
@@ -135,21 +138,27 @@ public class AuthController : ControllerBase
   {
     var refreshToken = Request.Cookies[RefreshTokenCookieName] ?? request?.RefreshToken;
     if (string.IsNullOrEmpty(refreshToken))
+    {
+      _logger.LogWarning("Refresh failed: missing refresh token");
       return BadRequest(new ErrorResponse
       {
         Error = "invalid_request",
         ErrorDescription = "Refresh token is required."
       });
+    }
 
     var tokens = await _authService.RefreshAsync(refreshToken);
     if (tokens == null)
     {
+      _logger.LogWarning("Refresh failed: invalid or expired refresh token");
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_grant",
         ErrorDescription = "Invalid refresh token."
       });
     }
+
+    _logger.LogDebug("Refresh tokens issued");
 
     SetRefreshTokenCookie(tokens.RefreshToken);
     return Ok(new
@@ -173,19 +182,25 @@ public class AuthController : ControllerBase
                       ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
     if (!Guid.TryParse(userIdClaim, out var userId))
+    {
+      _logger.LogWarning("/me failed: invalid user identifier in token");
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_token",
         ErrorDescription = "Invalid user identifier."
       });
+    }
 
     var me = await _authService.GetMeAsync(userId);
     if (me is null)
+    {
+      _logger.LogWarning("/me failed: user {UserId} not found", userId);
       return Unauthorized(new ErrorResponse
       {
         Error = "user_not_found",
         ErrorDescription = "User not found."
       });
+    }
 
     return Ok(me);
   }
@@ -203,11 +218,14 @@ public class AuthController : ControllerBase
                       ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
     if (!Guid.TryParse(userIdClaim, out var userId))
+    {
+      _logger.LogWarning("Logout failed: invalid user identifier in token");
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_token",
         ErrorDescription = "Invalid user identifier."
       });
+    }
 
     request ??= new LogoutRequest();
 
@@ -219,22 +237,32 @@ public class AuthController : ControllerBase
     var result = await _authService.LogoutAsync(userId, request);
 
     if (result.Error == LogoutError.None)
-      DeleteRefreshTokenCookie();
-
-    return result.Error switch
     {
-      LogoutError.None => Ok(new { message = result.Message }),
-      LogoutError.InvalidToken => BadRequest(new ErrorResponse
+      DeleteRefreshTokenCookie();
+      _logger.LogInformation("User {UserId} logged out (allSessions={AllSessions})", userId, request.AllSessions == true);
+      return Ok(new { message = result.Message });
+    }
+
+    if (result.Error == LogoutError.InvalidToken)
+    {
+      _logger.LogWarning("Logout failed: refresh token not found or revoked (userId={UserId})", userId);
+      return BadRequest(new ErrorResponse
       {
         Error = "invalid_token",
         ErrorDescription = "Refresh token not found or already revoked."
-      }),
-      LogoutError.MissingParameters => BadRequest(new ErrorResponse
+      });
+    }
+
+    if (result.Error == LogoutError.MissingParameters)
+    {
+      _logger.LogWarning("Logout failed: missing parameters (userId={UserId})", userId);
+      return BadRequest(new ErrorResponse
       {
         Error = "invalid_request",
         ErrorDescription = "Either refresh token or all_sessions flag must be provided."
-      }),
-      _ => BadRequest()
-    };
+      });
+    }
+
+    return BadRequest();
   }
 }

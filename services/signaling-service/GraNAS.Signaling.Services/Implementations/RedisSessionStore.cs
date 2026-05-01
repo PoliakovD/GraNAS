@@ -1,6 +1,7 @@
 using System.Text.Json;
 using GraNAS.Signaling.Models.DTO;
 using GraNAS.Signaling.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace GraNAS.Signaling.Services.Implementations;
@@ -8,10 +9,15 @@ namespace GraNAS.Signaling.Services.Implementations;
 public class RedisSessionStore : ISessionStore
 {
     private readonly IDatabase _db;
+    private readonly ILogger<RedisSessionStore> _logger;
     private static readonly TimeSpan DeviceTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan SessionTtl = TimeSpan.FromHours(1);
 
-    public RedisSessionStore(IConnectionMultiplexer redis) => _db = redis.GetDatabase();
+    public RedisSessionStore(IConnectionMultiplexer redis, ILogger<RedisSessionStore> logger)
+    {
+        _db = redis.GetDatabase();
+        _logger = logger;
+    }
 
     // ── Key builders ──────────────────────────────────────────────────────────
     private static string ConnKey(Guid deviceId) => $"signaling:conn:{deviceId}";
@@ -47,7 +53,11 @@ public class RedisSessionStore : ISessionStore
     public async Task RemoveDeviceConnectionAsync(Guid deviceId, string connectionId, Guid userId, CancellationToken ct = default)
     {
         var current = (string?)await _db.StringGetAsync(ConnKey(deviceId));
-        if (current != connectionId) return; // stale call — another connection already registered
+        if (current != connectionId)
+        {
+            _logger.LogDebug("Remove device connection: device {DeviceId} stale call — connection already replaced", deviceId);
+            return; // stale call — another connection already registered
+        }
 
         var batch = _db.CreateBatch();
         var t1 = batch.KeyDeleteAsync(ConnKey(deviceId));
@@ -133,6 +143,8 @@ public class RedisSessionStore : ISessionStore
         var t4 = batch.KeyExpireAsync(PairKey(ownerConnId), SessionTtl);
         batch.Execute();
         await Task.WhenAll(t1, t2, t3, t4);
+        _logger.LogDebug("Session pair registered: {ConnA} ↔ {ConnB} for folder {FolderId}",
+            receiverConnId, ownerConnId, folderId);
     }
 
     public Task<bool> IsValidSessionPairAsync(string connA, string connB, CancellationToken ct = default)

@@ -57,7 +57,11 @@ public class SignalingHub : Hub
         var access = await _access.CheckJwtAccessAsync(folderId, userId);
 
         if (access is null || access.OwnerId != userId)
+        {
+            _logger.LogWarning("Owner join refused: device {DeviceId} not authorized as owner of folder {FolderId} (userId={UserId})",
+                deviceId, folderId, userId);
             throw new HubException("Not authorized as owner of this folder.");
+        }
 
         await _sessions.RegisterOwnerAsync(folderId, deviceId);
         TrackOwnerFolder(folderId);
@@ -85,6 +89,7 @@ public class SignalingHub : Hub
                 .SendAsync("OwnerOnlineStatusChanged", folderId, false);
         }
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, FolderGroupKey(folderId));
+        _logger.LogInformation("Owner device {DeviceId} left folder {FolderId}", deviceId.Value, folderId);
     }
 
     /// <summary>Receiver subscribes to owner online status.</summary>
@@ -93,6 +98,8 @@ public class SignalingHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, FolderGroupKey(folderId));
         var ownerDeviceId = await _sessions.GetOwnerDeviceIdAsync(folderId);
         await Clients.Caller.SendAsync("OwnerOnlineStatusChanged", folderId, ownerDeviceId is not null);
+        _logger.LogInformation("WatchFolder: conn {ConnId} watching folder {FolderId} (ownerOnline={OwnerOnline})",
+            Context.ConnectionId, folderId, ownerDeviceId is not null);
     }
 
     /// <summary>Receiver initiates a P2P session. JWT or share token required.</summary>
@@ -116,6 +123,8 @@ public class SignalingHub : Hub
 
         if (accessResult is null)
         {
+            _logger.LogWarning("RequestSession denied: conn {ConnId} has no access to folder {FolderId}",
+                Context.ConnectionId, folderId);
             await Clients.Caller.SendAsync("AccessDenied", folderId, "Access denied.");
             return;
         }
@@ -123,6 +132,8 @@ public class SignalingHub : Hub
         var ownerDeviceId = await _sessions.GetOwnerDeviceIdAsync(folderId);
         if (ownerDeviceId is null)
         {
+            _logger.LogWarning("RequestSession: owner of folder {FolderId} is offline (requester conn={ConnId})",
+                folderId, Context.ConnectionId);
             await Clients.Caller.SendAsync("OwnerOffline", folderId);
             return;
         }
@@ -130,6 +141,8 @@ public class SignalingHub : Hub
         var ownerConnId = await _sessions.GetConnectionIdByDeviceAsync(ownerDeviceId.Value);
         if (ownerConnId is null)
         {
+            _logger.LogWarning("RequestSession: owner device {DeviceId} has no active connection (folder={FolderId})",
+                ownerDeviceId.Value, folderId);
             await Clients.Caller.SendAsync("OwnerOffline", folderId);
             return;
         }
@@ -146,21 +159,25 @@ public class SignalingHub : Hub
     /// <summary>Relay SDP offer from owner to receiver.</summary>
     public async Task SendOffer(string targetConnectionId, string sdp)
     {
-        await AssertValidSessionAsync(targetConnectionId);
+        await AssertValidSessionAsync("SendOffer", targetConnectionId);
         await Clients.Client(targetConnectionId).SendAsync("Offer", Context.ConnectionId, sdp);
+        _logger.LogDebug("SendOffer forwarded {From} → {To} (sdpLength={Length})",
+            Context.ConnectionId, targetConnectionId, sdp.Length);
     }
 
     /// <summary>Relay SDP answer from receiver to owner.</summary>
     public async Task SendAnswer(string targetConnectionId, string sdp)
     {
-        await AssertValidSessionAsync(targetConnectionId);
+        await AssertValidSessionAsync("SendAnswer", targetConnectionId);
         await Clients.Client(targetConnectionId).SendAsync("Answer", Context.ConnectionId, sdp);
+        _logger.LogDebug("SendAnswer forwarded {From} → {To} (sdpLength={Length})",
+            Context.ConnectionId, targetConnectionId, sdp.Length);
     }
 
     /// <summary>Relay ICE candidate between peers.</summary>
     public async Task SendIceCandidate(string targetConnectionId, string candidate, string? sdpMid, int? sdpMLineIndex)
     {
-        await AssertValidSessionAsync(targetConnectionId);
+        await AssertValidSessionAsync("SendIceCandidate", targetConnectionId);
         LogIceCandidateType(candidate);
         await Clients.Client(targetConnectionId)
             .SendAsync("IceCandidate", Context.ConnectionId, candidate, sdpMid, sdpMLineIndex);
@@ -193,10 +210,14 @@ public class SignalingHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    private async Task AssertValidSessionAsync(string targetConnectionId)
+    private async Task AssertValidSessionAsync(string methodName, string targetConnectionId)
     {
         if (!await _sessions.IsValidSessionPairAsync(Context.ConnectionId, targetConnectionId))
+        {
+            _logger.LogWarning("{Method} rejected: invalid session pair {From} ↔ {To}",
+                methodName, Context.ConnectionId, targetConnectionId);
             throw new HubException("Invalid or expired session.");
+        }
     }
 
     private void LogIceCandidateType(string candidate)
