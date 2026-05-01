@@ -27,7 +27,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using Serilog.Sinks.Elasticsearch;
+using Serilog.Events;
 
 namespace GraNAS.Metadata.API;
 
@@ -41,22 +41,7 @@ public class Program
 
     var builder = WebApplication.CreateBuilder(args);
 
-    builder.Host.UseSerilog((ctx, cfg) =>
-    {
-      var esUri = ctx.Configuration["Elasticsearch:Uri"]
-                  ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
-
-      cfg
-        .ReadFrom.Configuration(ctx.Configuration)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("Application", apiTitle)
-        .WriteTo.Console()
-        .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
-        {
-          AutoRegisterTemplate = true,
-          IndexFormat = "granas-logs-{0:yyyy.MM.dd}"
-        });
-    });
+    builder.Host.UseGraNasCentralLogging(apiTitle);
 
     builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
@@ -76,8 +61,6 @@ public class Program
         return new BadRequestObjectResult(errorResponse);
       };
     });
-
-    builder.Services.AddHttpContextAccessor();
 
     builder.AddPostgreSql<MetadataDbContext>();
 
@@ -143,6 +126,7 @@ public class Program
       })
       .AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
+    builder.Services.AddGraNasCentralLoggingMvc();
     builder.Services.AddControllers()
       .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -197,7 +181,13 @@ public class Program
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseCorrelationId();
-    app.UseSerilogRequestLogging();
+    app.UseSerilogRequestLogging(opts =>
+    {
+      opts.GetLevel = (ctx, _, _) =>
+        ctx.Request.Path.StartsWithSegments("/health")
+          ? LogEventLevel.Debug
+          : LogEventLevel.Information;
+    });
 
 
 
@@ -239,6 +229,13 @@ public class Program
       Predicate = c => c.Tags.Contains("ready")
     }).AllowAnonymous().DisableRateLimiting();
 
-    await app.RunAsync();
+    try
+    {
+      await app.RunAsync();
+    }
+    finally
+    {
+      Log.CloseAndFlush();
+    }
   }
 }

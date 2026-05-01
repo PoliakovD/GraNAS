@@ -9,7 +9,7 @@
 
 ---
 
-## Текущее состояние (2026-04-26)
+## Текущее состояние (2026-05-01)
 
 **Реализовано:**
 
@@ -17,19 +17,19 @@
 - `auth-service` — регистрация, логин, JWT, refresh-токены в httpOnly cookie (Phase 1/4); `GET /api/auth/me`, `GET /api/internal/users/{id}` (Phase 5)
 - `metadata-service` — CRUD папок с иерархией подпапок + permissions (Phase 2) + InternalFoldersController; `GET /api/folders/{id}/permissions` (Phase 5)
 - `sharing-service` — share-ссылки для незарегистрированных (Phase 3): токены base64url+SHA256, 5 эндпоинтов, cleanup job, RabbitMQ publish
-- `log-service` — централизованный сбор логов через RabbitMQ
+- `log-service` — централизованный сбор логов: RabbitMQ consumer → OpenSearch; IndexTemplate при старте; `GET /api/logs` с фильтрацией по `service`/`level`/`correlationId`
 - `clients/web/` — React 19 + Vite + AntD 6 веб-клиент (Phase 4): все экраны Phase 1–3, silent refresh, 10 Vitest тестов; UX-улучшения (все 5 спринтов) — [`docs/web-ux-roadmap.md`](web-ux-roadmap.md)
 - `clients/desktop/` — Avalonia 11 + ReactiveUI + Semi.Avalonia Windows-клиент (Phase 5+6): 6 экранов + P2P sender (SIPSorcery 8.0.0 + SignalR.Client), FolderShareRegistry, ECDH+AES-GCM, online-toggle, DeviceIdentity (Phase 6.5), 16 desktop-тестов
 - `services/signaling-service/` — SignalR hub + TURN credentials + Redis session store (Phase 6) + device sessions в signalingdb PostgreSQL (Phase 6.5)
 - **coturn** в docker compose (Phase 6)
 - **EF migrations bundle** — Dockerfiles для auth, metadata, sharing содержат `bundle` stage; при старте контейнера `efbundle` применяет миграции до запуска приложения
-- Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, Serilog → Elasticsearch
+- Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, `GraNAS.Shared.LoggingService` — `UseGraNasCentralLogging` + `RabbitMqLogSink` + `SensitiveDataEnricher` + `MvcLoggingActionFilter`; логи идут через RabbitMQ → log-service → OpenSearch
 - Docker Compose для dev и prod (gateway на порту 8080, signaling на 8085)
 - CI/CD (GitHub Actions → GHCR → staging via SSH)
 - **155 .NET тестов + 16 Desktop-тестов + 10 Vitest тестов — все зелёные**
 
 **Плейсхолдеры без реализации:**
-`admin-service`, `notification-service`, `search-service`, `signaling-service`
+`admin-service`, `notification-service`, `search-service`
 
 **Не начато:** Android.
 
