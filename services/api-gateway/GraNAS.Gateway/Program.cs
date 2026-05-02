@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Events;
 
 namespace GraNAS.Gateway;
 
@@ -57,7 +58,13 @@ public class Program
         var app = builder.Build();
 
         app.UseCorrelationId();
-        app.UseSerilogRequestLogging();
+        app.UseSerilogRequestLogging(opts =>
+        {
+            opts.GetLevel = (ctx, _, _) =>
+                ctx.Request.Path.StartsWithSegments("/health")
+                    ? LogEventLevel.Debug
+                    : LogEventLevel.Information;
+        });
 
         if (!app.Environment.IsDevelopment())
         {

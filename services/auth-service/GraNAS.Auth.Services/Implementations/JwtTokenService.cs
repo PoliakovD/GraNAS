@@ -9,6 +9,7 @@ using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Models.Repositories;
 using GraNAS.Auth.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace GraNAS.Auth.Services.Implementations;
@@ -17,11 +18,16 @@ public class JwtTokenService : ITokenService
 {
   private readonly IConfiguration _configuration;
   private readonly IRefreshTokenRepository _refreshTokenRepository;
+  private readonly ILogger<JwtTokenService> _logger;
 
-  public JwtTokenService(IConfiguration configuration, IRefreshTokenRepository refreshTokenRepository)
+  public JwtTokenService(
+    IConfiguration configuration,
+    IRefreshTokenRepository refreshTokenRepository,
+    ILogger<JwtTokenService> logger)
   {
     _configuration = configuration;
     _refreshTokenRepository = refreshTokenRepository;
+    _logger = logger;
   }
 
   public string GenerateAccessToken(User user)
@@ -91,24 +97,35 @@ public class JwtTokenService : ITokenService
   {
     var existingToken = await _refreshTokenRepository.GetValidTokenAsync(refreshToken);
     if (existingToken == null)
+    {
+      _logger.LogWarning("JWT: refresh token not found, expired, or revoked");
       return null;
+    }
 
     await _refreshTokenRepository.RevokeAsync(existingToken.Id);
 
     var user = existingToken.User;
     if (user == null)
+    {
+      _logger.LogWarning("JWT: refresh token {TokenId} has no associated user", existingToken.Id);
       return null;
+    }
 
+    _logger.LogDebug("JWT: tokens rotated for user {UserId}", user.Id);
     return await GenerateTokensAsync(user);
   }
 
-  public Task<bool> RevokeRefreshTokenAsync(string refreshToken, Guid userId)
+  public async Task<bool> RevokeRefreshTokenAsync(string refreshToken, Guid userId)
   {
-    return _refreshTokenRepository.RevokeTokenAsync(refreshToken, userId);
+    var revoked = await _refreshTokenRepository.RevokeTokenAsync(refreshToken, userId);
+    if (!revoked)
+      _logger.LogWarning("JWT: revoke refused — token not found or not owned by user {UserId}", userId);
+    return revoked;
   }
 
   public Task RevokeAllUserRefreshTokensAsync(Guid userId)
   {
+    _logger.LogInformation("JWT: revoking all refresh tokens for user {UserId}", userId);
     return _refreshTokenRepository.RevokeAllForUserAsync(userId);
   }
 }

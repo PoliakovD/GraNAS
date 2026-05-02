@@ -21,7 +21,7 @@ public class DevicesControllerTests : IClassFixture<SignalingWebApplicationFacto
     public async Task Post_WithoutJwt_Returns401()
     {
         var req = new { deviceId = Guid.NewGuid(), deviceName = "TestPC", platform = "Windows" };
-        var resp = await _client.PostAsJsonAsync("/api/signaling/devices", req);
+        var resp = await _client.PostAsJsonAsync("/api/devices", req);
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
@@ -32,7 +32,7 @@ public class DevicesControllerTests : IClassFixture<SignalingWebApplicationFacto
         var client = WithJwt(userId);
 
         var deviceId = Guid.NewGuid();
-        var resp = await client.PostAsJsonAsync("/api/signaling/devices",
+        var resp = await client.PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "MyPC", platform = "Windows" });
         resp.EnsureSuccessStatusCode();
 
@@ -50,10 +50,10 @@ public class DevicesControllerTests : IClassFixture<SignalingWebApplicationFacto
         var client = WithJwt(userId);
         var deviceId = Guid.NewGuid();
 
-        await client.PostAsJsonAsync("/api/signaling/devices",
+        await client.PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "OldName", platform = "Windows" });
 
-        var resp = await client.PostAsJsonAsync("/api/signaling/devices",
+        var resp = await client.PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "NewName", platform = "Linux" });
         resp.EnsureSuccessStatusCode();
 
@@ -67,10 +67,10 @@ public class DevicesControllerTests : IClassFixture<SignalingWebApplicationFacto
     {
         var deviceId = Guid.NewGuid();
 
-        await WithJwt(Guid.NewGuid()).PostAsJsonAsync("/api/signaling/devices",
+        await WithJwt(Guid.NewGuid()).PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "User1PC", platform = "Windows" });
 
-        var resp = await WithJwt(Guid.NewGuid()).PostAsJsonAsync("/api/signaling/devices",
+        var resp = await WithJwt(Guid.NewGuid()).PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "User2PC", platform = "Windows" });
 
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
@@ -82,12 +82,12 @@ public class DevicesControllerTests : IClassFixture<SignalingWebApplicationFacto
         var user1 = Guid.NewGuid();
         var user2 = Guid.NewGuid();
 
-        await WithJwt(user1).PostAsJsonAsync("/api/signaling/devices",
+        await WithJwt(user1).PostAsJsonAsync("/api/devices",
             new { deviceId = Guid.NewGuid(), deviceName = $"U1-{Guid.NewGuid():N}", platform = "Windows" });
-        await WithJwt(user2).PostAsJsonAsync("/api/signaling/devices",
+        await WithJwt(user2).PostAsJsonAsync("/api/devices",
             new { deviceId = Guid.NewGuid(), deviceName = $"U2-{Guid.NewGuid():N}", platform = "MacOS" });
 
-        var resp = await WithJwt(user2).GetAsync("/api/signaling/devices");
+        var resp = await WithJwt(user2).GetAsync("/api/devices");
         resp.EnsureSuccessStatusCode();
         var devices = await resp.Content.ReadFromJsonAsync<List<DeviceResponse>>();
 

@@ -1,0 +1,26 @@
+{
+  "index_patterns": ["granas-logs-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": false,
+      "properties": {
+        "@timestamp":     { "type": "date" },
+        "Level":          { "type": "keyword" },
+        "Service":        { "type": "keyword" },
+        "Message":        { "type": "text" },
+        "SourceContext":  { "type": "keyword" },
+        "ActionName":     { "type": "keyword" },
+        "Method":         { "type": "keyword" },
+        "Parameters":     { "type": "object", "dynamic": false, "enabled": false },
+        "CorrelationId":  { "type": "keyword" },
+        "Exception":      { "type": "text" },
+        "Environment":    { "type": "keyword" },
+        "UserId":         { "type": "keyword" }
+      }
+    }
+  }
+}

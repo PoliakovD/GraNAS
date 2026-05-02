@@ -3,6 +3,7 @@ using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Models.Repositories;
 using GraNAS.Auth.Services.Implementations;
 using GraNAS.Auth.Services.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -16,7 +17,7 @@ public class AuthServiceTests
 
     public AuthServiceTests()
     {
-        _sut = new AuthService(_userRepo.Object, _hasher.Object, _tokenService.Object);
+        _sut = new AuthService(_userRepo.Object, _hasher.Object, _tokenService.Object, NullLogger<AuthService>.Instance);
     }
 
     // ──────────────────────────────── RegisterAsync ────────────────────────────────

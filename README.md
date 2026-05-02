@@ -24,13 +24,17 @@
 **Файлы не хранятся на сервере.** Сервер управляет только метаданными и правами; байты передаются напрямую между клиентами по WebRTC.
 
 ```
-Browser / App
+Browser / Desktop App
      │
      ▼
 YARP API Gateway :8080
-     ├─ /api/auth/**      → auth-service
-     ├─ /api/metadata/**  → metadata-service
-     └─ /api/sharing/**   → sharing-service
+     ├─ /api/auth/**       → auth-service
+     ├─ /api/metadata/**   → metadata-service
+     ├─ /api/sharing/**    → sharing-service
+     └─ /hubs/signaling/** → signaling-service (WebSocket/SignalR)
+
+Logs pipeline:
+  [each service] → RabbitMQ logs_exchange → log-service consumer → OpenSearch
 ```
 
 | Сервис | Стек | Назначение |
@@ -39,8 +43,10 @@ YARP API Gateway :8080
 | `auth-service` | ASP.NET Core + PostgreSQL + Redis | Регистрация, логин, JWT, refresh-токены |
 | `metadata-service` | ASP.NET Core + PostgreSQL | CRUD папок с иерархией, permissions |
 | `sharing-service` | ASP.NET Core + PostgreSQL + RabbitMQ | Share-ссылки, токены SHA256 |
-| `log-service` | ASP.NET Core + PostgreSQL + RabbitMQ | Централизованный сбор логов |
-| `clients/web` | React 19 + Vite + AntD 6 | Веб-клиент |
+| `log-service` | ASP.NET Core + OpenSearch + RabbitMQ | Централизованный сбор логов (consumer → OpenSearch) |
+| `signaling-service` | ASP.NET Core + SignalR + Redis | WebRTC signaling, TURN-креды |
+| `clients/web` | React 19 + Vite + AntD 6 | Веб-клиент + P2P receiver |
+| `clients/desktop` | Avalonia 11 + ReactiveUI | Windows-клиент + P2P sender |
 
 ---
 
@@ -101,8 +107,11 @@ npm run dev   # http://localhost:5173
 ### Тесты
 
 ```bash
-# .NET (116 тестов — unit + integration через Testcontainers)
+# .NET backend (155 тестов — unit + integration через Testcontainers)
 dotnet test tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj
+
+# .NET desktop (16 тестов)
+dotnet test tests/GraNAS.Desktop.Tests/GraNAS.Desktop.Tests.csproj
 
 # Frontend (10 Vitest-тестов)
 cd clients/web && npm test
@@ -118,8 +127,9 @@ cd clients/web && npm test
 | Phase 2 | Permissions: `View`/`Full` для зарегистрированных пользователей | ✅ |
 | Phase 3 | Share-ссылки для анонимных пользователей | ✅ |
 | Phase 4 | Веб-клиент + API Gateway + UX-полировка | ✅ |
-| Phase 5 | Windows-клиент (.NET 10 + WPF) | 🔜 |
-| Phase 6 | P2P/WebRTC: signaling-service + передача файлов | 🔜 |
+| Phase 5 | Windows-клиент (Avalonia 11 + ReactiveUI + SIPSorcery) | ✅ |
+| Phase 6 | P2P/WebRTC: signaling-service + coturn + передача файлов | ✅ |
+| Phase 6.5 | Device Sessions: идентичность устройств + управление сессиями | ✅ |
 | Phase 7 | Уведомления: email + in-app | 🔜 |
 | Phase 8 | Поиск по метаданным | 🔜 |
 | Phase 9 | Административная панель | 🔜 |

@@ -12,23 +12,30 @@ using GraNAS.Signaling.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Controllers;
 
 [ApiController]
-[Route("api/signaling/sessions")]
+[Route("api/sessions")]
 [Authorize]
 public class SessionsController : ControllerBase
 {
     private readonly ISessionStore _sessions;
     private readonly IDeviceRepository _deviceRepo;
     private readonly IHubContext<SignalingHub> _hub;
+    private readonly ILogger<SessionsController> _logger;
 
-    public SessionsController(ISessionStore sessions, IDeviceRepository deviceRepo, IHubContext<SignalingHub> hub)
+    public SessionsController(
+        ISessionStore sessions,
+        IDeviceRepository deviceRepo,
+        IHubContext<SignalingHub> hub,
+        ILogger<SessionsController> logger)
     {
         _sessions = sessions;
         _deviceRepo = deviceRepo;
         _hub = hub;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -57,6 +64,7 @@ public class SessionsController : ControllerBase
             });
         }
 
+        _logger.LogDebug("Sessions listed for user {UserId}: count={Count}", userId, responses.Count);
         return Ok(responses);
     }
 
@@ -68,7 +76,10 @@ public class SessionsController : ControllerBase
         var userId = GetUserId();
 
         if (!await _deviceRepo.BelongsToUserAsync(deviceId, userId, ct))
+        {
+            _logger.LogWarning("Terminate session rejected: device {DeviceId} not owned by userId={UserId}", deviceId, userId);
             return NotFound();
+        }
 
         var info = await _sessions.GetSessionInfoAsync(deviceId, ct);
         if (info is not null)
@@ -77,6 +88,7 @@ public class SessionsController : ControllerBase
             await _sessions.RemoveDeviceConnectionAsync(deviceId, info.ConnectionId, userId, ct);
         }
 
+        _logger.LogInformation("Session terminated: device {DeviceId} (userId={UserId})", deviceId, userId);
         return NoContent();
     }
 

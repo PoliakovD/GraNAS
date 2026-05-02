@@ -74,16 +74,16 @@ services:
     volumes:
       - redis_data:/data
 
-  elasticsearch:
-    container_name: ${PREFIX}_elasticsearch
-    image: elasticsearch:${ELASTIC_VERSION}
+  opensearch:
+    container_name: ${PREFIX}_opensearch
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION}
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
-      - xpack.security.enabled=false
+      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS}
+      - DISABLE_SECURITY_PLUGIN=true
       - http.cors.enabled=true
-      - http.cors.allow-origin="*"
+      - http.cors.allow-origin=*
       - http.cors.allow-headers=X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization
     ulimits:
       memlock:
@@ -104,9 +104,9 @@ services:
     networks:
       - app-network
     volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
+      - opensearch_data:/usr/share/opensearch/data
     ports:
-      - "${ELASTIC_PORT_HOST}:${ELASTIC_PORT_CONTAINER}"
+      - "${OPENSEARCH_PORT_HOST}:${OPENSEARCH_PORT_CONTAINER}"
 
   rabbitmq:
     container_name: ${PREFIX}_rabbitmq
@@ -150,7 +150,6 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE}
       Jwt__AccessTokenExpirationMinutes: ${JWT_ACCESS_MINUTES}
       Jwt__RefreshTokenExpirationDays: ${JWT_REFRESH_DAYS}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
@@ -162,8 +161,6 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -195,7 +192,6 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       AuthService__BaseUrl: http://auth-service:${SERVICE_PORT_CONTAINER}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
@@ -206,8 +202,6 @@ services:
       postgres-metadata:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -236,7 +230,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
       ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
       ConnectionStrings__DefaultConnection: ${LOG_DB_CONNECTION_STRING}
-      Elasticsearch__Uri: ${ELASTIC_URI}
+      OpenSearch__Uri: ${OPENSEARCH_URI}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
@@ -245,7 +239,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      elasticsearch:
+      opensearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -323,7 +317,6 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       MetadataService__BaseUrl: http://metadata-service:${SERVICE_PORT_CONTAINER}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
@@ -336,8 +329,6 @@ services:
       metadata-service:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -370,7 +361,6 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       MetadataService__BaseUrl: http://metadata-service:${SERVICE_PORT_CONTAINER}
       SharingService__BaseUrl: http://sharing-service:${SERVICE_PORT_CONTAINER}
       Turn__StaticAuthSecret: ${TURN_SECRET}
@@ -480,6 +470,6 @@ volumes:
   postgres_metadata_data:
   postgres_sharing_data:
   postgres_signaling_data:
-  elasticsearch_data:
+  opensearch_data:
   rabbitmq_data:
   redis_data:

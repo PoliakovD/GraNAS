@@ -8,17 +8,23 @@ using GraNAS.Signaling.Models.DTO;
 using GraNAS.Signaling.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Controllers;
 
 [ApiController]
-[Route("api/signaling/devices")]
+[Route("api/devices")]
 [Authorize]
 public class DevicesController : ControllerBase
 {
     private readonly IDeviceService _deviceService;
+    private readonly ILogger<DevicesController> _logger;
 
-    public DevicesController(IDeviceService deviceService) => _deviceService = deviceService;
+    public DevicesController(IDeviceService deviceService, ILogger<DevicesController> logger)
+    {
+        _deviceService = deviceService;
+        _logger = logger;
+    }
 
     [HttpPost]
     [ProducesResponseType(typeof(DeviceResponse), 200)]
@@ -28,11 +34,14 @@ public class DevicesController : ControllerBase
     {
         try
         {
-            var result = await _deviceService.RegisterOrUpdateAsync(GetUserId(), req, ct);
+            var userId = GetUserId();
+            var result = await _deviceService.RegisterOrUpdateAsync(userId, req, ct);
+            _logger.LogInformation("Device registered: id={DeviceId} for userId={UserId}", result.DeviceId, userId);
             return Ok(result);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("different user"))
         {
+            _logger.LogWarning("Device registration conflict: device {DeviceId} is owned by another user", req.DeviceId);
             return Conflict(new { error = "DEVICE_OWNED_BY_OTHER_USER", message = ex.Message });
         }
     }
@@ -40,7 +49,12 @@ public class DevicesController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<DeviceResponse>), 200)]
     public async Task<ActionResult<List<DeviceResponse>>> List(CancellationToken ct)
-        => Ok(await _deviceService.GetByUserAsync(GetUserId(), ct));
+    {
+        var userId = GetUserId();
+        var devices = await _deviceService.GetByUserAsync(userId, ct);
+        _logger.LogDebug("Devices listed for user {UserId}: count={Count}", userId, devices.Count);
+        return Ok(devices);
+    }
 
     private Guid GetUserId()
     {

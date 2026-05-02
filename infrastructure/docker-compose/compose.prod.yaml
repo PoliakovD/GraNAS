@@ -20,11 +20,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
     restart: always
 
-  elasticsearch:
+  opensearch:
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
-      - xpack.security.enabled=true
-      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS}
+      - DISABLE_SECURITY_PLUGIN=true

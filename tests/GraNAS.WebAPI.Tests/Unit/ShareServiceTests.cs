@@ -3,6 +3,7 @@ using GraNAS.Sharing.Models.DTO;
 using GraNAS.Sharing.Models.Repositories;
 using GraNAS.Sharing.Services.Implementations;
 using GraNAS.Sharing.Services.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -19,7 +20,7 @@ public class ShareServiceTests
     {
         _tokenGen.Setup(t => t.GenerateToken()).Returns("test_token_value");
         _tokenGen.Setup(t => t.ComputeHash(It.IsAny<string>())).Returns("testhash64charslong000000000000000000000000000000000000000000");
-        _sut = new ShareService(_repo.Object, _tokenGen.Object, _metadataClient.Object, _eventPublisher.Object);
+        _sut = new ShareService(_repo.Object, _tokenGen.Object, _metadataClient.Object, _eventPublisher.Object, NullLogger<ShareService>.Instance);
     }
 
     // ──────────────── CreateAsync ────────────────

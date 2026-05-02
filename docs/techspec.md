@@ -14,6 +14,7 @@
 ### 🔧 Backend
 
 - **API Gateway** (`services/api-gateway/`, YARP) — единая точка входа для браузерных клиентов на порту 8080. Централизованный CORS (`WithOrigins + AllowCredentials`), прозрачный проброс Cookie/Authorization заголовков, Correlation-Id. JWT-валидация и rate-limiting остаются на каждом сервисе.
+- **Централизованное логирование** — все API-сервисы пишут в `RabbitMQ logs_exchange` (topic) через `GraNAS.Shared.LoggingService.RabbitMqLogSink`; `log-service` — единственный consumer, индексирует события в OpenSearch. Маскирование чувствительных данных в Production через `SensitiveDataEnricher`. Авто-обогащение `ActionName`/`Method`/`Parameters`/`UserId` через `MvcLoggingActionFilter`. Все контроллеры и доменные сервисы покрыты структурированными логами на уровнях Debug/Information/Warning/Error. Console — fallback при недоступности RabbitMQ.
 - **Центральный REST API** для всех клиентов (Web, Android, Windows)
 - **PostgreSQL** – хранение метаданных (пользователи, папки, файлы, права, ссылки, события)
 - **Аутентификация** – email/пароль, JWT access-token (Bearer) + refresh-token в httpOnly cookie (см. раздел Безопасность)
@@ -29,7 +30,7 @@
 - **Email‑уведомления** – через внешний SMTP-сервер
 - **Ошибки** – возвращаются с соответствующим статусом и сообщением (истёкшая/отозванная ссылка, доступ к чужим данным и т.д.)
 - **Нет хранения файлов** – только метаданные и ссылки на локальные файлы
-- **signaling-service** – отдельный микросервис, сводит WebRTC-пиры (SignalR/WebSocket). Никаких файлов через него не проходит — только обмен SDP-offer/answer и ICE-кандидатов.
+- **signaling-service** ✅ — отдельный микросервис, сводит WebRTC-пиры (SignalR/WebSocket hub `/hubs/signaling`). TURN-credentials endpoint, Redis session store. Никаких файлов через него не проходит — только обмен SDP-offer/answer и ICE-кандидатов.
 
 ### 🔀 P2P-транспорт файлов (WebRTC / ICE / DTLS)
 
@@ -162,10 +163,10 @@
 - **metadata-service** (`services/metadata-service/`) – CRUD папок, иерархия, permissions ✅ Phase 1/2
 - **sharing-service** (`services/sharing-service/`) – share-ссылки, токены, cleanup job ✅ Phase 3
 - **web-client-react** (`clients/web/`) – React 19 + Vite + AntD 6, TanStack Query v5, React Router v7 ✅ Phase 4
-- **signaling-service** – WebRTC signaling (SignalR hub, выдача TURN-кредов) ⏳ Phase 6
-- **turn-infra** – развёрнутый coturn, публичные STUN берём как есть ⏳ Phase 6
+- **signaling-service** – WebRTC signaling (SignalR hub, TURN-креды, Redis) ✅ Phase 6
+- **turn-infra** – coturn в compose, UDP relay 49152–49252 ✅ Phase 6
 - **android-client** – Android-приложение (`google-webrtc`) ⏳ Phase 11
-- **windows-client** – Windows-клиент + Shell Extension + SIPSorcery для P2P ⏳ Phase 5/10
+- **windows-client** – Avalonia 11 + ReactiveUI + SIPSorcery, P2P sender, FolderShareRegistry ✅ Phase 5/6
 - **db-migrations** – миграции и схемы PostgreSQL (в каждом сервисе через EF Core)
 - **notifications-service** – обработка email и webhook-уведомлений ⏳ Phase 7
 

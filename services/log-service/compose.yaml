@@ -50,7 +50,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
       ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=${POSTGRES_PORT_CONTAINER};Database=${LOG_POSTGRES_DB};Username=${LOG_POSTGRES_USER};Password=${LOG_POSTGRES_PASSWORD}
-      Elasticsearch__Uri: ${ELASTIC_URI}
+      OpenSearch__Uri: ${OPENSEARCH_URI}
       RabbitMQ__Host: rabbitmq
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}

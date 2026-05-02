@@ -14,14 +14,14 @@ public class SessionsControllerTests : IClassFixture<SignalingWebApplicationFact
     [Fact]
     public async Task Get_WithoutJwt_Returns401()
     {
-        var resp = await _factory.CreateClient().GetAsync("/api/signaling/sessions");
+        var resp = await _factory.CreateClient().GetAsync("/api/sessions");
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
     [Fact]
     public async Task Get_NoOnlineSessions_ReturnsEmptyList()
     {
-        var resp = await WithJwt(Guid.NewGuid()).GetAsync("/api/signaling/sessions");
+        var resp = await WithJwt(Guid.NewGuid()).GetAsync("/api/sessions");
         resp.EnsureSuccessStatusCode();
 
         var sessions = await resp.Content.ReadFromJsonAsync<List<ActiveSessionResponse>>();
@@ -36,11 +36,11 @@ public class SessionsControllerTests : IClassFixture<SignalingWebApplicationFact
         var deviceId = Guid.NewGuid();
 
         // Register device for owner
-        await WithJwt(ownerId).PostAsJsonAsync("/api/signaling/devices",
+        await WithJwt(ownerId).PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "OwnerPC", platform = "Windows" });
 
         // Try to terminate it as another user
-        var resp = await WithJwt(Guid.NewGuid()).DeleteAsync($"/api/signaling/sessions/{deviceId}");
+        var resp = await WithJwt(Guid.NewGuid()).DeleteAsync($"/api/sessions/{deviceId}");
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
@@ -50,11 +50,11 @@ public class SessionsControllerTests : IClassFixture<SignalingWebApplicationFact
         var userId = Guid.NewGuid();
         var deviceId = Guid.NewGuid();
 
-        await WithJwt(userId).PostAsJsonAsync("/api/signaling/devices",
+        await WithJwt(userId).PostAsJsonAsync("/api/devices",
             new { deviceId, deviceName = "MyPC", platform = "Windows" });
 
         // Device registered but no hub connection → no session info → still 204
-        var resp = await WithJwt(userId).DeleteAsync($"/api/signaling/sessions/{deviceId}");
+        var resp = await WithJwt(userId).DeleteAsync($"/api/sessions/{deviceId}");
         Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
     }
 

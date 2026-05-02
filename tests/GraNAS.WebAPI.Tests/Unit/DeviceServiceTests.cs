@@ -4,6 +4,7 @@ using GraNAS.Signaling.Models.Enums;
 using GraNAS.Signaling.Models.Repositories;
 using GraNAS.Signaling.Services.Implementations;
 using GraNAS.Signaling.Services.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -12,7 +13,7 @@ public class DeviceServiceTests
 {
     private readonly Mock<IDeviceRepository> _repoMock = new();
     private readonly Mock<ISessionStore> _sessionsMock = new();
-    private DeviceService CreateSut() => new(_repoMock.Object, _sessionsMock.Object);
+    private DeviceService CreateSut() => new(_repoMock.Object, _sessionsMock.Object, NullLogger<DeviceService>.Instance);
 
     [Fact]
     public async Task RegisterOrUpdateAsync_NewDevice_ReturnsResponse()

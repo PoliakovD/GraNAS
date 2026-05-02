@@ -1,9 +1,9 @@
-using Elastic.Clients.Elasticsearch;
-using Elastic.Clients.Elasticsearch.QueryDsl;
 using GraNAS.LogService.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
+using OpenSearch.Client;
 
 namespace GraNAS.LogService.Controllers;
 
@@ -12,59 +12,73 @@ namespace GraNAS.LogService.Controllers;
 [EnableRateLimiting("api")]
 public class LogsController : ControllerBase
 {
-  private const string IndexPattern = "granas-logs-*";
+    private const string IndexPattern = "granas-logs-*";
 
-  private readonly ElasticsearchClient _es;
+    private readonly OpenSearchClient _os;
+    private readonly ILogger<LogsController> _logger;
 
-  public LogsController(ElasticsearchClient es) => _es = es;
-
-  /// <summary>
-  /// Поиск логов с фильтрацией и пагинацией
-  /// </summary>
-  [HttpGet]
-  [ProducesResponseType(StatusCodes.Status200OK)]
-  [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
-  public async Task<IActionResult> GetLogs(
-    [FromQuery] string? service,
-    [FromQuery] string? level,
-    [FromQuery] string? correlationId,
-    [FromQuery] int page = 1,
-    [FromQuery] int pageSize = 50)
-  {
-    var musts = new List<Query>();
-
-    if (!string.IsNullOrEmpty(service))
-      musts.Add(new TermQuery(new Field("Application")) { Value = service });
-
-    if (!string.IsNullOrEmpty(level))
-      musts.Add(new TermQuery(new Field("level")) { Value = level.ToLowerInvariant() });
-
-    if (!string.IsNullOrEmpty(correlationId))
-      musts.Add(new TermQuery(new Field("CorrelationId")) { Value = correlationId });
-
-    var query = musts.Count > 0
-      ? Query.Bool(new BoolQuery { Must = musts })
-      : Query.MatchAll(new MatchAllQuery());
-
-    var response = await _es.SearchAsync<LogDocument>(s => s
-      .Indices(IndexPattern)
-      .From((page - 1) * pageSize)
-      .Size(pageSize)
-      .Query(query)
-      .Sort(sort => sort.Field(
-        new Field("@timestamp"),
-        new FieldSort { Order = SortOrder.Desc }))
-    );
-
-    if (!response.IsValidResponse)
-      return StatusCode(502, new { error = "elasticsearch_error", detail = response.DebugInformation });
-
-    return Ok(new
+    public LogsController(OpenSearchClient os, ILogger<LogsController> logger)
     {
-      total = response.Total,
-      page,
-      pageSize,
-      logs = response.Documents
-    });
-  }
+        _os = os;
+        _logger = logger;
+    }
+
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> GetLogs(
+        [FromQuery] string? service,
+        [FromQuery] string? level,
+        [FromQuery] string? correlationId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        var musts = new List<QueryContainer>();
+
+        if (!string.IsNullOrEmpty(service))
+            musts.Add(new TermQuery { Field = "Service", Value = service });
+
+        if (!string.IsNullOrEmpty(level))
+            musts.Add(new TermQuery { Field = "Level", Value = level });
+
+        if (!string.IsNullOrEmpty(correlationId))
+            musts.Add(new TermQuery { Field = "CorrelationId", Value = correlationId });
+
+        ISearchResponse<LogDocument> response;
+        try
+        {
+            response = await _os.SearchAsync<LogDocument>(s => s
+                .Index(IndexPattern)
+                .From((page - 1) * pageSize)
+                .Size(pageSize)
+                .Query(q => musts.Count > 0
+                    ? new QueryContainer(new BoolQuery { Must = musts })
+                    : q.MatchAll())
+                .Sort(ss => ss.Descending("@timestamp"))
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "LogsController: OpenSearch query failed (service={Service} level={Level})", service, level);
+            return StatusCode(502, new { error = "opensearch_error", detail = ex.Message });
+        }
+
+        if (!response.IsValid)
+        {
+            _logger.LogError("LogsController: OpenSearch returned invalid response (service={Service} level={Level}): {Detail}",
+                service, level, response.DebugInformation);
+            return StatusCode(502, new { error = "opensearch_error", detail = response.DebugInformation });
+        }
+
+        _logger.LogDebug("LogsController: returned {Count} entries (service={Service} level={Level} page={Page})",
+            response.Documents.Count, service, level, page);
+
+        return Ok(new
+        {
+            total = response.Total,
+            page,
+            pageSize,
+            logs = response.Documents
+        });
+    }
 }

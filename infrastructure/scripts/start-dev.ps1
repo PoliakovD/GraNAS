@@ -3,23 +3,15 @@
 
 Write-Host "Запуск dev-окружения..." -ForegroundColor Green
 
-# Проверяем наличие docker-compose
-if (!(Get-Command docker-compose -ErrorAction SilentlyContinue)) {
-    Write-Host "Ошибка: docker-compose не найден в системе" -ForegroundColor Red
-    Write-Host "Установите Docker Desktop или Docker Compose" -ForegroundColor Red
-    Pause
-    exit 1
-}
-
-# Переходим в папку с docker-compose.yml
+# Переходим в папку с compose-файлами
 $ScriptDir = Split-Path $MyInvocation.MyCommand.Path
 $ComposeDir = Join-Path $ScriptDir "..\docker-compose"
 Set-Location $ComposeDir
 
 Write-Host "Запуск контейнеров в режиме разработки..." -ForegroundColor Yellow
 
-# Запускаем docker-compose с переменными из dev.env
-docker-compose --env-file dev.env up --build -d
+# compose.dev.yaml накладывается поверх compose.yaml: debug-логи + hot-reload volumes
+docker compose --env-file dev.env -f compose.yaml -f compose.dev.yaml up --build -d
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

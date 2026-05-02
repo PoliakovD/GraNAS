@@ -5,6 +5,7 @@ using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Models.Repositories;
 using GraNAS.Metadata.Services.Implementations;
 using GraNAS.Metadata.Services.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -18,7 +19,7 @@ public class PermissionServiceTests
 
     public PermissionServiceTests()
     {
-        _sut = new PermissionService(_folders.Object, _permissions.Object, _authClient.Object);
+        _sut = new PermissionService(_folders.Object, _permissions.Object, _authClient.Object, NullLogger<PermissionService>.Instance);
     }
 
     // ──────────────── GrantAsync ────────────────
