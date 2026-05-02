@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 namespace GraNAS.Signaling.API.Controllers;
 
 [ApiController]
-[Route("api/signaling/sessions")]
+[Route("api/sessions")]
 [Authorize]
 public class SessionsController : ControllerBase
 {

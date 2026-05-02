@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace GraNAS.Signaling.API.Controllers;
 
 [ApiController]
-[Route("api/signaling/devices")]
+[Route("api/devices")]
 [Authorize]
 public class DevicesController : ControllerBase
 {
