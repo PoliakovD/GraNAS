@@ -110,12 +110,8 @@ npm run dev   # http://localhost:5173
 # .NET backend (155 тестов — unit + integration через Testcontainers)
 dotnet test tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj
 
-# .NET desktop (16 тестов)
-dotnet test tests/GraNAS.Desktop.Tests/GraNAS.Desktop.Tests.csproj
-
-# Frontend (10 Vitest-тестов)
-cd clients/web && npm test
-```
+- 📄 [`brief.md`](docs/brief.md) – обзор проекта, цели, user journey
+- ⚙️ [`techspec.md`](docs//techspec.md) – детальная техническая спецификация, модель данных, архитектура
 
 ---
 
