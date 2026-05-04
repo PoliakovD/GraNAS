@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Shared.Models.DTO;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace GraNAS.WebAPI.Tests.Integration;
 
@@ -14,14 +16,23 @@ namespace GraNAS.WebAPI.Tests.Integration;
 public class AuthControllerTests : IClassFixture<AuthWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    // Отдельный клиент с cookie jar — для тестов httpOnly cookie.
+    private readonly HttpClient _cookieClient;
 
     public AuthControllerTests(AuthWebApplicationFactory factory)
     {
-        // BaseAddress = https: при UseHttpsRedirection (Test-env) HTTP→HTTPS 307-редирект
-        // дропает Authorization-заголовок. Используем HTTPS сразу — редиректа нет.
-        _client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        // HandleCookies=false: тесты на body-based refresh/logout не должны
+        // видеть cookie-jar другого теста из-за shared client.
+        _client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost")
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = false
+        });
+
+        _cookieClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = true
         });
     }
 
@@ -243,6 +254,100 @@ public class AuthControllerTests : IClassFixture<AuthWebApplicationFactory>
         Assert.Equal("invalid_request", body!.Error);
     }
 
+    // ─────────────────────── httpOnly cookie tests ─────────────────────────
+
+    [Fact]
+    public async Task Login_ShouldSet_RefreshTokenCookie_HttpOnly()
+    {
+        var email = UniqueEmail();
+        await _cookieClient.PostAsJsonAsync("/api/auth/register", new { email, password = "ValidPass1" });
+
+        var response = await _cookieClient.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var setCookie = response.Headers.GetValues("Set-Cookie").FirstOrDefault();
+        Assert.NotNull(setCookie);
+        Assert.Contains("refresh_token=", setCookie);
+        Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=lax", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldSucceed_UsingCookieWhenBodyIsEmpty()
+    {
+        var email = UniqueEmail();
+        await _cookieClient.PostAsJsonAsync("/api/auth/register", new { email, password = "ValidPass1" });
+        // Login — _cookieClient stores the refresh_token cookie automatically
+        await _cookieClient.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
+
+        // Empty body: cookie is used by the client handler
+        var response = await _cookieClient.PostAsync("/api/auth/refresh", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("access_token").GetString()?.Length > 0);
+    }
+
+    [Fact]
+    public async Task Logout_ShouldDelete_RefreshTokenCookie()
+    {
+        var email = UniqueEmail();
+        await _cookieClient.PostAsJsonAsync("/api/auth/register", new { email, password = "ValidPass1" });
+        var loginResp = await _cookieClient.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
+        var loginBody = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
+        var accessToken = loginBody.GetProperty("access_token").GetString()!;
+
+        // Logout without body — rely on cookie
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _cookieClient.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Server should set an expired/empty cookie to clear it
+        var setCookie = response.Headers.GetValues("Set-Cookie").FirstOrDefault();
+        Assert.NotNull(setCookie);
+        Assert.Contains("refresh_token=", setCookie);
+    }
+
+    // ─────────────────────── GET /api/auth/me ──────────────────────────────
+
+    [Fact]
+    public async Task Me_Authenticated_Returns200WithEmailAndId()
+    {
+        var email = UniqueEmail();
+        await _client.PostAsJsonAsync("/api/auth/register", new { email, password = "ValidPass1" });
+        var (accessToken, _) = await RegisterAndLoginWith(email);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<MeResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(email, body!.Email);
+        Assert.NotEqual(Guid.Empty, body.Id);
+        Assert.False(body.IsAdmin);
+    }
+
+    [Fact]
+    public async Task Me_WithoutToken_Returns401()
+    {
+        var response = await _client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_WithInvalidToken_Returns401()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not.a.valid.jwt");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     // ─────────────────────── helpers ───────────────────────────────────────
 
     private async Task<(string AccessToken, string RefreshToken)> RegisterAndLogin()
@@ -253,6 +358,16 @@ public class AuthControllerTests : IClassFixture<AuthWebApplicationFactory>
         var loginResp = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
         var body      = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
 
+        return (
+            body.GetProperty("access_token").GetString()!,
+            body.GetProperty("refresh_token").GetString()!
+        );
+    }
+
+    private async Task<(string AccessToken, string RefreshToken)> RegisterAndLoginWith(string email)
+    {
+        var loginResp = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "ValidPass1" });
+        var body      = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
         return (
             body.GetProperty("access_token").GetString()!,
             body.GetProperty("refresh_token").GetString()!

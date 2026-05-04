@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <RootNamespace>GraNAS.Notifications.API</RootNamespace>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.3" />
+        <PackageReference Include="NetEscapades.AspNetCore.SecurityHeaders" Version="1.3.1" />
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+        <PackageReference Include="RabbitMQ.Client" Version="7.1.0" />
+        <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Correlation\GraNAS.Shared.Correlation.csproj" />
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Infrastructure\GraNAS.Shared.Infrastructure.csproj" />
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.LoggingService\GraNAS.Shared.LoggingService.csproj" />
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Messaging\GraNAS.Shared.Messaging.csproj" />
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Models\GraNAS.Shared.Models.csproj" />
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Swagger\GraNAS.Shared.Swagger.csproj" />
+        <ProjectReference Include="..\GraNAS.Notifications.Models\GraNAS.Notifications.Models.csproj" />
+        <ProjectReference Include="..\GraNAS.Notifications.DAL\GraNAS.Notifications.DAL.csproj" />
+        <ProjectReference Include="..\GraNAS.Notifications.Services\GraNAS.Notifications.Services.csproj" />
+    </ItemGroup>
+
+</Project>

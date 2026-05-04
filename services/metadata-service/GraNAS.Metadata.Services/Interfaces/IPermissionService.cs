@@ -11,4 +11,5 @@ public interface IPermissionService
   Task<GrantPermissionResult> GrantAsync(Guid ownerId, Guid folderId, GrantPermissionRequest req, CancellationToken ct = default);
   Task<RevokePermissionResult> RevokeAsync(Guid ownerId, Guid folderId, Guid targetUserId);
   Task<bool> HasAccessAsync(Guid userId, Guid folderId, AccessLevel required);
+  Task<IReadOnlyList<PermissionResponse>?> ListByFolderAsync(Guid ownerId, Guid folderId, CancellationToken ct = default);
 }

@@ -14,6 +14,7 @@ COPY shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj ./shared/
 COPY shared/GraNAS.Shared.Infrastructure/GraNAS.Shared.Infrastructure.csproj ./shared/GraNAS.Shared.Infrastructure/
 COPY shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj ./shared/GraNAS.Shared.LoggingService/
 COPY shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj ./shared/GraNAS.Shared.Swagger/
+COPY shared/GraNAS.Shared.Messaging/GraNAS.Shared.Messaging.csproj ./shared/GraNAS.Shared.Messaging/
 
 # === Восстановление зависимостей ===
 RUN dotnet restore "services/metadata-service/GraNAS.Metadata.API/GraNAS.Metadata.API.csproj"
@@ -46,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
 
 USER appuser
-ENTRYPOINT ["dotnet", "GraNAS.Metadata.API.dll"]
+ENTRYPOINT ["/bin/sh", "-c", "exec dotnet GraNAS.Metadata.API.dll"]

@@ -4,12 +4,15 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Services.Interfaces;
-using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Auth.API.Controllers;
 
@@ -18,13 +21,38 @@ namespace GraNAS.Auth.API.Controllers;
 [Produces("application/json")]
 public class AuthController : ControllerBase
 {
-  private readonly IAuthService _authService;
-  private readonly ILoggerService _logger;
+  private const string RefreshTokenCookieName = "refresh_token";
+  private const string RefreshTokenCookiePath = "/api/auth";
 
-  public AuthController(IAuthService authService, ILoggerService logger)
+  private readonly IAuthService _authService;
+  private readonly IWebHostEnvironment _env;
+  private readonly ILogger<AuthController> _logger;
+
+  public AuthController(IAuthService authService, IWebHostEnvironment env, ILogger<AuthController> logger)
   {
     _authService = authService;
+    _env = env;
     _logger = logger;
+  }
+
+  private void SetRefreshTokenCookie(string token)
+  {
+    Response.Cookies.Append(RefreshTokenCookieName, token, new CookieOptions
+    {
+      HttpOnly = true,
+      Secure = !_env.IsDevelopment(),
+      SameSite = SameSiteMode.Lax,
+      Path = RefreshTokenCookiePath,
+      Expires = DateTimeOffset.UtcNow.AddDays(7)
+    });
+  }
+
+  private void DeleteRefreshTokenCookie()
+  {
+    Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
+    {
+      Path = RefreshTokenCookiePath
+    });
   }
 
   /// <summary>Регистрация нового пользователя</summary>
@@ -44,12 +72,14 @@ public class AuthController : ControllerBase
     switch (result.Error)
     {
       case RegisterError.WeakPassword:
+        _logger.LogWarning("Registration rejected for {Email}: weak password", request.Email);
         return BadRequest(new ErrorResponse
         {
           Error = "weak_password",
           ErrorDescription = "Password must contain at least one uppercase letter, one lowercase letter, and one digit."
         });
       case RegisterError.EmailAlreadyExists:
+        _logger.LogWarning("Registration rejected for {Email}: email already exists", request.Email);
         return Conflict(new ErrorResponse
         {
           Error = "email_already_exists",
@@ -57,7 +87,7 @@ public class AuthController : ControllerBase
         });
     }
 
-    await _logger.LogInfo($"New user registered: {request.Email}", userId: result.Response!.UserId.ToString());
+    _logger.LogInformation("User registered: {Email} (id={UserId})", request.Email, result.Response!.UserId);
     return Ok(result.Response);
   }
 
@@ -76,6 +106,7 @@ public class AuthController : ControllerBase
     var tokens = await _authService.LoginAsync(request);
     if (tokens == null)
     {
+      _logger.LogWarning("Login failed for {Email}: invalid credentials", request.Email);
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_grant",
@@ -83,8 +114,9 @@ public class AuthController : ControllerBase
       });
     }
 
-    await _logger.LogInfo($"User {request.Email} logged in");
+    _logger.LogInformation("User logged in: {Email}", request.Email);
 
+    SetRefreshTokenCookie(tokens.RefreshToken);
     return Ok(new
     {
       access_token = tokens.AccessToken,
@@ -101,14 +133,24 @@ public class AuthController : ControllerBase
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-  public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
+  public async Task<IActionResult> Refresh(
+    [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? request)
   {
-    if (!ModelState.IsValid)
-      return BadRequest(ModelState);
+    var refreshToken = Request.Cookies[RefreshTokenCookieName] ?? request?.RefreshToken;
+    if (string.IsNullOrEmpty(refreshToken))
+    {
+      _logger.LogWarning("Refresh failed: missing refresh token");
+      return BadRequest(new ErrorResponse
+      {
+        Error = "invalid_request",
+        ErrorDescription = "Refresh token is required."
+      });
+    }
 
-    var tokens = await _authService.RefreshAsync(request.RefreshToken);
+    var tokens = await _authService.RefreshAsync(refreshToken);
     if (tokens == null)
     {
+      _logger.LogWarning("Refresh failed: invalid or expired refresh token");
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_grant",
@@ -116,6 +158,9 @@ public class AuthController : ControllerBase
       });
     }
 
+    _logger.LogDebug("Refresh tokens issued");
+
+    SetRefreshTokenCookie(tokens.RefreshToken);
     return Ok(new
     {
       access_token = tokens.AccessToken,
@@ -125,40 +170,99 @@ public class AuthController : ControllerBase
     });
   }
 
+  /// <summary>Получить профиль текущего пользователя</summary>
+  [Authorize]
+  [HttpGet("me")]
+  [EnableRateLimiting("auth")]
+  [ProducesResponseType(typeof(MeResponse), StatusCodes.Status200OK)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> Me()
+  {
+    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+    if (!Guid.TryParse(userIdClaim, out var userId))
+    {
+      _logger.LogWarning("/me failed: invalid user identifier in token");
+      return Unauthorized(new ErrorResponse
+      {
+        Error = "invalid_token",
+        ErrorDescription = "Invalid user identifier."
+      });
+    }
+
+    var me = await _authService.GetMeAsync(userId);
+    if (me is null)
+    {
+      _logger.LogWarning("/me failed: user {UserId} not found", userId);
+      return Unauthorized(new ErrorResponse
+      {
+        Error = "user_not_found",
+        ErrorDescription = "User not found."
+      });
+    }
+
+    return Ok(me);
+  }
+
   /// <summary>Выход из системы</summary>
   [Authorize]
   [HttpPost("logout")]
   [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
   [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-  public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+  public async Task<IActionResult> Logout(
+    [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LogoutRequest? request)
   {
     var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                       ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
     if (!Guid.TryParse(userIdClaim, out var userId))
+    {
+      _logger.LogWarning("Logout failed: invalid user identifier in token");
       return Unauthorized(new ErrorResponse
       {
         Error = "invalid_token",
         ErrorDescription = "Invalid user identifier."
       });
+    }
+
+    request ??= new LogoutRequest();
+
+    // cookie takes priority; supplement body if RefreshToken not provided
+    var cookieToken = Request.Cookies[RefreshTokenCookieName];
+    if (cookieToken != null && string.IsNullOrEmpty(request.RefreshToken))
+      request.RefreshToken = cookieToken;
 
     var result = await _authService.LogoutAsync(userId, request);
 
-    return result.Error switch
+    if (result.Error == LogoutError.None)
     {
-      LogoutError.None => Ok(new { message = result.Message }),
-      LogoutError.InvalidToken => BadRequest(new ErrorResponse
+      DeleteRefreshTokenCookie();
+      _logger.LogInformation("User {UserId} logged out (allSessions={AllSessions})", userId, request.AllSessions == true);
+      return Ok(new { message = result.Message });
+    }
+
+    if (result.Error == LogoutError.InvalidToken)
+    {
+      _logger.LogWarning("Logout failed: refresh token not found or revoked (userId={UserId})", userId);
+      return BadRequest(new ErrorResponse
       {
         Error = "invalid_token",
         ErrorDescription = "Refresh token not found or already revoked."
-      }),
-      LogoutError.MissingParameters => BadRequest(new ErrorResponse
+      });
+    }
+
+    if (result.Error == LogoutError.MissingParameters)
+    {
+      _logger.LogWarning("Logout failed: missing parameters (userId={UserId})", userId);
+      return BadRequest(new ErrorResponse
       {
         Error = "invalid_request",
         ErrorDescription = "Either refresh token or all_sessions flag must be provided."
-      }),
-      _ => BadRequest()
-    };
+      });
+    }
+
+    return BadRequest();
   }
 }

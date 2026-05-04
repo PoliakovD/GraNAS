@@ -5,6 +5,8 @@ using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Models.Repositories;
 using GraNAS.Metadata.Services.Implementations;
 using GraNAS.Metadata.Services.Interfaces;
+using GraNAS.Shared.Messaging.Abstractions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -14,11 +16,12 @@ public class PermissionServiceTests
     private readonly Mock<IFolderRepository> _folders = new();
     private readonly Mock<IPermissionRepository> _permissions = new();
     private readonly Mock<IAuthServiceClient> _authClient = new();
+    private readonly Mock<IEventPublisher> _eventPublisher = new();
     private readonly PermissionService _sut;
 
     public PermissionServiceTests()
     {
-        _sut = new PermissionService(_folders.Object, _permissions.Object, _authClient.Object);
+        _sut = new PermissionService(_folders.Object, _permissions.Object, _authClient.Object, _eventPublisher.Object, NullLogger<PermissionService>.Instance);
     }
 
     // ──────────────── GrantAsync ────────────────

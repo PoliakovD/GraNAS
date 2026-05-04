@@ -8,10 +8,12 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.6" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\GraNAS.Metadata.Models\GraNAS.Metadata.Models.csproj" />
+      <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Messaging\GraNAS.Shared.Messaging.csproj" />
     </ItemGroup>
 
 </Project>

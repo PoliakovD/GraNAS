@@ -4,11 +4,10 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using System.Threading.Tasks;
-using GraNAS.Metadata.API.Authorization;
 using GraNAS.Metadata.API.Infrastructure;
 using GraNAS.Metadata.DAL;
+using GraNAS.Shared.Messaging.DependencyInjection;
 using GraNAS.Metadata.DAL.Extensions;
-using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Services.Extensions;
 using GraNAS.Metadata.Services.Interfaces;
 using GraNAS.Shared.Correlation;
@@ -18,19 +17,19 @@ using GraNAS.Shared.LoggingService;
 using GraNAS.Shared.Models.DTO;
 using GraNAS.Shared.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using Serilog.Sinks.Elasticsearch;
+using Serilog.Events;
 
 namespace GraNAS.Metadata.API;
 
@@ -44,22 +43,7 @@ public class Program
 
     var builder = WebApplication.CreateBuilder(args);
 
-    builder.Host.UseSerilog((ctx, cfg) =>
-    {
-      var esUri = ctx.Configuration["Elasticsearch:Uri"]
-                  ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
-
-      cfg
-        .ReadFrom.Configuration(ctx.Configuration)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("Application", apiTitle)
-        .WriteTo.Console()
-        .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
-        {
-          AutoRegisterTemplate = true,
-          IndexFormat = "granas-logs-{0:yyyy.MM.dd}"
-        });
-    });
+    builder.Host.UseGraNasCentralLogging(apiTitle);
 
     builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
@@ -79,8 +63,6 @@ public class Program
         return new BadRequestObjectResult(errorResponse);
       };
     });
-
-    builder.Services.AddHttpContextAccessor();
 
     builder.AddPostgreSql<MetadataDbContext>();
 
@@ -139,22 +121,16 @@ public class Program
     });
 
     builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceClient>(c =>
-    {
-      var baseUrl = builder.Configuration["AuthService:BaseUrl"]
-                    ?? throw new InvalidOperationException("AuthService:BaseUrl is not configured");
-      c.BaseAddress = new Uri(baseUrl);
-    });
+      {
+        var baseUrl = builder.Configuration["AuthService:BaseUrl"]
+                      ?? throw new InvalidOperationException("AuthService:BaseUrl is not configured");
+        c.BaseAddress = new Uri(baseUrl);
+      })
+      .AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
+    builder.Services.AddGraNasCentralLoggingMvc();
     builder.Services.AddControllers()
       .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-    builder.Services.AddAuthorization(options =>
-    {
-      options.AddPolicy("CanReadFolder",
-        p => p.Requirements.Add(new FolderAccessRequirement(AccessLevel.View)));
-      options.AddPolicy("CanWriteFolder",
-        p => p.Requirements.Add(new FolderAccessRequirement(AccessLevel.Full)));
-    });
-    builder.Services.AddScoped<IAuthorizationHandler, FolderAccessHandler>();
 
     builder.Services.AddRateLimiter(options =>
     {
@@ -188,6 +164,8 @@ public class Program
       options.MaxAge = TimeSpan.FromDays(365);
     });
 
+    builder.Services.AddGraNasMessaging(builder.Configuration);
+
     // Composition root: регистрация слоёв
     builder.Services.AddMetadataDal();
     builder.Services.AddMetadataApplication();
@@ -195,17 +173,27 @@ public class Program
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerWithJwt(apiTitle, versionApi);
 
-    WebApplication app = builder.Build();
+    builder.Services.AddCorrelationId();
 
-    app.UseMiddleware<ExceptionHandlingMiddleware>();
-    app.UseMiddleware<CorrelationIdMiddleware>();
-    app.UseSerilogRequestLogging();
+    WebApplication app = builder.Build();
 
     if (!app.Environment.IsDevelopment())
     {
       app.UseHttpsRedirection();
       app.UseHsts();
     }
+
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseCorrelationId();
+    app.UseSerilogRequestLogging(opts =>
+    {
+      opts.GetLevel = (ctx, _, _) =>
+        ctx.Request.Path.StartsWithSegments("/health")
+          ? LogEventLevel.Debug
+          : LogEventLevel.Information;
+    });
+
+
 
     app.UseSecurityHeaders(policy =>
     {
@@ -245,6 +233,18 @@ public class Program
       Predicate = c => c.Tags.Contains("ready")
     }).AllowAnonymous().DisableRateLimiting();
 
-    await app.RunAsync();
+    try
+    {
+      using (var scope = app.Services.CreateScope())
+      {
+        var db = scope.ServiceProvider.GetRequiredService<MetadataDbContext>();
+        await db.Database.MigrateAsync();
+      }
+      await app.RunAsync();
+    }
+    finally
+    {
+      Log.CloseAndFlush();
+    }
   }
 }

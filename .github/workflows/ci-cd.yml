@@ -94,7 +94,6 @@ jobs:
           RabbitMQ__Host: "localhost"
           RabbitMQ__Username: "guest"
           RabbitMQ__Password: "guest"
-          Elasticsearch__Uri: "http://localhost:9200"
         run: |
           mkdir -p docs/openapi
           dotnet swagger tofile \
@@ -111,7 +110,6 @@ jobs:
           RabbitMQ__Host: "localhost"
           RabbitMQ__Username: "guest"
           RabbitMQ__Password: "guest"
-          Elasticsearch__Uri: "http://localhost:9200"
         run: |
           dotnet swagger tofile \
             --output docs/openapi/metadata-v1.json \

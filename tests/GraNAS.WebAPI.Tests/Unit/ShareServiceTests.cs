@@ -1,8 +1,10 @@
+using GraNAS.Shared.Messaging.Abstractions;
 using GraNAS.Sharing.Models;
 using GraNAS.Sharing.Models.DTO;
 using GraNAS.Sharing.Models.Repositories;
 using GraNAS.Sharing.Services.Implementations;
 using GraNAS.Sharing.Services.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace GraNAS.WebAPI.Tests.Unit;
@@ -12,14 +14,14 @@ public class ShareServiceTests
     private readonly Mock<IShareLinkRepository> _repo = new();
     private readonly Mock<ITokenGenerator> _tokenGen = new();
     private readonly Mock<IMetadataServiceClient> _metadataClient = new();
-    private readonly Mock<IShareEventPublisher> _eventPublisher = new();
+    private readonly Mock<IEventPublisher> _eventPublisher = new();
     private readonly ShareService _sut;
 
     public ShareServiceTests()
     {
         _tokenGen.Setup(t => t.GenerateToken()).Returns("test_token_value");
         _tokenGen.Setup(t => t.ComputeHash(It.IsAny<string>())).Returns("testhash64charslong000000000000000000000000000000000000000000");
-        _sut = new ShareService(_repo.Object, _tokenGen.Object, _metadataClient.Object, _eventPublisher.Object);
+        _sut = new ShareService(_repo.Object, _tokenGen.Object, _metadataClient.Object, _eventPublisher.Object, NullLogger<ShareService>.Instance);
     }
 
     // ──────────────── CreateAsync ────────────────
@@ -168,12 +170,12 @@ public class ShareServiceTests
             Revoked = false, CreatedAt = DateTime.UtcNow
         });
         _repo.Setup(r => r.UpdateAsync(It.IsAny<ShareLink>())).Returns(Task.CompletedTask);
-        _eventPublisher.Setup(p => p.PublishShareRevokedAsync(linkId, folderId, ownerId)).Returns(Task.CompletedTask);
+        _eventPublisher.Setup(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var result = await _sut.RevokeByTokenAsync(ownerId, "revoke_token");
 
         Assert.Equal(RevokeShareError.None, result.Error);
-        _eventPublisher.Verify(p => p.PublishShareRevokedAsync(linkId, folderId, ownerId), Times.Once);
+        _eventPublisher.Verify(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -210,7 +212,7 @@ public class ShareServiceTests
             Revoked = false, CreatedAt = DateTime.UtcNow
         });
         _repo.Setup(r => r.UpdateAsync(It.IsAny<ShareLink>())).Returns(Task.CompletedTask);
-        _eventPublisher.Setup(p => p.PublishShareRevokedAsync(linkId, folderId, ownerId)).Returns(Task.CompletedTask);
+        _eventPublisher.Setup(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var result = await _sut.RevokeByIdAsync(ownerId, linkId);
 

@@ -74,16 +74,16 @@ services:
     volumes:
       - redis_data:/data
 
-  elasticsearch:
-    container_name: ${PREFIX}_elasticsearch
-    image: elasticsearch:${ELASTIC_VERSION}
+  opensearch:
+    container_name: ${PREFIX}_opensearch
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION}
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
-      - xpack.security.enabled=false
+      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS}
+      - DISABLE_SECURITY_PLUGIN=true
       - http.cors.enabled=true
-      - http.cors.allow-origin="*"
+      - http.cors.allow-origin=*
       - http.cors.allow-headers=X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization
     ulimits:
       memlock:
@@ -104,9 +104,9 @@ services:
     networks:
       - app-network
     volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
+      - opensearch_data:/usr/share/opensearch/data
     ports:
-      - "${ELASTIC_PORT_HOST}:${ELASTIC_PORT_CONTAINER}"
+      - "${OPENSEARCH_PORT_HOST}:${OPENSEARCH_PORT_CONTAINER}"
 
   rabbitmq:
     container_name: ${PREFIX}_rabbitmq
@@ -150,7 +150,6 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE}
       Jwt__AccessTokenExpirationMinutes: ${JWT_ACCESS_MINUTES}
       Jwt__RefreshTokenExpirationDays: ${JWT_REFRESH_DAYS}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
@@ -162,8 +161,6 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -195,7 +192,6 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       AuthService__BaseUrl: http://auth-service:${SERVICE_PORT_CONTAINER}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
@@ -206,8 +202,6 @@ services:
       postgres-metadata:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -236,7 +230,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
       ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
       ConnectionStrings__DefaultConnection: ${LOG_DB_CONNECTION_STRING}
-      Elasticsearch__Uri: ${ELASTIC_URI}
+      OpenSearch__Uri: ${OPENSEARCH_URI}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
@@ -245,7 +239,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      elasticsearch:
+      opensearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -284,6 +278,32 @@ services:
     volumes:
       - postgres_sharing_data:/var/lib/postgresql/data
 
+  postgres-signaling:
+    container_name: ${PREFIX}_postgres_signaling
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${SIGNALING_POSTGRES_DB}
+      POSTGRES_USER: ${SIGNALING_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SIGNALING_POSTGRES_PASSWORD}
+    ports:
+      - "${SIGNALING_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SIGNALING_POSTGRES_USER} -d ${SIGNALING_POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - db-network
+    volumes:
+      - postgres_signaling_data:/var/lib/postgresql/data
+
   sharing-service:
     container_name: ${PREFIX}_sharing_service
     build:
@@ -297,7 +317,6 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Elasticsearch__Uri: ${ELASTIC_URI}
       MetadataService__BaseUrl: http://metadata-service:${SERVICE_PORT_CONTAINER}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
@@ -310,8 +329,6 @@ services:
       metadata-service:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -330,6 +347,227 @@ services:
       retries: 3
       start_period: 20s
 
+  signaling-service:
+    container_name: ${PREFIX}_signaling_service
+    build:
+      context: ../..
+      dockerfile: services/signaling-service/GraNAS.Signaling.API/Dockerfile
+    image: ${SIGNALING_SERVICE_IMAGE}:${SIGNALING_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__Redis: ${SIGNALING_REDIS_CONNECTION_STRING}
+      ConnectionStrings__SignalingDb: ${SIGNALING_DB_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      MetadataService__BaseUrl: http://metadata-service:${SERVICE_PORT_CONTAINER}
+      SharingService__BaseUrl: http://sharing-service:${SERVICE_PORT_CONTAINER}
+      Turn__StaticAuthSecret: ${TURN_SECRET}
+      Turn__Realm: ${TURN_REALM}
+      Turn__Uris__0: turn:${TURN_HOST}:${TURN_PORT}?transport=udp
+      Turn__Uris__1: turn:${TURN_HOST}:${TURN_PORT}?transport=tcp
+      Turn__TtlSeconds: 600
+      RabbitMQ__Host: ${RABBITMQ_HOST}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${SIGNALING_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-signaling:
+        condition: service_healthy
+      metadata-service:
+        condition: service_healthy
+      sharing-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  postgres-notification:
+    container_name: ${PREFIX}_postgres_notification
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${NOTIFICATION_POSTGRES_DB}
+      POSTGRES_USER: ${NOTIFICATION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD}
+    ports:
+      - "${NOTIFICATION_POSTGRES_PORT_HOST}:${POSTGRES_PORT_CONTAINER}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${NOTIFICATION_POSTGRES_USER} -d ${NOTIFICATION_POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - db-network
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+
+  notification-service:
+    container_name: ${PREFIX}_notification_service
+    build:
+      context: ../..
+      dockerfile: services/notification-service/GraNAS.Notifications.API/Dockerfile
+    image: ${NOTIFICATION_SERVICE_IMAGE}:${NOTIFICATION_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      ConnectionStrings__Default: ${NOTIFICATION_DB_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      RabbitMQ__Host: ${RABBITMQ_HOST}
+      RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
+      RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
+      RabbitMQ__ExchangeName: granas.events
+      Smtp__Host: ${SMTP_HOST}
+      Smtp__Port: ${SMTP_PORT}
+      Smtp__Username: ${SMTP_USERNAME}
+      Smtp__Password: ${SMTP_PASSWORD}
+      Smtp__From: ${SMTP_FROM}
+      Smtp__UseStartTls: ${SMTP_USE_STARTTLS}
+      AuthService__BaseUrl: http://auth-service:${SERVICE_PORT_CONTAINER}
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - app-network
+      - db-network
+      - messaging-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  coturn:
+    container_name: ${PREFIX}_coturn
+    image: coturn/coturn:latest
+    ports:
+      - "${TURN_PORT}:3478/udp"
+      - "${TURN_PORT}:3478/tcp"
+      - "50000-50010:50000-50010/udp"
+    command:
+      - "--use-auth-secret"
+      - "--static-auth-secret=${TURN_SECRET}"
+      - "--realm=${TURN_REALM}"
+      - "--no-tls"
+      - "--fingerprint"
+      - "--min-port=49152"
+      - "--max-port=49252"
+      - "--total-quota=100"
+      - "--stale-nonce=600"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mailpit:
+    container_name: ${PREFIX}_mailpit
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  web-client:
+    container_name: ${PREFIX}_web_client
+    build:
+      context: ../../clients/web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    image: ${WEB_CLIENT_IMAGE}:${WEB_CLIENT_VERSION}
+    ports:
+      - "${WEB_CLIENT_PORT_HOST}:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - app-network
+
+  api-gateway:
+    container_name: ${PREFIX}_api_gateway
+    build:
+      context: ../..
+      dockerfile: services/api-gateway/GraNAS.Gateway/Dockerfile
+    image: ${GATEWAY_SERVICE_IMAGE}:${GATEWAY_SERVICE_VERSION}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
+      Cors__AllowedOrigins__0: ${WEB_CLIENT_ORIGIN}
+      ReverseProxy__Clusters__auth__Destinations__d1__Address: http://auth-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__metadata__Destinations__d1__Address: http://metadata-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__sharing__Destinations__d1__Address: http://sharing-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__signaling__Destinations__d1__Address: http://signaling-service:${SERVICE_PORT_CONTAINER}
+      ReverseProxy__Clusters__notification__Destinations__d1__Address: http://notification-service:${SERVICE_PORT_CONTAINER}
+    ports:
+      - "${GATEWAY_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      metadata-service:
+        condition: service_healthy
+      sharing-service:
+        condition: service_healthy
+      signaling-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVICE_PORT_CONTAINER}/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
 networks:
   db-network:
     driver: bridge
@@ -342,6 +580,8 @@ volumes:
   postgres_auth_data:
   postgres_metadata_data:
   postgres_sharing_data:
-  elasticsearch_data:
+  postgres_signaling_data:
+  postgres_notification_data:
+  opensearch_data:
   rabbitmq_data:
   redis_data:

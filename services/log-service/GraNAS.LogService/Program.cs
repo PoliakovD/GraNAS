@@ -1,36 +1,38 @@
-using Elastic.Clients.Elasticsearch;
+using OpenSearch.Client;
 using GraNAS.LogService.Health;
+using GraNAS.LogService.Infrastructure;
 using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
-using Serilog.Sinks.Elasticsearch;
+using Serilog.Events;
+using Serilog.Sinks.OpenSearch;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((ctx, cfg) =>
 {
-  var esUri = ctx.Configuration["Elasticsearch:Uri"]
-              ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
+  var esUri = ctx.Configuration["OpenSearch:Uri"]
+              ?? throw new InvalidOperationException("OpenSearch:Uri is not configured");
 
   cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
     .Enrich.WithProperty("Application", "GraNAS.LogService")
     .WriteTo.Console()
-    .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
+    .WriteTo.OpenSearch(new OpenSearchSinkOptions(new Uri(esUri))
     {
       AutoRegisterTemplate = true,
       IndexFormat = "granas-logs-{0:yyyy.MM.dd}"
     });
 });
 
-var esUri = builder.Configuration["Elasticsearch:Uri"]
-            ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
+var esUri = builder.Configuration["OpenSearch:Uri"]
+            ?? throw new InvalidOperationException("OpenSearch:Uri is not configured");
 
-builder.Services.AddSingleton(new ElasticsearchClient(new Uri(esUri)));
+builder.Services.AddSingleton(new OpenSearchClient(new ConnectionSettings(new Uri(esUri))));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -57,13 +59,23 @@ builder.Services.AddRateLimiter(options =>
   };
 });
 
+builder.Services.AddHostedService<IndexTemplateInitializer>();
+builder.Services.AddHostedService<LogIngestService>();
+
 builder.Services.AddHealthChecks()
   .AddCheck("live", () => HealthCheckResult.Healthy(), tags: ["live"])
-  .AddCheck<ElasticsearchHealthCheck>("elasticsearch", tags: ["ready"]);
+  .AddCheck<OpenSearchHealthCheck>("opensearch", tags: ["ready"])
+  .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: ["ready"]);
 
 var app = builder.Build();
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(opts =>
+{
+  opts.GetLevel = (ctx, _, _) =>
+    ctx.Request.Path.StartsWithSegments("/health")
+      ? LogEventLevel.Debug
+      : LogEventLevel.Information;
+});
 app.UseRateLimiter();
 
 app.UseSwagger();
@@ -80,4 +92,11 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
   Predicate = c => c.Tags.Contains("ready")
 }).AllowAnonymous().DisableRateLimiting();
 
-app.Run();
+try
+{
+    app.Run();
+}
+finally
+{
+    Log.CloseAndFlush();
+}

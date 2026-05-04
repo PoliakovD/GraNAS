@@ -9,22 +9,29 @@
 
 ---
 
-## Текущее состояние (2026-04-18)
+## Текущее состояние (2026-05-01)
 
 **Реализовано:**
 
-- `auth-service` — регистрация, логин, JWT, refresh-токены (Clean Architecture)
-- `metadata-service` — CRUD папок с иерархией подпапок (parent_folder_id, ON DELETE CASCADE); таблица files удалена, список файлов клиент получает от владельца по P2P (Clean Architecture)
-- `log-service` — централизованный сбор логов через RabbitMQ + React-дашборд
-- Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, Serilog → Elasticsearch
-- Docker Compose для dev и prod
+- `api-gateway` (`services/api-gateway/`) — YARP, порт 8080, CORS, Correlation-Id (Phase 4)
+- `auth-service` — регистрация, логин, JWT, refresh-токены в httpOnly cookie (Phase 1/4); `GET /api/auth/me`, `GET /api/internal/users/{id}` (Phase 5)
+- `metadata-service` — CRUD папок с иерархией подпапок + permissions (Phase 2) + InternalFoldersController; `GET /api/folders/{id}/permissions` (Phase 5)
+- `sharing-service` — share-ссылки для незарегистрированных (Phase 3): токены base64url+SHA256, 5 эндпоинтов, cleanup job, RabbitMQ publish
+- `log-service` — централизованный сбор логов: RabbitMQ consumer → OpenSearch; IndexTemplate при старте; `GET /api/logs` с фильтрацией по `service`/`level`/`correlationId`
+- `clients/web/` — React 19 + Vite + AntD 6 веб-клиент (Phase 4): все экраны Phase 1–3, silent refresh, 10 Vitest тестов; UX-улучшения (все 5 спринтов) — [`docs/web-ux-roadmap.md`](web-ux-roadmap.md)
+- `clients/desktop/` — Avalonia 11 + ReactiveUI + Semi.Avalonia Windows-клиент (Phase 5+6): 6 экранов + P2P sender (SIPSorcery 8.0.0 + SignalR.Client), FolderShareRegistry, ECDH+AES-GCM, online-toggle, DeviceIdentity (Phase 6.5), 16 desktop-тестов
+- `services/signaling-service/` — SignalR hub + TURN credentials + Redis session store (Phase 6) + device sessions в signalingdb PostgreSQL (Phase 6.5)
+- **coturn** в docker compose (Phase 6)
+- **EF migrations bundle** — Dockerfiles для auth, metadata, sharing содержат `bundle` stage; при старте контейнера `efbundle` применяет миграции до запуска приложения
+- Shared: Correlation-Id, Swagger+JWT, ExceptionHandlingMiddleware, `GraNAS.Shared.LoggingService` — `UseGraNasCentralLogging` + `RabbitMqLogSink` + `SensitiveDataEnricher` + `MvcLoggingActionFilter`; логи идут через RabbitMQ → log-service → OpenSearch
+- Docker Compose для dev и prod (gateway на порту 8080, signaling на 8085)
 - CI/CD (GitHub Actions → GHCR → staging via SSH)
+- **155 .NET тестов + 16 Desktop-тестов + 10 Vitest тестов — все зелёные**
 
 **Плейсхолдеры без реализации:**
-`admin-service`, `notification-service`, `search-service`, `sharing-service`, `signaling-service`
+`admin-service`, `notification-service`, `search-service`
 
-**Не начато:** веб-клиент основного UI, Android, Windows Shell Extension,
-P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STUN/TURN.
+**Не начато:** Android.
 
 ---
 
@@ -32,17 +39,17 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
 
 Прежде чем строить фичи, закрыть долги текущих сервисов.
 
-- [ ] **Тесты auth-service** — юнит на AuthService (все Result-ветки) +
+- [x] **Тесты auth-service** — юнит на AuthService (все Result-ветки) +
       интеграционные на контроллер с testcontainers PostgreSQL
 - [x] **Тесты metadata-service** — юнит на FolderService (создание корня и подпапки, валидация родителя) + интеграционные на FoldersController через Testcontainers PostgreSQL; проверка ON DELETE CASCADE рекурсивно (root → child → grandchild)
 - [x] **Миграция AddFolderHierarchy** — parent_folder_id UUID NULL, self-FK ON DELETE CASCADE, индекс IX_folders_parent_folder_id
-- [ ] **Убрать `tests.txt` с живыми JWT** из репозитория (если ещё где-то остался)
-- [ ] **Health-checks** (`/health`, `/health/ready`) во все API
-- [ ] **Rate limiting** на auth-эндпоинтах (ASP.NET Core RateLimiter)
-- [ ] **Secrets management** — перевести JWT_SECRET и строки подключения
+- [x] **Убрать `tests.txt` с живыми JWT** из репозитория (если ещё где-то остался)
+- [x] **Health-checks** (`/health`, `/health/ready`) во все API
+- [x] **Rate limiting** на auth-эндпоинтах (ASP.NET Core RateLimiter)
+- [x] **Secrets management** — перевести JWT_SECRET и строки подключения
       на Docker secrets / env-файл вне репо
-- [ ] **OpenAPI-контракты** зафиксировать как артефакты CI
-- [ ] **Kestrel CVE (NU1904)** — обновить транзитивную зависимость
+- [x] **OpenAPI-контракты** зафиксировать как артефакты CI
+- [x] **Kestrel CVE (NU1904)** — обновить транзитивную зависимость
 
 **Критерий готовности:** зелёный CI, покрытие ≥70% на Auth/Metadata,
 секреты не попадают в образ.
@@ -54,36 +61,36 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
 Из брифа шаг 3 User Journey: владелец назначает `view` / `full` другому
 зарегистрированному пользователю.
 
-- [ ] **Таблица `permissions`** в metadata-service (folder_id, user_id, access_level enum, **path VARCHAR NULL**)
-- [ ] **Доменная модель** `Permission`, `AccessLevel { View, Full }` в `Metadata.Models`
-- [ ] **IPermissionRepository** + реализация
-- [ ] **PermissionService** — Grant / Revoke / List / Check
-- [ ] **Authorization policy** `CanReadFolder` / `CanWriteFolder` —
+- [x] **Таблица `permissions`** в metadata-service (folder_id, user_id, access_level enum, **path VARCHAR NULL**)
+- [x] **Доменная модель** `Permission`, `AccessLevel { View, Full }` в `Metadata.Models`
+- [x] **IPermissionRepository** + реализация
+- [x] **PermissionService** — Grant / Revoke / List / Check
+- [x] **Authorization policy** `CanReadFolder` / `CanWriteFolder` —
       проверка владения ИЛИ наличия permission на каждом запросе
-- [ ] **Эндпоинты** `POST /folders/{id}/permissions` (принимает опциональный `path` для гранулярного доступа), `DELETE /folders/{id}/permissions/{userId}`
-- [ ] **Интеграция с auth-service** — поиск пользователя по email для выдачи прав
+- [x] **Эндпоинты** `POST /folders/{id}/permissions` (принимает опциональный `path` для гранулярного доступа), `DELETE /folders/{id}/permissions/{userId}`
+- [x] **Интеграция с auth-service** — поиск пользователя по email для выдачи прав
       (через REST, не через общую БД)
-- [ ] **path-hint** — `permissions.path VARCHAR NULL`: null = вся папка, иначе подпапка или файл; сервер не валидирует путь, владелец применяет scope при P2P-handshake
+- [x] **path-hint** — `permissions.path VARCHAR NULL`: null = вся папка, иначе подпапка или файл; сервер не валидирует путь, владелец применяет scope при P2P-handshake
 
 **Критерий готовности:** второй пользователь видит чужую папку согласно правам;
 попытка записи с `view` → 403.
 
 ---
 
-## Фаза 3. sharing-service — ссылки для незарегистрированных
+## Фаза 3. sharing-service — ссылки для незарегистрированных ✅ (2026-04-25)
 
 
-- [ ] **Скелет `GraNAS.Sharing.{API,Services,Models,DAL}`** по Clean Architecture
-- [ ] **Таблица `share_links`** (id,folder_id, token_hash, expires_at, revoked, path TEXT NULL)
-- [ ] path-hint — share_links.path VARCHAR NULL
+- [x] **Скелет `GraNAS.Sharing.{API,Services,Models,DAL}`** по Clean Architecture
+- [x] **Таблица `share_links`** (id,folder_id, token_hash, expires_at, revoked, path TEXT NULL)
+- [x] path-hint — share_links.path VARCHAR NULL
   - Непрозрачная для сервера строка относительного пути
   - null = доступ ко всей папке, иначе — к конкретной подпапке или файлу
-  - соСервер не валидирует существование пути; владелец применяет scope при P2P‑handshake
-- [ ] **Криптостойкая генерация токенов** — `RandomNumberGenerator`, кодирование `base64url`
-- [ ] **Хранение только SHA-256 хэшей** (в БД токен в открытом виде не лежит)
-- [ ] Эндпоинты:
+  - Сервер не валидирует существование пути; владелец применяет scope при P2P‑handshake
+- [x] **Криптостойкая генерация токенов** — `RandomNumberGenerator`, кодирование `base64url`
+- [x] **Хранение только SHA-256 хэшей** (в БД токен в открытом виде не лежит)
+- [x] Эндпоинты:
   - **POST** `/folders/{id}/share` (только владелец)
-    -  Принимает опциональный path (подпапка/файл, null = вся папка)
+    - Принимает опциональный path (подпапка/файл, null = вся папка)
     - Генерирует токен, сохраняет SHA-256(токен) → token_hash, возвращает полный токен владельцу один раз
 
   - **GET** `/share/{token}` (публичный)
@@ -100,159 +107,195 @@ P2P-транспорт (WebRTC / ICE / DTLS) и инфраструктура STU
   - **DELETE** /share-links/{id} (только владелец)
     - Отзыв ссылки по её внутреннему id — используется, когда исходный токен утерян
 
-- [ ] Фоновая очистка просроченных ссылок (`IHostedService / Hangfire`)
-- [ ] Для ссылок без локального токена разрешён только просмотр метаданных и отзыв по `DELETE /share-links/{id}`
-- [ ] Публикация события share_revoked в RabbitMQ для `notification‑service`
+- [x] Фоновая очистка просроченных ссылок (`BackgroundService` + `PeriodicTimer`)
+- [x] Для ссылок без локального токена разрешён только просмотр метаданных и отзыв по `DELETE /share-links/{id}`
+- [x] Публикация события share_revoked в RabbitMQ для `notification‑service`
 
-**Критерий готовности:** Получатель ссылки видит содержимое папки до истечения срока; при отзыве получает 410 Gone.;
+**Критерий готовности:** Получатель ссылки видит содержимое папки до истечения срока; при отзыве получает 410 Gone.
 Владелец видит все свои выданные ссылки (метаданные), может отозвать любую из них по ID, а при наличии локально сохранённого токена — скопировать полный URL.
 
 ---
 
-## Фаза 4. signaling-service + P2P-транспорт (WebRTC / ICE / DTLS)
+## Фаза 4. Минимальный Web-клиент ✅ (2026-04-25)
 
-Без этого фаза sharing остаётся "бумажной": ссылка выдана, папка видна,
-а сами байты между клиентами передавать нечем. Файлы на сервере не лежат —
-единственный путь идёт **напрямую между клиентами** через WebRTC data channel.
-Сервер только знакомит пиров и, при худшем NAT, ретранслирует зашифрованные
-пакеты через TURN.
+Сделать существующий бэкенд (auth + metadata + sharing) пригодным для
+реального использования через браузер. P2P-передача файлов не входит в эту
+фазу — она появится в Фазе 6 после signaling-service.
 
-**Стек:** signaling (SignalR) → STUN (публичные) → TURN (свой coturn) → ICE
-(host/srflx/relay) → DTLS (шифрование канала) → app-level E2E (шифрование
-самого файла на клиенте). C# — `SIPSorcery`; браузер — нативный `RTCPeerConnection`.
+- [x] **API Gateway** — YARP (`services/api-gateway/GraNAS.Gateway`), порт 8080, CORS WithOrigins+AllowCredentials для фронтенда
+- [x] Стек: **React 19 + Vite + TypeScript**, React Query (TanStack v5), React Router v7
+- [x] UI Kit: **Ant Design 6** (выбрано), фронтенд в `clients/web/`
+- [x] **HTTPS-only** (в prod), refresh-токен в httpOnly cookie (SameSite=Lax, Path=/api/auth)
+- [x] Экраны:
+  - Регистрация / Логин / Выход
+  - Мои папки — дерево с иерархией, создание, удаление
+  - Папка: управление правами (выдать/отозвать по email, access level)
+  - Папка: управление share-ссылками (создать с expire, список, отозвать)
+  - Доступные папки — чужие папки, к которым выдан доступ
+  - Просмотр папки по share-ссылке (публичная страница для получателя)
+- [x] Silent refresh при F5 (cookie жива → сессия восстанавливается)
+- [x] MSW тесты фронтенда: 10/10 зелёных
 
-- [ ] Скелет `GraNAS.Signaling.{API,Services}` (Clean Architecture,
-      без DAL — состояние эфемерное, в Redis)
-- [ ] **SignalR hub** `/p2p` с операциями `join`, `offer`, `answer`, `ice-candidate`
-- [ ] **Авторизация в хабе** — JWT от auth-service + проверка прав на папку
-      (через metadata-service) или валидация share-токена (через sharing-service)
-- [ ] **TURN-credentials endpoint** — генерация временных учёток coturn
-      через shared secret (RFC 8489 REST API), TTL ≈ 10 мин
-- [ ] **coturn в compose** — отдельный сервис в dev/prod, проброс UDP-диапазона,
-      конфиг с `use-auth-secret`
-- [ ] **Референсная C#-реализация пира** на SIPSorcery
-      (`RTCPeerConnection`, data channel) — для Windows-клиента и интеграционных тестов
-- [ ] **Прототип передачи файла** через data channel: chunking, backpressure
-      (буфер `bufferedAmount`), SHA-256 верификация на приёмнике
-- [ ] **Web-клиент P2P-слой** — нативный `RTCPeerConnection` в браузере
-- [ ] **App-level encryption** — ECDH handshake внутри data channel до старта
-      передачи, AES-GCM для payload; сервер ключи не видит
-- [ ] **Метрики:** распределение соединений host/srflx/relay — нужно для
-      оценки нагрузки на TURN и бюджета трафика
-- [ ] **Документированное ограничение v1:** симметричный NAT без TURN
-      → явный fallback "попросите владельца открыть порт / использовать TURN"
+**Открытые долги Phase 4:**
+- Бэкенд не имеет `GET /api/folders/{id}/permissions` — список прав сбрасывается при F5 (данные в TanStack Query кэше). Решение: добавить эндпоинт в Phase 4.5 follow-up.
+- CORS на сервисах (AllowAnyOrigin) — оставить до prod-выкатки, когда весь браузерный трафик идёт через gateway. Tightening — Phase 12.
 
-**Критерий готовности:** два клиента (web↔web, web↔Windows) за разными NAT
-передают файл > 100 МБ; при симметричном NAT — через relay с видимым лейблом;
-проверка, что оператор signaling/TURN не может расшифровать содержимое
-(снимаем дамп на relay → не читается без клиентского ключа).
-
-**Что отложено:** push из сервера клиенту "владелец онлайн, можно забирать" —
-пока клиент сам опрашивает через signaling.
+**Критерий готовности:** все сценарии Phase 1–3 проходятся через UI браузера
+без Swagger/curl; незарегистрированный пользователь открывает share-ссылку
+и видит метаданные папки.
 
 ---
 
-## Фаза 5. notification-service — email + webhooks
+## Фаза 5. Минимальный Windows-клиент (Desktop) ✅ (2026-04-26)
 
-Шаги 6, 14 User Journey.
+Нативное приложение под Windows, покрывающее те же 4 сервиса, что и веб-клиент.
+Цель — получить рабочий desktop-клиент до добавления P2P, чтобы потом
+интегрировать signaling в оба клиента одновременно.
+
+> **Примечание:** В roadmap был зафиксирован WPF, но после обсуждения выбран **Avalonia 11** ради кросс-платформенного потенциала. Phase 5 всё равно таргетирует только Windows (Credential Manager — Windows API).
+
+- [x] Стек: **.NET 10 + Avalonia 11 + ReactiveUI + Semi.Avalonia** (`clients/desktop/GraNAS.Desktop.App/`)
+- [x] Тот же набор экранов, что и веб-клиент Phase 4 (6 экранов: Login/Register, MyFolders с TreeView, FolderDetail с вкладками Права/Shares, SharedWithMe, PublicShare)
+- [x] JWT хранить в `Windows Credential Manager` (через `Meziantou.Framework.Win32.CredentialManager`), access-token — в памяти процесса
+- [x] Silent refresh on startup: читает refresh-token из Credential Manager → POST /api/auth/refresh
+- [x] Inflight dedup refresh (SemaphoreSlim) + _retry flag (порт client.ts) → 401 storm безопасен
+- [x] Backend-долги закрыты: `GET /api/auth/me` (email resolution после login) + `GET /api/folders/{id}/permissions` (список прав с email)
+- [x] DI: Microsoft.Extensions.DependencyInjection, circular dep решена через `Func<IAuthSession>` в handlers
+- [x] 13 desktop-тестов: FolderTreeBuilder, JwtTokenReader, LoginViewModel
+- [x] Modal-диалоги: `CreateFolderDialog`, `GrantPermissionDialog`, `CreateShareDialog`, `ShareCreatedDialog` (одноразовый токен + Copy в буфер); `IDialogService / DialogService`
+- [x] Toast-уведомления: `INotificationService` / `NotificationService` поверх Avalonia `WindowNotificationManager` (BottomRight, 4 с); все `ErrorMessage` TextBlock-и заменены на тосты
+- [x] Polly retry: `Microsoft.Extensions.Http.Polly`, 2 попытки (1с/3с) на транзиентных ошибках (5xx, timeout); добавлено на все 4 HttpClient-а
+- [x] `CorrelationIdDelegatingHandler` реализован локально (без зависимости от `GraNAS.Shared.Correlation` / ASP.NET)
+
+**Критерий готовности:** пользователь может выполнять все операции (папки,
+права, share-ссылки) через нативное окно без браузера; токены не хранятся
+в plaintext на диске. ✅
+
+**Остаток для Phase 10 / Phase 6:**
+- WebRTC/P2P (Phase 6)
+- Shell Extension / Cloud Files API (Phase 10)
+
+---
+
+## Фаза 6. signaling-service + P2P-транспорт (WebRTC / ICE / DTLS) ✅ (2026-04-27)
+
+Соединяем web и desktop клиентов: ссылка выдана, папка видна — теперь можно
+и файлы передать. Файлы на сервере не лежат — единственный путь идёт
+**напрямую между клиентами** через WebRTC data channel. Сервер только знакомит
+пиров и, при худшем NAT, ретранслирует зашифрованные пакеты через TURN.
+
+**Стек:** signaling (SignalR) → STUN (публичные) → TURN (свой coturn) → ICE
+(host/srflx/relay) → DTLS (шифрование канала) → app-level E2E (AES-GCM на файле).
+C# — `SIPSorcery 8.0.0`; браузер — нативный `RTCPeerConnection` + SubtleCrypto.
+
+- [x] Скелет `GraNAS.Signaling.{API,Services}` (без DAL — состояние в Redis)
+- [x] **SignalR hub** `/hubs/signaling` с операциями: `JoinAsOwner`, `LeaveAsOwner`,
+      `WatchFolder`, `RequestSession`, `SendOffer`, `SendAnswer`, `SendIceCandidate`
+- [x] **Авторизация в хабе** — JWT (query string `?access_token=`) для зарегистрированных;
+      share-токен передаётся параметром в `RequestSession` для анонимных
+- [x] **TURN-credentials endpoint** `GET /api/turn/credentials` — HMAC-SHA1 RFC 8489,
+      TTL 10 мин; синхронизирован с coturn shared secret
+- [x] **coturn в compose** — command-line конфигурация, UDP 49152–49252, relay для NAT
+- [x] **Передача файла** через data channel: 64 KB чанки, backpressure-aware,
+      SHA-256 верификация на приёмнике
+- [x] **App-level encryption** — ECDH P-256 handshake → HKDF → AES-GCM;
+      каждый чанк: nonce(12)+ciphertext+tag(16) packed
+- [x] **P2P-слой в web-клиенте** — нативный `RTCPeerConnection` + SubtleCrypto;
+      web = только receiver; вкладка «Файлы» в FolderDetailPage + PublicSharePage
+- [x] **P2P-слой в desktop-клиенте** — SIPSorcery `RTCPeerConnection`; desktop = owner/sender;
+      `FolderShareRegistry` (JSON), `FileChunker`, `EcdhSession`; toggle online/offline в UI
+- [x] **Owner-online индикатор** — зелёная/серая точка через `OwnerOnlineStatusChanged` event;
+      `useOwnerOnlineStatus` hook + `OwnerStatusBadge` component
+- [x] **Метрики:** логирование типа ICE кандидата (host/srflx/relay) в хабе
+- [x] **Internal endpoints** — `GET /api/internal/folders/{id}/access?userId=` (metadata-service),
+      `GET /api/internal/shares/by-token-hash/{hash}` (sharing-service)
+- [x] **Тесты:** 141 backend (18 новых для signaling), 13 desktop, 10 web — все ✅
+
+## Фаза 6.5. Device Sessions — идентичность устройств + управление сессиями ✅ (2026-04-27)
+
+**Проблема:** владельцы трекались по ephemeral `connectionId`, нельзя показать пользователю активные сессии или различить desktop 1 vs desktop 2.
+
+**Решение:**
+- [x] `GraNAS.Signaling.DAL` — новый EF-проект, `signalingdb` PostgreSQL, таблица `table_devices`
+- [x] `postgres-signaling` контейнер (порт 5437 dev), миграция через efbundle при старте
+- [x] `IDeviceRepository` / `DeviceRepository` — upsert по clientgenerated UUID, unique(user_id, device_name)
+- [x] `IDeviceService` / `DeviceService` — регистрация/обновление + `isOnline` из Redis
+- [x] Обновлённый `ISessionStore` / `RedisSessionStore` — device↔connection mapping, folder-owners теперь Set<deviceId>
+- [x] Обновлённый `SignalingHub` — новый метод `RegisterDevice(deviceId)`, hub.JoinAsOwner читает deviceId из Context.Items
+- [x] `DevicesController` — `POST/GET /api/signaling/devices`
+- [x] `SessionsController` — `GET /api/signaling/sessions`, `DELETE /api/signaling/sessions/{deviceId}` + `ForceDisconnect` event
+- [x] Desktop: `IDeviceIdentity` / `DeviceIdentity` — генерирует/сохраняет UUID в Credential Manager; `P2PHost` вызывает REST + `RegisterDevice` перед JoinAsOwner; обрабатывает `ForceDisconnect`
+- [x] **Тесты:** 155 backend (5 новых DeviceService unit + 9 новых integration), 16 desktop — все ✅
+
+**Критерий готовности:** web↔desktop за разными NAT передают файл > 100 МБ;
+SHA-256 получателя совпадает; дамп TURN relay не расшифровывается без ключа сессии;
+owner offline — receiver видит индикатор и не зависает.
+
+---
+
+## Фаза 7. notification-service — email + webhooks
 
 - [ ] Скелет `GraNAS.Notifications.{API,Services,Models,DAL}`
 - [ ] **Таблица `events`** (user_id, type, data jsonb, delivered, created_at)
-- [ ] **RabbitMQ consumer** на события из metadata/sharing:
-  - `access_granted`, `access_revoked`, `share_revoked`, `access_lost`
-- [ ] **SMTP-адаптер** — интерфейс `IEmailSender`, реализация через MailKit;
-      выбор провайдера (SendGrid / Mailgun / SES) — конфигом
+- [ ] **RabbitMQ consumer** на события: `access_granted`, `access_revoked`,
+      `share_revoked`, `access_lost`
+- [ ] **SMTP-адаптер** — `IEmailSender` через MailKit; провайдер — конфигом
 - [ ] **Webhook delivery** с повторами и экспоненциальным backoff
-- [ ] **Outbox pattern** — запись события в БД и отправка в фоне,
-      чтобы переживать падения SMTP
-- [ ] Шаблоны писем (минимум: grant, revoke, share-revoked, access-lost)
+- [ ] **Outbox pattern** — событие в БД → отправка в фоне
+- [ ] Шаблоны писем: grant, revoke, share-revoked, access-lost
+- [ ] **In-app уведомления** в web и desktop клиентах (bell + история)
 
-**Критерий готовности:** grant/revoke прав генерируют письмо + in-app событие;
+**Критерий готовности:** grant/revoke генерируют письмо + in-app событие;
 падение SMTP не теряет уведомления.
 
 ---
 
-## Фаза 6. search-service — расширенный поиск
+## Фаза 8. search-service — расширенный поиск
 
-Шаг 8 User Journey.
+- [ ] **PostgreSQL full-text** (`tsvector`) — старт с PG FTS; Elasticsearch —
+      запасной вариант, если PG не хватит
+- [ ] Эндпоинт `GET /search?q=&owner=&access=` с пагинацией (cursor-based)
+- [ ] Фильтрация по правам: только доступные пользователю папки
+- [ ] Экран поиска в web и desktop клиентах
 
-- [ ] Решение: **PostgreSQL full-text** (`tsvector`) vs **Elasticsearch**.
-      Стартуем с PG FTS (Elasticsearch уже есть для логов — переиспользовать
-      как альтернативу, если PG не хватит).
-- [ ] Индексы по `name`, `type`, `owner_id`
-- [ ] Эндпоинт `GET /search?q=&type=&owner=&access=`
-- [ ] Фильтрация по правам: выдаём только то, к чему есть доступ
-- [ ] Пагинация (cursor-based)
-
-**Критерий готовности:** поиск по имени/типу/владельцу за < 300 мс на 10k записях.
+**Критерий готовности:** поиск по имени/владельцу за < 300 мс на 10k записях.
 
 ---
 
-## Фаза 7. admin-service
-
-Шаг 12 User Journey.
+## Фаза 9. admin-service
 
 - [ ] Скелет `GraNAS.Admin.{API,Services,Models}`
-- [ ] Authorization policy `RequireAdmin` (по `is_admin`)
-- [ ] Эндпоинты: список пользователей, блокировка, просмотр метаданных,
-      принудительный revoke прав / ссылок
-- [ ] Аудит-лог административных действий (в events или отдельную таблицу)
+- [ ] Authorization policy `RequireAdmin` (по `is_admin` в JWT)
+- [ ] Эндпоинты: список пользователей, блокировка, принудительный revoke прав / ссылок
+- [ ] Аудит-лог административных действий
 
-**Критерий готовности:** админ может заблокировать пользователя и отозвать
-все его share-ссылки одним запросом.
-
----
-
-## Фаза 8. Web-клиент (React)
-
-Фронтенд основного приложения (отдельно от существующего log-dashboard).
-
-- [ ] Стек: **React 19 + Vite + TypeScript**, React Query, React Router
-- [ ] UI Kit: Ant Design / shadcn-ui — выбрать один
-- [ ] Экраны:
-  - Регистрация / логин
-  - Мои папки (дерево + upload метаданных)
-  - Назначение прав (поиск пользователя по email, выбор access level)
-  - Генерация share-ссылки с датой expire
-  - Вкладка «Доступные папки» (фильтры: владелец, название, права)
-  - Поиск
-  - Уведомления (колокольчик + история)
-- [ ] HTTPS-only, refresh-токен в httpOnly cookie
-- [ ] **P2P-модуль** — обёртка над нативным `RTCPeerConnection`,
-      интеграция с signaling-service, UI прогресса передачи с индикатором
-      пути (host / srflx / relay)
-
-**Критерий готовности:** полный user journey из брифа проходится в браузере,
-включая скачивание файла по ссылке через P2P.
+**Критерий готовности:** админ блокирует пользователя и отзывает все его
+share-ссылки одним запросом.
 
 ---
 
-## Фаза 9. Windows-клиент + Shell Extension
+## Фаза 10. Windows-клиент — Cloud Files API + Shell Extension
 
-Шаг 9 User Journey.
+Расширение desktop-клиента Phase 5: интеграция в Проводник Windows.
 
-- [ ] **Выбор стека:** .NET 10 + WPF/WinUI3 для UI,
-      **Cloud Files API** (CF API) — предпочтительнее устаревших Shell Extensions
-- [ ] Virtual folder: монтирование пользовательских папок как placeholder-файлов
-- [ ] Действия Проводника (copy, rename, delete метаданных) → REST API
-- [ ] **Передача содержимого файлов** через SIPSorcery `RTCPeerConnection`
-      → signaling-service; hydrate placeholder → тянем байты напрямую с пира
-- [ ] Фоновый синк метаданных (**без кэширования чужих данных**)
-- [ ] Обработка offline: понятная ошибка вместо «зависания»
+- [ ] **Cloud Files API** (CF API) — виртуальные placeholder-файлы
+- [ ] Монтирование папок GraNAS как виртуального диска в Проводнике
+- [ ] Действия Проводника (copy, rename, delete) → REST API
+- [ ] Hydrate placeholder → P2P-скачивание через signaling-service
+- [ ] Фоновый синк метаданных без кэширования чужих данных
 - [ ] Auto-update механизм
 
-**Критерий готовности:** пользователь видит свои и доступные папки в Проводнике,
-метаданные синхронизируются с сервером, открытие чужого файла триггерит
-P2P-скачивание с владельца.
+**Критерий готовности:** папки GraNAS видны в Проводнике; открытие чужого файла
+триггерит P2P-загрузку с владельца.
 
 ---
 
-## Фаза 10. Android-клиент
+## Фаза 11. Android-клиент
 
 - [ ] Стек: **Kotlin + Jetpack Compose**, Retrofit, DataStore
-- [ ] Те же экраны, что веб (адаптированные под мобильный UX)
-- [ ] **P2P:** библиотека `google-webrtc`, интеграция с signaling-service
-- [ ] Push-уведомления — FCM (привязка к notification-service webhooks)
+- [ ] Те же экраны, что веб-клиент (адаптированные под мобильный UX)
+- [ ] **P2P:** `google-webrtc`, интеграция с signaling-service
+- [ ] Push-уведомления — FCM (привязка к notification-service)
 - [ ] Certificate pinning для HTTPS
 
 **Критерий готовности:** на Android доступны все сценарии брифа, push работают,
@@ -260,20 +303,15 @@ P2P-скачивание с владельца.
 
 ---
 
-## Фаза 11. Production hardening
+## Фаза 12. Production hardening
 
-- [ ] **Observability:** Grafana дашборды поверх Elasticsearch-логов +
-      Prometheus метрики через OpenTelemetry
-- [ ] **Tracing:** OTEL через Jaeger — корреляция между сервисами
-      (Correlation-Id уже есть, добавить span-ы)
+- [ ] **Observability:** Grafana дашборды + Prometheus метрики через OpenTelemetry
+- [ ] **Tracing:** OTEL через Jaeger (Correlation-Id уже есть, добавить span-ы)
 - [ ] **Backup PostgreSQL** — pgBackRest + отдельный бакет
 - [ ] **Load testing** — k6 / NBomber на 100+ конкурентных пользователей
-- [ ] **TURN-нагрузка** — оценить долю relay-соединений на реальном трафике,
-      решить по мощности coturn и бюджету исходящего трафика
 - [ ] **Security audit:** OWASP ZAP + `dotnet list package --vulnerable` +
-      пентест P2P-handshake (подмена SDP, MITM на signaling)
-- [ ] **SLA/SLO:** определить и измерять доступность, p95 latency (отдельно
-      для REST и для setup-time P2P-канала)
+      пентест P2P-handshake
+- [ ] **SLA/SLO:** определить и измерять p95 latency (REST и P2P setup-time)
 - [ ] **Документация оператора:** runbook инцидентов, playbook деплоя
 
 **Критерий готовности:** система проходит нагрузку 100 пользователей
@@ -313,8 +351,7 @@ P2P-скачивание с владельца.
    но требует Windows 10+.
 3. **Хранить permissions в metadata-service или вынести в отдельный access-service** —
    пока разумно оставить в metadata, при росте сложности выделить.
-4. **API Gateway** (Ocelot / YARP) — нужен ли при 5+ сервисах или оставляем
-   клиенту список URL-ов.
+4. **API Gateway** ✅ — **Принято: YARP**, реализован в Phase 4. Единая точка входа для браузера (`services/api-gateway/`). CORS, Correlation-Id, health-check. JWT-валидация и rate-limiting остаются на сервисах.
 5. **Схема миграции на permissions** — если прод уже запущен, требуется
    plan миграции существующих папок.
 6. **C#-стек для WebRTC:** SIPSorcery — фактически единственный

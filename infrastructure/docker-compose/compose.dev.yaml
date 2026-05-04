@@ -6,6 +6,7 @@ services:
   auth-service:
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: ${DOTNET_USE_POLLING_FILE_WATCHER}
+      Serilog__MinimumLevel__Default: Debug
     volumes:
       - ../../services/auth-service:/src/services/auth-service
       - ~/.nuget/packages:/root/.nuget/packages
@@ -14,6 +15,7 @@ services:
   metadata-service:
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: ${DOTNET_USE_POLLING_FILE_WATCHER}
+      Serilog__MinimumLevel__Default: Debug
     volumes:
       - ../../services/metadata-service:/src/services/metadata-service
       - ~/.nuget/packages:/root/.nuget/packages
@@ -22,7 +24,41 @@ services:
   log-service:
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: ${DOTNET_USE_POLLING_FILE_WATCHER}
+      Serilog__MinimumLevel__Default: Debug
     volumes:
       - ../../services/log-service:/src/services/log-service
       - ~/.nuget/packages:/root/.nuget/packages
       - ~/.dotnet:/root/.dotnet
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:${OPENSEARCH_VERSION}
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
+    ports:
+      - "5601:5601"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  sharing-service:
+    environment:
+      Serilog__MinimumLevel__Default: Debug
+
+  signaling-service:
+    environment:
+      Serilog__MinimumLevel__Default: Debug
+
+  notification-service:
+    environment:
+      Serilog__MinimumLevel__Default: Debug
+      Smtp__Host: mailpit
+      Smtp__Port: 1025
+      Smtp__UseStartTls: "false"
+
+  api-gateway:
+    environment:
+      Serilog__MinimumLevel__Default: Debug
+

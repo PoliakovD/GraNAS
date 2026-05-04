@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Sharing.API.Controllers;
 
@@ -20,10 +21,12 @@ namespace GraNAS.Sharing.API.Controllers;
 public class SharingController : ControllerBase
 {
     private readonly IShareService _shareService;
+    private readonly ILogger<SharingController> _logger;
 
-    public SharingController(IShareService shareService)
+    public SharingController(IShareService shareService, ILogger<SharingController> logger)
     {
         _shareService = shareService;
+        _logger = logger;
     }
 
     /// <summary>Создать share-ссылку на папку (только владелец)</summary>
@@ -43,16 +46,23 @@ public class SharingController : ControllerBase
 
         var result = await _shareService.CreateAsync(ownerId.Value, folderId, request, ct);
 
-        return result.Error switch
+        if (result.Error == CreateShareError.FolderNotFoundOrForbidden)
         {
-            CreateShareError.None => StatusCode(StatusCodes.Status201Created, result.Response),
-            CreateShareError.FolderNotFoundOrForbidden => NotFound(new ErrorResponse
+            _logger.LogWarning("Share link create rejected: folder {FolderId} not found or not owned (ownerId={OwnerId})",
+                folderId, ownerId);
+            return NotFound(new ErrorResponse
             {
                 Error = "folder_not_found",
                 ErrorDescription = "Folder not found or access denied."
-            }),
-            _ => StatusCode(StatusCodes.Status500InternalServerError)
-        };
+            });
+        }
+
+        if (result.Error != CreateShareError.None)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        _logger.LogInformation("Share link created: id={ShareLinkId} folder={FolderId} expiresAt={ExpiresAt} ownerId={OwnerId}",
+            result.Response!.Id, folderId, result.Response.ExpiresAt, ownerId);
+        return StatusCode(StatusCodes.Status201Created, result.Response);
     }
 
     /// <summary>Список share-ссылок для папки (только владелец, без исходных токенов)</summary>
@@ -82,16 +92,22 @@ public class SharingController : ControllerBase
 
         var result = await _shareService.RevokeByIdAsync(ownerId.Value, id);
 
-        return result.Error switch
+        if (result.Error == RevokeShareError.NotFoundOrForbidden)
         {
-            RevokeShareError.None => NoContent(),
-            RevokeShareError.NotFoundOrForbidden => NotFound(new ErrorResponse
+            _logger.LogWarning("Revoke by id rejected: share link {ShareLinkId} not found or not owned (ownerId={OwnerId})",
+                id, ownerId);
+            return NotFound(new ErrorResponse
             {
                 Error = "share_link_not_found",
                 ErrorDescription = "Share link not found or access denied."
-            }),
-            _ => StatusCode(StatusCodes.Status500InternalServerError)
-        };
+            });
+        }
+
+        if (result.Error != RevokeShareError.None)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        _logger.LogInformation("Share link revoked by id: {ShareLinkId} (ownerId={OwnerId})", id, ownerId);
+        return NoContent();
     }
 
     private Guid? GetCurrentUserId()

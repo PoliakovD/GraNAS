@@ -2,32 +2,18 @@ using System.Text.Json.Serialization;
 
 namespace GraNAS.LogService.Models;
 
-/// <summary>
-/// Документ лога, как он хранится в Elasticsearch.
-/// Поля соответствуют тому, что пишет Serilog.Sinks.Elasticsearch:
-/// - @timestamp, level, message — стандартные поля Serilog
-/// - Application, CorrelationId, UserId, AdditionalData — из LogContext.PushProperty / Enrich.WithProperty
-/// </summary>
 public class LogDocument
 {
-  [JsonPropertyName("@timestamp")]
-  public DateTime Timestamp { get; set; }
-
-  [JsonPropertyName("level")]
-  public string Level { get; set; } = string.Empty;
-
-  [JsonPropertyName("message")]
-  public string Message { get; set; } = string.Empty;
-
-  [JsonPropertyName("Application")]
-  public string? Application { get; set; }
-
-  [JsonPropertyName("CorrelationId")]
-  public string? CorrelationId { get; set; }
-
-  [JsonPropertyName("UserId")]
-  public string? UserId { get; set; }
-
-  [JsonPropertyName("AdditionalData")]
-  public string? AdditionalData { get; set; }
+    [JsonPropertyName("@timestamp")]    public DateTime Timestamp { get; set; }
+    [JsonPropertyName("Level")]         public string Level { get; set; } = "";
+    [JsonPropertyName("Service")]       public string? Service { get; set; }
+    [JsonPropertyName("Message")]       public string Message { get; set; } = "";
+    [JsonPropertyName("SourceContext")] public string? SourceContext { get; set; }
+    [JsonPropertyName("ActionName")]    public string? ActionName { get; set; }
+    [JsonPropertyName("Method")]        public string? Method { get; set; }
+    [JsonPropertyName("Parameters")]    public Dictionary<string, object?>? Parameters { get; set; }
+    [JsonPropertyName("CorrelationId")] public string? CorrelationId { get; set; }
+    [JsonPropertyName("Exception")]     public string? Exception { get; set; }
+    [JsonPropertyName("Environment")]   public string? Environment { get; set; }
+    [JsonPropertyName("UserId")]        public string? UserId { get; set; }
 }

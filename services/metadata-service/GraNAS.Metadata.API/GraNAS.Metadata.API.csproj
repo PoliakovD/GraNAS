@@ -14,7 +14,6 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
-    <PackageReference Include="Serilog.Sinks.Elasticsearch" Version="10.0.0" />
     <PackageReference Include="NetEscapades.AspNetCore.SecurityHeaders" Version="1.3.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
@@ -24,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Correlation\GraNAS.Shared.Correlation.csproj" />
+    <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Messaging\GraNAS.Shared.Messaging.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Infrastructure\GraNAS.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.LoggingService\GraNAS.Shared.LoggingService.csproj" />
     <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Models\GraNAS.Shared.Models.csproj" />

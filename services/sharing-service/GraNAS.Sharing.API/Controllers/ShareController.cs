@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Sharing.API.Controllers;
 
@@ -19,10 +20,12 @@ namespace GraNAS.Sharing.API.Controllers;
 public class ShareController : ControllerBase
 {
     private readonly IShareService _shareService;
+    private readonly ILogger<ShareController> _logger;
 
-    public ShareController(IShareService shareService)
+    public ShareController(IShareService shareService, ILogger<ShareController> logger)
     {
         _shareService = shareService;
+        _logger = logger;
     }
 
     /// <summary>Получить метаданные папки по share-токену (публичный эндпоинт)</summary>
@@ -37,20 +40,27 @@ public class ShareController : ControllerBase
     {
         var isRevoked = await _shareService.IsRevokedAsync(token);
         if (isRevoked)
+        {
+            _logger.LogWarning("Share resolve: token revoked");
             return StatusCode(StatusCodes.Status410Gone, new ErrorResponse
             {
                 Error = "share_revoked",
                 ErrorDescription = "This share link has been revoked."
             });
+        }
 
         var details = await _shareService.GetByTokenAsync(token, ct);
         if (details is null)
+        {
+            _logger.LogDebug("Share resolve: token not found or expired");
             return NotFound(new ErrorResponse
             {
                 Error = "share_not_found",
                 ErrorDescription = "Share link not found or has expired."
             });
+        }
 
+        _logger.LogDebug("Share resolve: hit (folder={FolderId})", details.FolderId);
         return Ok(details);
     }
 
@@ -69,16 +79,21 @@ public class ShareController : ControllerBase
 
         var result = await _shareService.RevokeByTokenAsync(ownerId.Value, token);
 
-        return result.Error switch
+        if (result.Error == RevokeShareError.NotFoundOrForbidden)
         {
-            RevokeShareError.None => NoContent(),
-            RevokeShareError.NotFoundOrForbidden => NotFound(new ErrorResponse
+            _logger.LogWarning("Revoke by token rejected: not found or not owned (ownerId={OwnerId})", ownerId);
+            return NotFound(new ErrorResponse
             {
                 Error = "share_link_not_found",
                 ErrorDescription = "Share link not found or access denied."
-            }),
-            _ => StatusCode(StatusCodes.Status500InternalServerError)
-        };
+            });
+        }
+
+        if (result.Error != RevokeShareError.None)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        _logger.LogInformation("Share link revoked by token (ownerId={OwnerId})", ownerId);
+        return NoContent();
     }
 
     private Guid? GetCurrentUserId()

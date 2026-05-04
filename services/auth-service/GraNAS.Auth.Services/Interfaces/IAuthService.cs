@@ -27,4 +27,5 @@ public interface IAuthService
   Task<TokenResponse?> LoginAsync(LoginRequest request);
   Task<TokenResponse?> RefreshAsync(string refreshToken);
   Task<LogoutResult> LogoutAsync(Guid userId, LogoutRequest request);
+  Task<MeResponse?> GetMeAsync(Guid userId);
 }

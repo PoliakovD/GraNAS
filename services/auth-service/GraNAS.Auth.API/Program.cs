@@ -18,13 +18,14 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using Serilog.Sinks.Elasticsearch;
+using Serilog.Events;
 
 namespace GraNAS.Auth.API;
 
@@ -39,30 +40,7 @@ public class Program
     var builder = WebApplication.CreateBuilder(args);
 
     builder.Services.AddCorrelationId();
-
-    // В тестовом окружении используем только консольный вывод
-    builder.Host.UseSerilog((ctx, cfg) =>
-    {
-        cfg
-            .ReadFrom.Configuration(ctx.Configuration)
-            .Enrich.FromLogContext()
-            .Enrich.WithProperty("Application", apiTitle);
-
-        if (ctx.HostingEnvironment.IsEnvironment("Test"))
-        {
-            cfg.WriteTo.Console();
-        }
-        else
-        {
-            var esUri = ctx.Configuration["Elasticsearch:Uri"]
-                        ?? throw new InvalidOperationException("Elasticsearch:Uri is not configured");
-            cfg.WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
-            {
-                AutoRegisterTemplate = true,
-                IndexFormat = "granas-logs-{0:yyyy.MM.dd}"
-            });
-        }
-    });
+    builder.Host.UseGraNasCentralLogging(apiTitle);
 
     builder.Services.AddHttpContextAccessor();
 
@@ -129,6 +107,7 @@ public class Program
       options.HttpsPort = 44344;
     });
 
+    builder.Services.AddGraNasCentralLoggingMvc();
     builder.Services.AddControllers();
 
     // Configure AFTER AddControllers so our factory is not overridden by ApiBehaviorOptionsSetup.
@@ -196,7 +175,13 @@ public class Program
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseCorrelationId();
-    app.UseSerilogRequestLogging();
+    app.UseSerilogRequestLogging(opts =>
+    {
+      opts.GetLevel = (ctx, _, _) =>
+        ctx.Request.Path.StartsWithSegments("/health")
+          ? LogEventLevel.Debug
+          : LogEventLevel.Information;
+    });
 
     if (!app.Environment.IsDevelopment())
     {
@@ -242,6 +227,18 @@ public class Program
       Predicate = c => c.Tags.Contains("ready")
     }).AllowAnonymous().DisableRateLimiting();
 
-    await app.RunAsync();
+    try
+    {
+      using (var scope = app.Services.CreateScope())
+      {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.MigrateAsync();
+      }
+      await app.RunAsync();
+    }
+    finally
+    {
+      Log.CloseAndFlush();
+    }
   }
 }

@@ -18,6 +18,9 @@
   </Folder>
 
   <Folder Name="/Services/" />
+  <Folder Name="/Services/Gateway/">
+    <Project Path="services/api-gateway/GraNAS.Gateway/GraNAS.Gateway.csproj" />
+  </Folder>
   <Folder Name="/Services/Authorization/">
     <Project Path="services/auth-service/GraNAS.Auth.API/GraNAS.Auth.API.csproj" />
     <Project Path="services/auth-service/GraNAS.Auth.Models/GraNAS.Auth.Models.csproj" />
@@ -43,14 +46,36 @@
     <Project Path="services/sharing-service/GraNAS.Sharing.Services/GraNAS.Sharing.Services.csproj" />
   </Folder>
 
+  <Folder Name="/Services/SignalingService/">
+    <Project Path="services/signaling-service/GraNAS.Signaling.API/GraNAS.Signaling.API.csproj" />
+    <Project Path="services/signaling-service/GraNAS.Signaling.Models/GraNAS.Signaling.Models.csproj" />
+    <Project Path="services/signaling-service/GraNAS.Signaling.DAL/GraNAS.Signaling.DAL.csproj" />
+    <Project Path="services/signaling-service/GraNAS.Signaling.Services/GraNAS.Signaling.Services.csproj" />
+  </Folder>
+
   <Folder Name="/Tests/">
     <Project Path="tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj" />
+    <Project Path="tests/GraNAS.Desktop.Tests/GraNAS.Desktop.Tests.csproj" />
+  </Folder>
+
+  <Folder Name="/Clients/" />
+  <Folder Name="/Clients/Desktop/">
+    <Project Path="clients/desktop/GraNAS.Desktop.App/GraNAS.Desktop.App.csproj" />
+    <Project Path="clients/desktop/GraNAS.Desktop.Contracts/GraNAS.Desktop.Contracts.csproj" />
+  </Folder>
+
+  <Folder Name="/Services/NotificationService/">
+    <Project Path="services/notification-service/GraNAS.Notifications.API/GraNAS.Notifications.API.csproj" />
+    <Project Path="services/notification-service/GraNAS.Notifications.Models/GraNAS.Notifications.Models.csproj" />
+    <Project Path="services/notification-service/GraNAS.Notifications.DAL/GraNAS.Notifications.DAL.csproj" />
+    <Project Path="services/notification-service/GraNAS.Notifications.Services/GraNAS.Notifications.Services.csproj" />
   </Folder>
 
   <Folder Name="/Shared/">
     <Project Path="shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj" />
     <Project Path="shared/GraNAS.Shared.Infrastructure/GraNAS.Shared.Infrastructure.csproj" />
     <Project Path="shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj" />
+    <Project Path="shared/GraNAS.Shared.Messaging/GraNAS.Shared.Messaging.csproj" />
     <Project Path="shared/GraNAS.Shared.Models/GraNAS.Shared.Models.csproj" />
     <Project Path="shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj" />
   </Folder>
