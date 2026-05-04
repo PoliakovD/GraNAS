@@ -54,6 +54,14 @@ public class MetadataServiceClient : IMetadataServiceClient
     {
         var auth = _accessor.HttpContext?.Request.Headers["Authorization"].ToString();
         if (!string.IsNullOrEmpty(auth))
+        {
             request.Headers.TryAddWithoutValidation("Authorization", auth);
+            return;
+        }
+
+        // SignalR WebSocket sends JWT via ?access_token= query param, not Authorization header
+        var token = _accessor.HttpContext?.Request.Query["access_token"].ToString();
+        if (!string.IsNullOrEmpty(token))
+            request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
     }
 }
