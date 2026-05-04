@@ -59,7 +59,7 @@ export function NotificationBell() {
   );
 
   return (
-    <Dropdown overlay={overlay} trigger={['click']} placement="bottomRight">
+    <Dropdown dropdownRender={() => overlay} trigger={['click']} placement="bottomRight">
       <Space style={{ cursor: 'pointer', lineHeight: '64px', padding: '0 8px' }}>
         <Badge count={unreadData?.unreadCount ?? 0} size="small">
           <BellOutlined style={{ fontSize: 20, color: '#fff' }} />
