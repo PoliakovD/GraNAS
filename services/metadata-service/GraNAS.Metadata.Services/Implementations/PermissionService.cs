@@ -6,6 +6,8 @@ using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Models.Repositories;
 using GraNAS.Metadata.Services.Interfaces;
+using GraNAS.Shared.Messaging.Abstractions;
+using GraNAS.Shared.Messaging.Events;
 using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Metadata.Services.Implementations;
@@ -15,17 +17,20 @@ public class PermissionService : IPermissionService
   private readonly IFolderRepository _folders;
   private readonly IPermissionRepository _permissions;
   private readonly IAuthServiceClient _authClient;
+  private readonly IEventPublisher _eventPublisher;
   private readonly ILogger<PermissionService> _logger;
 
   public PermissionService(
     IFolderRepository folders,
     IPermissionRepository permissions,
     IAuthServiceClient authClient,
+    IEventPublisher eventPublisher,
     ILogger<PermissionService> logger)
   {
     _folders = folders;
     _permissions = permissions;
     _authClient = authClient;
+    _eventPublisher = eventPublisher;
     _logger = logger;
   }
 
@@ -46,7 +51,6 @@ public class PermissionService : IPermissionService
       return GrantPermissionResult.UserNotFound();
     }
 
-    // Self-grant: owner already has full access, no-op
     if (user.Id == ownerId)
     {
       _logger.LogWarning("Grant: refused self-grant on folder {FolderId} by {OwnerId}", folderId, ownerId);
@@ -72,6 +76,23 @@ public class PermissionService : IPermissionService
     await _permissions.UpsertAsync(permission);
     _logger.LogInformation("Grant: permission {AccessLevel} on folder {FolderId} to user {TargetUserId} by {OwnerId}",
       req.AccessLevel, folderId, user.Id, ownerId);
+
+    try
+    {
+      await _eventPublisher.PublishAsync(new AccessGrantedEvent
+      {
+        TargetUserId = user.Id,
+        OwnerId = ownerId,
+        FolderId = folderId,
+        FolderName = folder.Name,
+        AccessLevel = req.AccessLevel.ToString(),
+        Path = req.Path
+      }, ct);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "Grant: failed to publish access_granted event for folder {FolderId}", folderId);
+    }
 
     return GrantPermissionResult.Success(new PermissionResponse
     {
@@ -101,6 +122,22 @@ public class PermissionService : IPermissionService
 
     _logger.LogInformation("Revoke: removed permission on folder {FolderId} from user {TargetUserId} by {OwnerId}",
       folderId, targetUserId, ownerId);
+
+    try
+    {
+      await _eventPublisher.PublishAsync(new AccessRevokedEvent
+      {
+        TargetUserId = targetUserId,
+        OwnerId = ownerId,
+        FolderId = folderId,
+        FolderName = folder.Name
+      });
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "Revoke: failed to publish access_revoked event for folder {FolderId}", folderId);
+    }
+
     return new RevokePermissionResult(RevokePermissionError.None);
   }
 
@@ -135,7 +172,6 @@ public class PermissionService : IPermissionService
 
   public async Task<bool> HasAccessAsync(Guid userId, Guid folderId, AccessLevel required)
   {
-    // Owner always has Full access
     var ownedFolder = await _folders.GetByIdForOwnerAsync(folderId, userId);
     if (ownedFolder is not null)
       return true;

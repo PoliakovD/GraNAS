@@ -213,6 +213,12 @@ public class Program
 
     try
     {
+      using (var scope = app.Services.CreateScope())
+      {
+        var db = scope.ServiceProvider.GetRequiredService<SignalingDbContext>();
+        await db.Database.MigrateAsync();
+      }
+
       await app.RunAsync();
     }
     finally

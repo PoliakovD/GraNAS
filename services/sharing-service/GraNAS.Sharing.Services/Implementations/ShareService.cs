@@ -1,3 +1,5 @@
+using GraNAS.Shared.Messaging.Abstractions;
+using GraNAS.Shared.Messaging.Events;
 using GraNAS.Sharing.Models;
 using GraNAS.Sharing.Models.DTO;
 using GraNAS.Sharing.Models.Repositories;
@@ -11,14 +13,14 @@ public class ShareService : IShareService
     private readonly IShareLinkRepository _repository;
     private readonly ITokenGenerator _tokenGenerator;
     private readonly IMetadataServiceClient _metadataClient;
-    private readonly IShareEventPublisher _eventPublisher;
+    private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<ShareService> _logger;
 
     public ShareService(
         IShareLinkRepository repository,
         ITokenGenerator tokenGenerator,
         IMetadataServiceClient metadataClient,
-        IShareEventPublisher eventPublisher,
+        IEventPublisher eventPublisher,
         ILogger<ShareService> logger)
     {
         _repository = repository;
@@ -166,7 +168,20 @@ public class ShareService : IShareService
         await _repository.UpdateAsync(shareLink);
 
         _logger.LogInformation("Revoke: share link {ShareLinkId} revoked by {OwnerId}", shareLink.Id, shareLink.OwnerId);
-        await _eventPublisher.PublishShareRevokedAsync(shareLink.Id, shareLink.FolderId, shareLink.OwnerId);
+
+        try
+        {
+            await _eventPublisher.PublishAsync(new ShareRevokedEvent
+            {
+                ShareLinkId = shareLink.Id,
+                FolderId = shareLink.FolderId,
+                OwnerId = shareLink.OwnerId
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Revoke: failed to publish share_revoked event for {ShareLinkId}", shareLink.Id);
+        }
 
         return new RevokeShareResult(RevokeShareError.None);
     }

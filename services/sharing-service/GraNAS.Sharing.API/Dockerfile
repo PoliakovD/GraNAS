@@ -13,6 +13,7 @@ COPY shared/GraNAS.Shared.Correlation/GraNAS.Shared.Correlation.csproj ./shared/
 COPY shared/GraNAS.Shared.Infrastructure/GraNAS.Shared.Infrastructure.csproj ./shared/GraNAS.Shared.Infrastructure/
 COPY shared/GraNAS.Shared.LoggingService/GraNAS.Shared.LoggingService.csproj ./shared/GraNAS.Shared.LoggingService/
 COPY shared/GraNAS.Shared.Swagger/GraNAS.Shared.Swagger.csproj ./shared/GraNAS.Shared.Swagger/
+COPY shared/GraNAS.Shared.Messaging/GraNAS.Shared.Messaging.csproj ./shared/GraNAS.Shared.Messaging/
 
 RUN dotnet restore "services/sharing-service/GraNAS.Sharing.API/GraNAS.Sharing.API.csproj"
 
@@ -29,15 +30,6 @@ RUN dotnet publish "GraNAS.Sharing.API.csproj" \
     /p:DebugType=none \
     /p:DebugSymbols=false
 
-FROM build AS bundle
-RUN dotnet tool install --global dotnet-ef --version 10.0.4
-RUN ConnectionStrings__Default="Host=localhost;Database=build;Username=build;Password=build" \
-    /root/.dotnet/tools/dotnet-ef migrations bundle \
-    --project ../GraNAS.Sharing.DAL/GraNAS.Sharing.DAL.csproj \
-    --self-contained -r linux-musl-x64 \
-    -o /app/efbundle && \
-    chmod +x /app/efbundle
-
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 ARG APP_UID=1000
 RUN addgroup -g $APP_UID appgroup && adduser -D -u $APP_UID -G appgroup appuser
@@ -46,10 +38,9 @@ WORKDIR /app
 EXPOSE 8080
 
 COPY --from=publish --chown=appuser:appgroup /app/publish .
-COPY --from=bundle --chown=appuser:appgroup /app/efbundle ./efbundle
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
 
 USER appuser
-ENTRYPOINT ["/bin/sh", "-c", "./efbundle && exec dotnet GraNAS.Sharing.API.dll"]
+ENTRYPOINT ["/bin/sh", "-c", "exec dotnet GraNAS.Sharing.API.dll"]

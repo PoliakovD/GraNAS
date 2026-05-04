@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\services\metadata-service\GraNAS.Metadata.API\GraNAS.Metadata.API.csproj" />
     <ProjectReference Include="..\..\services\sharing-service\GraNAS.Sharing.API\GraNAS.Sharing.API.csproj" />
     <ProjectReference Include="..\..\services\signaling-service\GraNAS.Signaling.API\GraNAS.Signaling.API.csproj" />
+    <ProjectReference Include="..\..\services\notification-service\GraNAS.Notifications.API\GraNAS.Notifications.API.csproj" />
   </ItemGroup>
 
 </Project>

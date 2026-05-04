@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using GraNAS.Shared.Messaging.Abstractions;
 using GraNAS.Sharing.API;
 using GraNAS.Sharing.DAL;
 using GraNAS.Sharing.Services.Interfaces;
@@ -26,7 +27,7 @@ public sealed class SharingWebApplicationFactory : WebApplicationFactory<Program
         .Build();
 
     public Mock<IMetadataServiceClient> MetadataClientMock { get; } = new();
-    public Mock<IShareEventPublisher> EventPublisherMock { get; } = new();
+    public Mock<IEventPublisher> EventPublisherMock { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -59,9 +60,9 @@ public sealed class SharingWebApplicationFactory : WebApplicationFactory<Program
             if (metaDesc != null) services.Remove(metaDesc);
             services.AddSingleton<IMetadataServiceClient>(_ => MetadataClientMock.Object);
 
-            var publisherDesc = services.SingleOrDefault(d => d.ServiceType == typeof(IShareEventPublisher));
+            var publisherDesc = services.SingleOrDefault(d => d.ServiceType == typeof(IEventPublisher));
             if (publisherDesc != null) services.Remove(publisherDesc);
-            services.AddSingleton<IShareEventPublisher>(_ => EventPublisherMock.Object);
+            services.AddSingleton<IEventPublisher>(_ => EventPublisherMock.Object);
 
             var loggerDesc = services.SingleOrDefault(d => d.ServiceType == typeof(ILoggerService));
             if (loggerDesc != null) services.Remove(loggerDesc);

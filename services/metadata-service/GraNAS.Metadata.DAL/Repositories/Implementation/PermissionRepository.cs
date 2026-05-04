@@ -34,6 +34,14 @@ public class PermissionRepository : IPermissionRepository
       .ToListAsync();
   }
 
+  public async Task<IReadOnlyList<Guid>> GetUsersForFolderAsync(Guid folderId, CancellationToken ct = default)
+  {
+    return await _context.Permissions
+      .Where(p => p.FolderId == folderId)
+      .Select(p => p.UserId)
+      .ToListAsync(ct);
+  }
+
   public async Task UpsertAsync(Permission permission)
   {
     var existing = await GetAsync(permission.FolderId, permission.UserId);

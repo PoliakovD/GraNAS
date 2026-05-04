@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Events;
 
 namespace GraNAS.Shared.LoggingService;
 
@@ -21,6 +22,7 @@ public static class CentralLoggingExtensions
                .Destructure.ToMaximumDepth(3)
                .Destructure.ToMaximumStringLength(1024)
                .Destructure.ToMaximumCollectionCount(32)
+               .Filter.ByExcluding(IsHealthCheckRequest)
                .WriteTo.Console();
 
             if (!ctx.HostingEnvironment.IsEnvironment("Test"))
@@ -38,4 +40,9 @@ public static class CentralLoggingExtensions
 
     public static IServiceCollection AddGraNasCentralLoggingMvc(this IServiceCollection services) =>
         services.Configure<MvcOptions>(o => o.Filters.Add<MvcLoggingActionFilter>());
+
+    private static bool IsHealthCheckRequest(LogEvent e) =>
+        e.Properties.TryGetValue("RequestPath", out var prop) &&
+        prop is ScalarValue { Value: string path } &&
+        path.StartsWith("/health");
 }

@@ -2,6 +2,7 @@ import { LogoutOutlined } from '@ant-design/icons';
 import { Avatar, Dropdown, Space, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 
 function getInitials(email: string): string {
   return email[0]?.toUpperCase() ?? '?';
@@ -27,13 +28,16 @@ export function Header() {
   ];
 
   return (
-    <Dropdown menu={{ items: menuItems }} trigger={['click']}>
-      <Space style={{ float: 'right', lineHeight: '64px', paddingRight: 24, cursor: 'pointer' }}>
-        <Avatar size="small" style={{ backgroundColor: '#722ed1' }}>
-          {user ? getInitials(user.email) : '?'}
-        </Avatar>
-        <Typography.Text style={{ color: '#fff' }}>{user?.email}</Typography.Text>
-      </Space>
-    </Dropdown>
+    <Space style={{ float: 'right', alignItems: 'center', paddingRight: 24 }}>
+      <NotificationBell />
+      <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+        <Space style={{ lineHeight: '64px', cursor: 'pointer' }}>
+          <Avatar size="small" style={{ backgroundColor: '#722ed1' }}>
+            {user ? getInitials(user.email) : '?'}
+          </Avatar>
+          <Typography.Text style={{ color: '#fff' }}>{user?.email}</Typography.Text>
+        </Space>
+      </Dropdown>
+    </Space>
   );
 }

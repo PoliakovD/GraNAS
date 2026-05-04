@@ -51,6 +51,14 @@ services:
     environment:
       Serilog__MinimumLevel__Default: Debug
 
+  notification-service:
+    environment:
+      Serilog__MinimumLevel__Default: Debug
+      Smtp__Host: mailpit
+      Smtp__Port: 1025
+      Smtp__UseStartTls: "false"
+
   api-gateway:
     environment:
       Serilog__MinimumLevel__Default: Debug
+
