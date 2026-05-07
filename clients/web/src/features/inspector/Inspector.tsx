@@ -6,13 +6,14 @@ import { permissionsKey, useGrantPermission, useRevokePermission } from '../perm
 import { useSharesQuery, useRevokeShare } from '../shares/useShareMutations';
 import type { FolderResponse } from '../../types/folder';
 import type { PermissionResponse } from '../../types/permission';
+import type { ShareLinkResponse } from '../../types/share';
 import type { AccessLevel } from '../../types/folder';
 
 function ShareLinkCard({ share, isOwner, onRevoke, onCopy }: {
-  share: { id: string; path: string | null; expiresAt: string | null; revoked: boolean; createdAt: string };
+  share: ShareLinkResponse;
   isOwner: boolean;
   onRevoke: (id: string) => void;
-  onCopy: (id: string) => void;
+  onCopy: (url: string) => void;
 }) {
   const expIn = share.expiresAt
     ? Math.max(0, Math.floor((+new Date(share.expiresAt) - Date.now()) / 1000 / 3600))
@@ -31,11 +32,14 @@ function ShareLinkCard({ share, isOwner, onRevoke, onCopy }: {
       </div>
       <div className="share-link-input">
         <Icon name="link" size={13} />
-        {/* Token not available from list endpoint — show hint */}
-        <code title="Полный URL виден только при создании ссылки">
-          granas.io/s/… (ID: {share.id.slice(0, 8)})
+        <code style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {share.shareUrl || `granas.io/s/… (${share.id.slice(0, 8)})`}
         </code>
-        <button className="btn ghost sm" onClick={() => onCopy(share.id)}>
+        <button
+          className="btn ghost sm"
+          disabled={!share.shareUrl}
+          onClick={() => share.shareUrl && onCopy(share.shareUrl)}
+        >
           <Icon name="copy" size={12} /> Копировать
         </button>
       </div>
@@ -81,9 +85,8 @@ export function Inspector({ folder, isOwner, onCreateShare }: InspectorProps) {
     setInviteEmail('');
   };
 
-  const handleCopyLink = (id: string) => {
-    const msg = `Полный URL виден только при создании ссылки (ID: ${id.slice(0, 8)})`;
-    alert(msg);
+  const handleCopyLink = (url: string) => {
+    navigator.clipboard.writeText(url).catch(() => {});
   };
 
   return (

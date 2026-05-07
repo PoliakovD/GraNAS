@@ -61,7 +61,7 @@ export const handlers = [
 
   http.get(`${BASE}/api/sharing/folders/:folderId/shares`, () =>
     HttpResponse.json([
-      { id: 'link-1', folderId: 'folder-1', path: null, expiresAt: '2027-01-01T00:00:00Z', revoked: false, createdAt: '2026-01-01T00:00:00Z' },
+      { id: 'link-1', folderId: 'folder-1', path: null, shareUrl: 'http://localhost:8080/s/tok123', expiresAt: '2027-01-01T00:00:00Z', revoked: false, createdAt: '2026-01-01T00:00:00Z' },
     ])),
 
   http.delete(`${BASE}/api/sharing/share-links/:id`, () =>
@@ -70,7 +70,7 @@ export const handlers = [
   // global shares listing (backend plan: docs/sharing-service-global-listing.md)
   http.get(`${BASE}/api/share-links`, () =>
     HttpResponse.json([
-      { id: 'link-1', folderId: 'folder-1', folderName: 'Root', path: null, expiresAt: '2027-01-01T00:00:00Z', revoked: false, createdAt: '2026-01-01T00:00:00Z', openCount: 0 },
+      { id: 'link-1', folderId: 'folder-1', folderName: 'Root', path: null, shareUrl: 'http://localhost:8080/s/tok123', expiresAt: '2027-01-01T00:00:00Z', revoked: false, createdAt: '2026-01-01T00:00:00Z', openCount: 0 },
     ])),
 
   // signaling (stub — WebSocket not supported in jsdom tests)

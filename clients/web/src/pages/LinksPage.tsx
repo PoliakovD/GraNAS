@@ -4,9 +4,12 @@ import { Icon } from '../shared/Icon';
 
 export function LinksPage() {
   const navigate = useNavigate();
-  const { data: shares, isLoading, error } = useGlobalSharesQuery();
+  const { data: shares, isLoading } = useGlobalSharesQuery();
 
-  const backendNotReady = !!error;
+  const copy = (url: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(url).catch(() => {});
+  };
 
   return (
     <>
@@ -20,42 +23,27 @@ export function LinksPage() {
       {isLoading && (
         <div className="list-table">
           {[1, 2, 3].map(i => (
-            <div key={i} className="list-row" style={{ cursor: 'default' }}>
+            <div key={i} className="list-row" style={{ cursor: 'default', gridTemplateColumns: '1fr 200px 140px 100px 40px' }}>
               <div className="sk" style={{ height: 20, borderRadius: 4, width: '60%' }} />
               <div className="sk" style={{ height: 16, borderRadius: 4, width: 120 }} />
               <div className="sk" style={{ height: 16, borderRadius: 4, width: 80 }} />
-              <div />
-              <div />
+              <div /><div />
             </div>
           ))}
         </div>
       )}
 
-      {backendNotReady && (
-        <div className="empty">
-          <div className="glyph" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
-            <Icon name="link" size={28} />
-          </div>
-          <h4>Функция в разработке</h4>
-          <p>
-            Глобальный список share-ссылок появится после реализации эндпоинта
-            <code style={{ fontFamily: 'var(--font-mono)', fontSize: 12, marginLeft: 4 }}>GET /api/share-links</code>.{' '}
-            Пока управляйте ссылками через Inspector (правая панель) в каждой папке.
-          </p>
-        </div>
-      )}
-
-      {!isLoading && !backendNotReady && shares && shares.length === 0 && (
+      {!isLoading && (!shares || shares.length === 0) && (
         <div className="empty">
           <div className="glyph" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
             <Icon name="link" size={28} />
           </div>
           <h4>Ссылок пока нет</h4>
-          <p>Откройте любую папку и создайте временную ссылку — это удобный способ поделиться с теми, у кого нет аккаунта.</p>
+          <p>Откройте любую папку и создайте временную ссылку — удобный способ поделиться с теми, у кого нет аккаунта.</p>
         </div>
       )}
 
-      {!isLoading && !backendNotReady && shares && shares.length > 0 && (
+      {!isLoading && shares && shares.length > 0 && (
         <div className="list-table">
           <div className="list-row head" style={{ gridTemplateColumns: '1fr 200px 140px 100px 40px' }}>
             <span>Папка / файл</span>
@@ -75,9 +63,11 @@ export function LinksPage() {
                 <div className="icon-wrap"><Icon name="link" size={14} /></div>
                 <div>
                   <div>{s.folderName}{s.path ? ` › ${s.path}` : ''}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-400)' }}>
-                    granas.io/s/… (ID: {s.id.slice(0, 8)})
-                  </div>
+                  {s.shareUrl && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-400)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>
+                      {s.shareUrl}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="meta-text">
@@ -91,8 +81,9 @@ export function LinksPage() {
               <div className="meta-text">{s.openCount ?? '—'}</div>
               <button
                 className="icon-btn"
-                onClick={e => e.stopPropagation()}
-                title="Полный URL виден только при создании ссылки"
+                onClick={e => s.shareUrl ? copy(s.shareUrl, e) : e.stopPropagation()}
+                disabled={!s.shareUrl}
+                title={s.shareUrl ? 'Копировать ссылку' : 'URL недоступен'}
               >
                 <Icon name="copy" size={14} />
               </button>

@@ -2,6 +2,7 @@ export interface ShareLinkResponse {
   id: string;
   folderId: string;
   path: string | null;
+  shareUrl: string;
   expiresAt: string | null;
   revoked: boolean;
   createdAt: string;
@@ -29,7 +30,6 @@ export interface ShareDetailsResponse {
   expiresAt: string | null;
 }
 
-// TODO: returned by GET /api/share-links (cross-folder listing, backend not yet implemented)
 export interface ShareLinkOwnerResponse extends ShareLinkResponse {
   folderName: string;
   openCount?: number;

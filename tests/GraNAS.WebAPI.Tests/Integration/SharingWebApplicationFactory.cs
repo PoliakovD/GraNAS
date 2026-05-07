@@ -9,7 +9,7 @@ using GraNAS.Shared.LoggingService;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;  // for GenerateJwt
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Moq;
@@ -46,15 +46,18 @@ public sealed class SharingWebApplicationFactory : WebApplicationFactory<Program
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // appsettings.Test.json provides: placeholder ConnectionStrings:Default,
+        // ShareLinkEncryption:Key, and App:BaseUrl. ConfigureServices below replaces
+        // SharingDbContext with the real Testcontainer instance.
         builder.UseEnvironment("Test");
 
         builder.ConfigureServices(services =>
         {
-            services.Add(ServiceDescriptor.Scoped<SharingDbContext>(_ =>
-                new SharingDbContext(
-                    new DbContextOptionsBuilder<SharingDbContext>()
-                        .UseNpgsql(_postgres.GetConnectionString())
-                        .Options)));
+            // Replace EF Core options so SharingDbContext uses the test Postgres container
+            var dbOpts = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<SharingDbContext>));
+            if (dbOpts != null) services.Remove(dbOpts);
+            services.AddDbContext<SharingDbContext>(options =>
+                options.UseNpgsql(_postgres.GetConnectionString()));
 
             var metaDesc = services.SingleOrDefault(d => d.ServiceType == typeof(IMetadataServiceClient));
             if (metaDesc != null) services.Remove(metaDesc);

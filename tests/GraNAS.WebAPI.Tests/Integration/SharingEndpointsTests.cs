@@ -247,6 +247,9 @@ public class SharingEndpointsTests : IClassFixture<SharingWebApplicationFactory>
             .Setup(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
+        // Reset invocation history to avoid accumulation from previous tests sharing the same mock
+        _factory.EventPublisherMock.Invocations.Clear();
+
         var createResp = await client.PostAsJsonAsync($"/api/folders/{folderId}/share", new
         {
             expiresAt = DateTime.UtcNow.AddDays(7)
