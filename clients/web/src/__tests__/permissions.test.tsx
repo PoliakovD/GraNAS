@@ -1,24 +1,32 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { GrantPermissionForm } from '../features/permissions/GrantPermissionForm';
+import { Inspector } from '../features/inspector/Inspector';
 import { renderWithProviders } from './test-utils';
+import type { FolderResponse } from '../types/folder';
 
-describe('GrantPermissionForm', () => {
-  it('renders the grant form', () => {
-    renderWithProviders(<GrantPermissionForm folderId="folder-1" />);
-    expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
+const MOCK_FOLDER: FolderResponse = {
+  id: 'folder-1', name: 'Root', parentFolderId: null,
+  ownerId: 'user-1', accessLevel: 'Full', path: null,
+  createdAt: '2026-01-01T00:00:00Z', updatedAt: null,
+};
+
+describe('Inspector — people tab', () => {
+  it('renders invite form for owner', () => {
+    renderWithProviders(
+      <Inspector folder={MOCK_FOLDER} isOwner onCreateShare={() => {}} />
+    );
+    expect(screen.getByPlaceholderText(/email@company\.com/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /выдать/i })).toBeInTheDocument();
   });
 
   it('submits grant request', async () => {
-    renderWithProviders(<GrantPermissionForm folderId="folder-1" />);
+    renderWithProviders(
+      <Inspector folder={MOCK_FOLDER} isOwner onCreateShare={() => {}} />
+    );
     const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText(/email/i), 'other@test.com');
+    await user.type(screen.getByPlaceholderText(/email@company\.com/i), 'other@test.com');
     await user.click(screen.getByRole('button', { name: /выдать/i }));
-
-    // MSW returns success — no error message shown
     await waitFor(() => {
       expect(screen.queryByText(/ошибка/i)).not.toBeInTheDocument();
     });

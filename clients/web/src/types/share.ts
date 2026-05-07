@@ -28,3 +28,9 @@ export interface ShareDetailsResponse {
   path: string | null;
   expiresAt: string | null;
 }
+
+// TODO: returned by GET /api/share-links (cross-folder listing, backend not yet implemented)
+export interface ShareLinkOwnerResponse extends ShareLinkResponse {
+  folderName: string;
+  openCount?: number;
+}

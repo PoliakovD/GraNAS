@@ -6,16 +6,18 @@ import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { queryClient } from './lib/queryClient';
 import { FolderDetailPage } from './pages/FolderDetailPage';
+import { FoldersPage } from './pages/FoldersPage';
+import { HomePage } from './pages/HomePage';
+import { LinksPage } from './pages/LinksPage';
 import { LoginPage } from './pages/LoginPage';
-import { MyFoldersPage } from './pages/MyFoldersPage';
 import { PublicSharePage } from './pages/PublicSharePage';
+import { RecentPage } from './pages/RecentPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { SharedWithMePage } from './pages/SharedWithMePage';
+import { SharedPage } from './pages/SharedPage';
 import { AppLayout } from './shared/Layout';
 import { ErrorBoundary } from './shared/ErrorBoundary';
 
 const router = createBrowserRouter([
-  { path: '/', element: <Navigate to="/folders" replace /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/s/:token', element: <PublicSharePage /> },
@@ -25,19 +27,22 @@ const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: '/folders', element: <MyFoldersPage /> },
+          { path: '/', element: <HomePage /> },
+          { path: '/folders', element: <FoldersPage /> },
           { path: '/folders/:id', element: <FolderDetailPage /> },
-          { path: '/shared', element: <SharedWithMePage /> },
+          { path: '/shared', element: <SharedPage /> },
+          { path: '/links', element: <LinksPage /> },
+          { path: '/recent', element: <RecentPage /> },
         ],
       },
     ],
   },
-  { path: '*', element: <Navigate to="/folders" replace /> },
+  { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
 export default function App() {
   return (
-    <ConfigProvider locale={ruRU} theme={{ token: { colorPrimary: '#722ed1' } }}>
+    <ConfigProvider locale={ruRU} theme={{ token: { colorPrimary: '#6938EF' } }}>
       <AntApp>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
