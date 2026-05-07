@@ -1,0 +1,76 @@
+# VDS overlay: HTTPS via nginx + certbot, все внутренние порты закрыты.
+# Использование:
+#   docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml up -d
+
+services:
+
+  # ----- Закрываем все внутренние порты (не нужны снаружи) -----
+  postgres-auth:
+    ports: []
+  postgres-metadata:
+    ports: []
+  postgres-sharing:
+    ports: []
+  postgres-signaling:
+    ports: []
+  postgres-notification:
+    ports: []
+  redis:
+    ports: []
+  rabbitmq:
+    ports: []
+  opensearch:
+    ports: []
+  auth-service:
+    ports: []
+  metadata-service:
+    ports: []
+  log-service:
+    ports: []
+  sharing-service:
+    ports: []
+  signaling-service:
+    ports: []
+  notification-service:
+    ports: []
+  api-gateway:
+    ports: []
+  web-client:
+    ports: []
+  mailpit:
+    ports: []
+
+  # ----- Nginx: TLS-терминация + прокси -----
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ${PREFIX}_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/app.conf.template:/etc/nginx/templates/app.conf.template:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    environment:
+      DOMAIN: ${DOMAIN}
+    depends_on:
+      - web-client
+      - api-gateway
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ----- Certbot: автообновление сертификата -----
+  certbot:
+    image: certbot/certbot:latest
+    container_name: ${PREFIX}_certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    # Проверяет обновление каждые 12 часов
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done;'"
+    restart: unless-stopped
+
+volumes:
+  certbot_www:
+  certbot_certs:
