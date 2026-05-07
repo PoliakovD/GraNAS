@@ -6,6 +6,7 @@ using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Models.Repositories;
 using GraNAS.Metadata.Services.Implementations;
 using GraNAS.Metadata.Services.Interfaces;
+using GraNAS.Shared.Messaging.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -16,15 +17,18 @@ public class FolderServiceTests
     private readonly Mock<IFolderRepository> _repo = new();
     private readonly Mock<IPermissionRepository> _permRepo = new();
     private readonly Mock<IPermissionService> _permSvc = new();
+    private readonly Mock<IEventPublisher> _eventPublisher = new();
     private readonly FolderService _sut;
 
     public FolderServiceTests()
     {
-        // Default: no shared folders
+        // Default: no shared folders, no affected users on delete
         _permRepo.Setup(r => r.ListByUserAsync(It.IsAny<Guid>()))
                  .ReturnsAsync(Array.Empty<Permission>());
+        _permRepo.Setup(r => r.GetUsersForFolderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(Array.Empty<Guid>());
 
-        _sut = new FolderService(_repo.Object, _permRepo.Object, _permSvc.Object, NullLogger<FolderService>.Instance);
+        _sut = new FolderService(_repo.Object, _permRepo.Object, _permSvc.Object, _eventPublisher.Object, NullLogger<FolderService>.Instance);
     }
 
     // ──────────────── CreateFolderAsync ────────────────

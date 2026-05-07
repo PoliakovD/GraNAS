@@ -107,6 +107,8 @@ export function createP2PSession(
       callbacks.onStatusChange('error');
       callbacks.onError('Data channel error');
     };
+    // Channel may already be open when ondatachannel fires (race with ICE)
+    if (dc.readyState === 'open') void initiateEcdh();
   }
 
   async function initiateEcdh(): Promise<void> {

@@ -6,6 +6,7 @@ using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using GraNAS.Metadata.API.Infrastructure;
 using GraNAS.Metadata.DAL;
+using GraNAS.Shared.Messaging.DependencyInjection;
 using GraNAS.Metadata.DAL.Extensions;
 using GraNAS.Metadata.Services.Extensions;
 using GraNAS.Metadata.Services.Interfaces;
@@ -21,6 +22,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -162,6 +164,8 @@ public class Program
       options.MaxAge = TimeSpan.FromDays(365);
     });
 
+    builder.Services.AddGraNasMessaging(builder.Configuration);
+
     // Composition root: регистрация слоёв
     builder.Services.AddMetadataDal();
     builder.Services.AddMetadataApplication();
@@ -231,6 +235,11 @@ public class Program
 
     try
     {
+      using (var scope = app.Services.CreateScope())
+      {
+        var db = scope.ServiceProvider.GetRequiredService<MetadataDbContext>();
+        await db.Database.MigrateAsync();
+      }
       await app.RunAsync();
     }
     finally

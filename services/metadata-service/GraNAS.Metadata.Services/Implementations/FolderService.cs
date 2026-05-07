@@ -6,6 +6,8 @@ using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Models.DTO;
 using GraNAS.Metadata.Models.Repositories;
 using GraNAS.Metadata.Services.Interfaces;
+using GraNAS.Shared.Messaging.Abstractions;
+using GraNAS.Shared.Messaging.Events;
 using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Metadata.Services.Implementations;
@@ -15,17 +17,20 @@ public class FolderService : IFolderService
   private readonly IFolderRepository _folderRepository;
   private readonly IPermissionRepository _permissionRepository;
   private readonly IPermissionService _permissionService;
+  private readonly IEventPublisher _eventPublisher;
   private readonly ILogger<FolderService> _logger;
 
   public FolderService(
     IFolderRepository folderRepository,
     IPermissionRepository permissionRepository,
     IPermissionService permissionService,
+    IEventPublisher eventPublisher,
     ILogger<FolderService> logger)
   {
     _folderRepository = folderRepository;
     _permissionRepository = permissionRepository;
     _permissionService = permissionService;
+    _eventPublisher = eventPublisher;
     _logger = logger;
   }
 
@@ -36,7 +41,7 @@ public class FolderService : IFolderService
 
     var permissions = await _permissionRepository.ListByUserAsync(userId);
     var shared = permissions
-      .Where(p => p.Folder is not null && p.Folder.OwnerId != userId) // exclude if user is also owner
+      .Where(p => p.Folder is not null && p.Folder.OwnerId != userId)
       .Select(p => ToResponse(p.Folder!, p.AccessLevel, p.Folder!.OwnerId, p.Path));
 
     var result = owned.Concat(shared).OrderByDescending(f => f.CreatedAt).ToList();
@@ -88,8 +93,31 @@ public class FolderService : IFolderService
       return new DeleteFolderResult(DeleteFolderError.Forbidden);
     }
 
+    var affectedUsers = await _permissionRepository.GetUsersForFolderAsync(folderId);
+
     await _folderRepository.DeleteAsync(folderId);
     _logger.LogInformation("DeleteFolder: deleted {FolderId} for {UserId}", folderId, userId);
+
+    foreach (var targetUserId in affectedUsers)
+    {
+      try
+      {
+        await _eventPublisher.PublishAsync(new AccessLostEvent
+        {
+          TargetUserId = targetUserId,
+          OwnerId = userId,
+          FolderId = folderId,
+          FolderName = folder.Name,
+          Reason = "folder_deleted"
+        });
+      }
+      catch (Exception ex)
+      {
+        _logger.LogWarning(ex, "DeleteFolder: failed to publish access_lost event for user {TargetUserId} folder {FolderId}",
+          targetUserId, folderId);
+      }
+    }
+
     return new DeleteFolderResult(DeleteFolderError.None);
   }
 

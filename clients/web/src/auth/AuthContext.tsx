@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authApi } from '../api/auth.api';
 import { getAccessToken, registerLogoutCallback, setAccessToken } from '../api/client';
+import * as notificationsHub from '../notifications/notificationsHub';
 import type { CurrentUser, LoginRequest } from '../types/auth';
 import { decodeUser } from './jwt';
 
@@ -22,6 +23,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const applyToken = useCallback((token: string | null) => {
     setAccessToken(token);
     setState({ user: token ? (decodeUser(token) ?? null) : null, loading: false });
+    if (token) {
+      notificationsHub.start().catch(() => {/* ignore connection errors */});
+    } else {
+      notificationsHub.stop().catch(() => {});
+    }
   }, []);
 
   // Try silent refresh on mount (restores session if cookie is alive)

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MailKit" Version="4.9.0" />
+        <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.6" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\GraNAS.Notifications.Models\GraNAS.Notifications.Models.csproj" />
+        <ProjectReference Include="..\..\..\shared\GraNAS.Shared.Messaging\GraNAS.Shared.Messaging.csproj" />
+    </ItemGroup>
+
+</Project>

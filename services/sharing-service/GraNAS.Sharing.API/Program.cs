@@ -6,6 +6,7 @@ using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using GraNAS.Sharing.API.HostedServices;
 using GraNAS.Sharing.API.Infrastructure;
+using GraNAS.Shared.Messaging.DependencyInjection;
 using GraNAS.Sharing.DAL;
 using GraNAS.Sharing.DAL.Extensions;
 using GraNAS.Sharing.Services.Extensions;
@@ -22,6 +23,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -163,7 +165,7 @@ public class Program
       options.MaxAge = TimeSpan.FromDays(365);
     });
 
-    builder.Services.AddSingleton<IShareEventPublisher, ShareEventPublisher>();
+    builder.Services.AddGraNasMessaging(builder.Configuration);
     builder.Services.AddHostedService<ExpiredShareCleanupService>();
 
     builder.Services.AddSharingDal();
@@ -225,6 +227,12 @@ public class Program
 
     try
     {
+      using (var scope = app.Services.CreateScope())
+      {
+        var db = scope.ServiceProvider.GetRequiredService<SharingDbContext>();
+        await db.Database.MigrateAsync();
+      }
+
       await app.RunAsync();
     }
     finally

@@ -45,9 +45,12 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
     {
         if (_hub?.State == HubConnectionState.Connected) return;
 
-        // Register/update device in the backend before hub connect
-        await _signalingApi.RegisterDeviceAsync(
-            new DeviceRegistrationRequest(_deviceIdentity.DeviceId, _deviceIdentity.DeviceName, _deviceIdentity.Platform), ct);
+        if (!_deviceIdentity.IsRegisteredForUser(_session.CurrentUserId))
+        {
+            await _signalingApi.RegisterDeviceAsync(
+                new DeviceRegistrationRequest(_deviceIdentity.DeviceId, _deviceIdentity.DeviceName, _deviceIdentity.Platform), ct);
+            _deviceIdentity.MarkRegisteredForUser(_session.CurrentUserId);
+        }
 
         _turnCredentials = await _signalingApi.GetTurnCredentialsAsync(ct);
 

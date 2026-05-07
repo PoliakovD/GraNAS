@@ -5,4 +5,7 @@ public interface IDeviceIdentity
     Guid DeviceId { get; }
     string DeviceName { get; }
     string Platform { get; }
+
+    bool IsRegisteredForUser(Guid userId);
+    void MarkRegisteredForUser(Guid userId);
 }

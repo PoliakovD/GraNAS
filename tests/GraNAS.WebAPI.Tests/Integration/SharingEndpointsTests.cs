@@ -162,7 +162,7 @@ public class SharingEndpointsTests : IClassFixture<SharingWebApplicationFactory>
 
         SetupOwnershipCheck(folderId, ownerId);
         _factory.EventPublisherMock
-            .Setup(p => p.PublishShareRevokedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var createResp = await ownerClient.PostAsJsonAsync($"/api/folders/{folderId}/share", new
@@ -244,7 +244,7 @@ public class SharingEndpointsTests : IClassFixture<SharingWebApplicationFactory>
 
         SetupOwnershipCheck(folderId, ownerId);
         _factory.EventPublisherMock
-            .Setup(p => p.PublishShareRevokedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var createResp = await client.PostAsJsonAsync($"/api/folders/{folderId}/share", new
@@ -257,7 +257,7 @@ public class SharingEndpointsTests : IClassFixture<SharingWebApplicationFactory>
         Assert.Equal(HttpStatusCode.NoContent, revokeResp.StatusCode);
 
         _factory.EventPublisherMock.Verify(
-            p => p.PublishShareRevokedAsync(created.Id, folderId, ownerId),
+            p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -292,7 +292,7 @@ public class SharingEndpointsTests : IClassFixture<SharingWebApplicationFactory>
 
         SetupOwnershipCheck(folderId, ownerId);
         _factory.EventPublisherMock
-            .Setup(p => p.PublishShareRevokedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Setup(p => p.PublishAsync(It.IsAny<GraNAS.Shared.Messaging.Events.ShareRevokedEvent>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var createResp = await client.PostAsJsonAsync($"/api/folders/{folderId}/share", new
