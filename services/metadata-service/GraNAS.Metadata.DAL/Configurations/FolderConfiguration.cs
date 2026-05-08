@@ -33,6 +33,11 @@ public class FolderConfiguration : IEntityTypeConfiguration<Folder>
     builder.Property(f => f.UpdatedAt)
       .HasColumnName("updated_at");
 
+    builder.Property(f => f.LastAccessedAt)
+      .HasColumnName("last_accessed_at");
+
+    builder.HasIndex(f => new { f.OwnerId, f.LastAccessedAt }, "IX_folders_last_accessed_at");
+
     builder.Property(f => f.ParentFolderId)
       .HasColumnName("parent_folder_id");
 

@@ -5,8 +5,8 @@ import { renderWithProviders } from './test-utils';
 import type { FolderResponse } from '../types/folder';
 
 const MOCK_FOLDERS: FolderResponse[] = [
-  { id: 'folder-1', name: 'Root', parentFolderId: null, ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: null },
-  { id: 'folder-2', name: 'Sub', parentFolderId: 'folder-1', ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: null },
+  { id: 'folder-1', name: 'Root', parentFolderId: null, ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', ownerEmail: null, updatedAt: null, lastAccessedAt: null },
+  { id: 'folder-2', name: 'Sub', parentFolderId: 'folder-1', ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', ownerEmail: null, updatedAt: null, lastAccessedAt: null },
 ];
 
 describe('FolderGrid', () => {

@@ -17,6 +17,7 @@ public class FolderServiceTests
     private readonly Mock<IFolderRepository> _repo = new();
     private readonly Mock<IPermissionRepository> _permRepo = new();
     private readonly Mock<IPermissionService> _permSvc = new();
+    private readonly Mock<IAuthServiceClient> _authClient = new();
     private readonly Mock<IEventPublisher> _eventPublisher = new();
     private readonly FolderService _sut;
 
@@ -27,8 +28,10 @@ public class FolderServiceTests
                  .ReturnsAsync(Array.Empty<Permission>());
         _permRepo.Setup(r => r.GetUsersForFolderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                  .ReturnsAsync(Array.Empty<Guid>());
+        _authClient.Setup(c => c.GetUserEmailsAsync(It.IsAny<System.Collections.Generic.IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(new System.Collections.Generic.Dictionary<Guid, string>());
 
-        _sut = new FolderService(_repo.Object, _permRepo.Object, _permSvc.Object, _eventPublisher.Object, NullLogger<FolderService>.Instance);
+        _sut = new FolderService(_repo.Object, _permRepo.Object, _permSvc.Object, _authClient.Object, _eventPublisher.Object, NullLogger<FolderService>.Instance);
     }
 
     // ──────────────── CreateFolderAsync ────────────────

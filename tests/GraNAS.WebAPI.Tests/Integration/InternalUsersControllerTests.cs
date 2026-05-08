@@ -99,4 +99,54 @@ public class InternalUsersControllerTests : IClassFixture<AuthWebApplicationFact
 
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
+
+    // ──────────────── GET /api/internal/users/batch ────────────────
+
+    [Fact]
+    public async Task GetBatch_KnownIds_Returns200WithEmailArray()
+    {
+        var (email1, userId1) = await RegisterUserAsync();
+        var (email2, userId2) = await RegisterUserAsync();
+        var client = AuthorizedClient();
+
+        var resp = await client.GetAsync($"/api/internal/users/batch?ids={userId1}&ids={userId2}");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<UserLookupResponse[]>();
+        Assert.NotNull(body);
+        Assert.Equal(2, body!.Length);
+        Assert.Contains(body, u => u.Id == userId1 && u.Email == email1);
+        Assert.Contains(body, u => u.Id == userId2 && u.Email == email2);
+    }
+
+    [Fact]
+    public async Task GetBatch_UnknownIds_Returns200WithEmptyArray()
+    {
+        var client = AuthorizedClient();
+        var resp = await client.GetAsync($"/api/internal/users/batch?ids={Guid.NewGuid()}&ids={Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<UserLookupResponse[]>();
+        Assert.NotNull(body);
+        Assert.Empty(body!);
+    }
+
+    [Fact]
+    public async Task GetBatch_EmptyIds_Returns200WithEmptyArray()
+    {
+        var client = AuthorizedClient();
+        var resp = await client.GetAsync("/api/internal/users/batch");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<UserLookupResponse[]>();
+        Assert.NotNull(body);
+        Assert.Empty(body!);
+    }
+
+    [Fact]
+    public async Task GetBatch_NoJwt_Returns401()
+    {
+        var resp = await _anonClient.GetAsync($"/api/internal/users/batch?ids={Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
 }

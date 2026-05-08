@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Models.Repositories;
@@ -44,6 +47,17 @@ public class InternalUsersController : ControllerBase
     }
 
     return Ok(new UserLookupResponse { Id = user.Id, Email = user.Email });
+  }
+
+  /// <summary>Батч-поиск пользователей по id (межсервисный вызов из metadata-service)</summary>
+  [HttpGet("batch")]
+  [ProducesResponseType(typeof(UserLookupResponse[]), StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> GetBatch([FromQuery] Guid[] ids, CancellationToken ct)
+  {
+    if (ids.Length == 0) return Ok(Array.Empty<UserLookupResponse>());
+    var users = await _users.GetByIdsAsync(ids, ct);
+    return Ok(users.Select(u => new UserLookupResponse { Id = u.Id, Email = u.Email }));
   }
 
   /// <summary>Поиск пользователя по email (межсервисный вызов из metadata-service)</summary>

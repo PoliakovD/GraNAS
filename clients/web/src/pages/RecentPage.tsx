@@ -13,9 +13,12 @@ export function RecentPage() {
   const { data: folders = [], isLoading } = useFoldersQuery();
   const { openContext } = useOutletContext<OutletCtx>();
 
-  // v1: sort by updatedAt — no last_accessed_at yet
   const recent = [...folders]
-    .sort((a, b) => +new Date(b.updatedAt ?? 0) - +new Date(a.updatedAt ?? 0))
+    .filter(f => f.lastAccessedAt ?? f.updatedAt)
+    .sort((a, b) =>
+      +new Date(b.lastAccessedAt ?? b.updatedAt ?? 0) -
+      +new Date(a.lastAccessedAt ?? a.updatedAt ?? 0)
+    )
     .slice(0, 12);
 
   return (
@@ -23,7 +26,7 @@ export function RecentPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Недавние</h1>
-          <p className="page-sub">Папки, недавно изменённые (сортировка по дате обновления)</p>
+          <p className="page-sub">Папки, которые вы недавно открывали</p>
         </div>
       </div>
 

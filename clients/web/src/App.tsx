@@ -1,6 +1,4 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { App as AntApp, ConfigProvider } from 'antd';
-import ruRU from 'antd/locale/ru_RU';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
@@ -42,16 +40,12 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <ConfigProvider locale={ruRU} theme={{ token: { colorPrimary: '#6938EF' } }}>
-      <AntApp>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ErrorBoundary>
-              <RouterProvider router={router} />
-            </ErrorBoundary>
-          </AuthProvider>
-        </QueryClientProvider>
-      </AntApp>
-    </ConfigProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ErrorBoundary>
+          <RouterProvider router={router} />
+        </ErrorBoundary>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

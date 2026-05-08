@@ -243,6 +243,21 @@ public class FoldersController : ControllerBase
     return Ok("User`s access revoked");
   }
 
+  /// <summary>Обновить last_accessed_at папки (вызывается при открытии)</summary>
+  [HttpPatch("{folderId:guid}/touch")]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+  [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> Touch(Guid folderId, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId == null)
+      return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
+
+    var ok = await _folderService.TouchAsync(folderId, userId.Value, ct);
+    return ok ? NoContent() : NotFound(new ErrorResponse { Error = "folder_not_found", ErrorDescription = "Folder not found or access denied." });
+  }
+
   private Guid? GetCurrentUserId()
   {
     var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

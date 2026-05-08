@@ -68,7 +68,7 @@ export function SharedPage() {
       )}
 
       {!isLoading && Object.entries(grouped).map(([ownerId, items]) => {
-        const ownerLabel = ownerId.slice(0, 8) + '…';
+        const ownerLabel = items[0]?.ownerEmail ?? (ownerId.slice(0, 8) + '…');
         return (
           <div key={ownerId} style={{ marginBottom: 22 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -79,11 +79,10 @@ export function SharedPage() {
                 display: 'grid', placeItems: 'center',
                 fontWeight: 600, fontSize: 11,
               }}>
-                {initials(ownerId)}
+                {initials(items[0]?.ownerEmail ?? ownerId)}
               </div>
               <div style={{ fontWeight: 600, fontSize: 13.5 }}>
                 {ownerLabel}
-                {/* TODO: show email when backend exposes owner lookup */}
               </div>
               <span className="tag">{items.length} {items.length === 1 ? 'папка' : 'папки'}</span>
             </div>

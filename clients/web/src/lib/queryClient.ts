@@ -1,5 +1,5 @@
 import { QueryCache, QueryClient } from '@tanstack/react-query';
-import { notification } from 'antd';
+import { toast } from '../shared/useToast';
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -10,7 +10,7 @@ export const queryClient = new QueryClient({
         (error as { response?: { data?: { title?: string } } })?.response?.data?.title ??
         (error as Error)?.message ??
         'Ошибка сети';
-      notification.error({ message: 'Ошибка загрузки данных', description });
+      toast(`Ошибка загрузки: ${description}`);
     },
   }),
   defaultOptions: {

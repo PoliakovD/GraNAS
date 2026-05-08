@@ -10,4 +10,7 @@ export const foldersApi = {
 
   delete: (id: string) =>
     api.delete(`/api/metadata/folders/${id}`),
+
+  touch: (id: string) =>
+    api.patch(`/api/metadata/folders/${id}/touch`),
 };

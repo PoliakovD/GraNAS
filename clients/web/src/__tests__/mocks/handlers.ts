@@ -29,13 +29,13 @@ export const handlers = [
   // folders
   http.get(`${BASE}/api/metadata/folders`, () =>
     HttpResponse.json([
-      { id: 'folder-1', name: 'Root', parentFolderId: null, ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: null },
-      { id: 'folder-2', name: 'Sub', parentFolderId: 'folder-1', ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: null },
+      { id: 'folder-1', name: 'Root', parentFolderId: null, ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', ownerEmail: 'test@test.com', updatedAt: null, lastAccessedAt: null },
+      { id: 'folder-2', name: 'Sub', parentFolderId: 'folder-1', ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', ownerEmail: 'test@test.com', updatedAt: null, lastAccessedAt: null },
     ])),
 
   http.post(`${BASE}/api/metadata/folders`, () =>
     HttpResponse.json(
-      { id: 'folder-3', name: 'New', parentFolderId: null, ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: null },
+      { id: 'folder-3', name: 'New', parentFolderId: null, ownerId: 'user-1', accessLevel: 'Full', path: null, createdAt: '2026-01-01T00:00:00Z', ownerEmail: 'test@test.com', updatedAt: null, lastAccessedAt: null },
       { status: 201 },
     )),
 

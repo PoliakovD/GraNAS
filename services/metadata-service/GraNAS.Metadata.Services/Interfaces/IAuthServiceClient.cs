@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,4 +11,5 @@ public interface IAuthServiceClient
 {
   Task<UserInfo?> GetUserByEmailAsync(string email, CancellationToken ct = default);
   Task<UserInfo?> GetUserByIdAsync(Guid id, CancellationToken ct = default);
+  Task<IReadOnlyDictionary<Guid, string>> GetUserEmailsAsync(IEnumerable<Guid> userIds, CancellationToken ct = default);
 }

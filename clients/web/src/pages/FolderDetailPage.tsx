@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { useCurrentUser } from '../auth/AuthContext';
 import { FolderGrid } from '../features/folders/FolderGrid';
 import { FolderListView } from '../features/folders/FolderListView';
 import { useFoldersQuery } from '../features/folders/useFoldersQuery';
+import { useTouchFolder } from '../features/folders/useTouchFolder';
 import { FileListPanel } from '../features/p2p/FileListPanel';
 import { OwnerStatusBadge } from '../features/p2p/OwnerStatusBadge';
 import { useOwnerOnlineStatus } from '../features/p2p/useOwnerOnlineStatus';
@@ -22,6 +23,11 @@ export function FolderDetailPage() {
   const { openContext } = useOutletContext<OutletCtx>();
   const ownerStatus = useOwnerOnlineStatus(id);
   const [subView, setSubView] = useState<View>('grid');
+  const touch = useTouchFolder();
+
+  useEffect(() => {
+    if (id) touch(id);
+  }, [id]);
 
   if (!id) return null;
 
@@ -79,7 +85,7 @@ export function FolderDetailPage() {
               {!isOwner && folder.accessLevel === 'Full' && <span className="tag green">полный доступ</span>}
             </h1>
             <p className="page-sub">
-              {isOwner ? 'Владелец: вы' : `Владелец: ${folder.ownerId.slice(0, 8)}…`}
+              {isOwner ? 'Владелец: вы' : `Владелец: ${folder.ownerEmail ?? (folder.ownerId.slice(0, 8) + '…')}`}
               {' · '}{subfolders.length} подпапок
               {' · '}обновлено {relTime(folder.updatedAt)}
             </p>

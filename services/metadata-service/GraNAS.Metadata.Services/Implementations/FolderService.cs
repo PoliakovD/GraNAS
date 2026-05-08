@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Models.DTO;
@@ -17,6 +18,7 @@ public class FolderService : IFolderService
   private readonly IFolderRepository _folderRepository;
   private readonly IPermissionRepository _permissionRepository;
   private readonly IPermissionService _permissionService;
+  private readonly IAuthServiceClient _authClient;
   private readonly IEventPublisher _eventPublisher;
   private readonly ILogger<FolderService> _logger;
 
@@ -24,12 +26,14 @@ public class FolderService : IFolderService
     IFolderRepository folderRepository,
     IPermissionRepository permissionRepository,
     IPermissionService permissionService,
+    IAuthServiceClient authClient,
     IEventPublisher eventPublisher,
     ILogger<FolderService> logger)
   {
     _folderRepository = folderRepository;
     _permissionRepository = permissionRepository;
     _permissionService = permissionService;
+    _authClient = authClient;
     _eventPublisher = eventPublisher;
     _logger = logger;
   }
@@ -37,12 +41,31 @@ public class FolderService : IFolderService
   public async Task<IEnumerable<FolderResponse>> GetUserFoldersAsync(Guid userId)
   {
     var ownedFolders = await _folderRepository.GetUserFoldersAsync(userId);
-    var owned = ownedFolders.Select(f => ToResponse(f, AccessLevel.Full, f.OwnerId, null));
+    var ownedList = ownedFolders.ToList();
 
     var permissions = await _permissionRepository.ListByUserAsync(userId);
-    var shared = permissions
+    var sharedList = permissions
       .Where(p => p.Folder is not null && p.Folder.OwnerId != userId)
-      .Select(p => ToResponse(p.Folder!, p.AccessLevel, p.Folder!.OwnerId, p.Path));
+      .ToList();
+
+    var ownerIds = ownedList.Select(f => f.OwnerId)
+      .Concat(sharedList.Select(p => p.Folder!.OwnerId))
+      .Distinct()
+      .ToArray();
+
+    Dictionary<Guid, string> emails;
+    try
+    {
+      emails = (await _authClient.GetUserEmailsAsync(ownerIds)).ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "GetUserFolders: failed to fetch owner emails");
+      emails = new Dictionary<Guid, string>();
+    }
+
+    var owned = ownedList.Select(f => ToResponse(f, AccessLevel.Full, f.OwnerId, null, emails.GetValueOrDefault(f.OwnerId)));
+    var shared = sharedList.Select(p => ToResponse(p.Folder!, p.AccessLevel, p.Folder!.OwnerId, p.Path, emails.GetValueOrDefault(p.Folder!.OwnerId)));
 
     var result = owned.Concat(shared).OrderByDescending(f => f.CreatedAt).ToList();
     _logger.LogDebug("GetUserFolders: returning {Count} folders for user {UserId}", result.Count, userId);
@@ -75,7 +98,7 @@ public class FolderService : IFolderService
     _logger.LogInformation("CreateFolder: created {FolderId} (parent={ParentFolderId}) for {UserId}",
       folder.Id, request.ParentFolderId, userId);
 
-    return CreateFolderResult.Success(ToResponse(folder, AccessLevel.Full, userId, null));
+    return CreateFolderResult.Success(ToResponse(folder, AccessLevel.Full, userId, null, null));
   }
 
   public async Task<DeleteFolderResult> DeleteFolderAsync(Guid userId, Guid folderId)
@@ -121,16 +144,25 @@ public class FolderService : IFolderService
     return new DeleteFolderResult(DeleteFolderError.None);
   }
 
-  private static FolderResponse ToResponse(Folder f, AccessLevel accessLevel, Guid ownerId, string? path) =>
+  public async Task<bool> TouchAsync(Guid folderId, Guid userId, CancellationToken ct)
+  {
+    var hasAccess = await _permissionService.HasAccessAsync(userId, folderId, AccessLevel.View);
+    if (!hasAccess) return false;
+    return await _folderRepository.TouchAsync(folderId, ct);
+  }
+
+  private static FolderResponse ToResponse(Folder f, AccessLevel accessLevel, Guid ownerId, string? path, string? ownerEmail) =>
     new()
     {
       Id = f.Id,
       Name = f.Name,
       ParentFolderId = f.ParentFolderId,
       OwnerId = ownerId,
+      OwnerEmail = ownerEmail,
       AccessLevel = accessLevel,
       Path = path,
       CreatedAt = f.CreatedAt,
-      UpdatedAt = f.UpdatedAt
+      UpdatedAt = f.UpdatedAt,
+      LastAccessedAt = f.LastAccessedAt
     };
 }

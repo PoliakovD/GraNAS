@@ -256,6 +256,10 @@ export function Inspector({ folder, isOwner, onCreateShare }: InspectorProps) {
                   <span style={{ color: 'var(--ink-500)' }}>Изменена</span>
                   <span>{relTime(folder.updatedAt)}</span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-500)' }}>Владелец</span>
+                  <span>{folder.ownerEmail ?? (folder.ownerId.slice(0, 8) + '…')}</span>
+                </div>
               </div>
             </div>
             <div>
