@@ -208,4 +208,52 @@ public class FoldersControllerTests : IClassFixture<MetadataWebApplicationFactor
         Assert.Null(rootDto!.ParentFolderId);
         Assert.Equal(root.Id, childDto!.ParentFolderId);
     }
+
+    // ──────────────── PATCH /api/folders/{id}/touch ────────────────
+
+    [Fact]
+    public async Task Touch_AsOwner_Returns204AndSetsLastAccessedAt()
+    {
+        var ownerId = Guid.NewGuid();
+        var client = ClientFor(ownerId);
+        var folder = await CreateFolderAsync(client, "TouchTest");
+
+        var resp = await client.PatchAsync($"/api/folders/{folder.Id}/touch", null);
+        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MetadataDbContext>();
+        var updated = await db.Folders.FindAsync(folder.Id);
+        Assert.NotNull(updated!.LastAccessedAt);
+    }
+
+    [Fact]
+    public async Task Touch_UnknownFolder_Returns404()
+    {
+        var client = ClientFor(Guid.NewGuid());
+        var resp = await client.PatchAsync($"/api/folders/{Guid.NewGuid()}/touch", null);
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Touch_Unauthenticated_Returns401()
+    {
+        var resp = await _client.PatchAsync($"/api/folders/{Guid.NewGuid()}/touch", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetFolders_AfterTouch_LastAccessedAtIsSet()
+    {
+        var ownerId = Guid.NewGuid();
+        var client = ClientFor(ownerId);
+        var folder = await CreateFolderAsync(client, "TouchedFolder");
+
+        await client.PatchAsync($"/api/folders/{folder.Id}/touch", null);
+
+        var listResp = await client.GetAsync("/api/folders");
+        var list = await listResp.Content.ReadFromJsonAsync<FolderResponse[]>();
+        var dto = Array.Find(list!, f => f.Id == folder.Id);
+        Assert.NotNull(dto!.LastAccessedAt);
+    }
 }

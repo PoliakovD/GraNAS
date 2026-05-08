@@ -13,12 +13,14 @@ namespace GraNAS.Signaling.Services.Implementations;
 public class DeviceService : IDeviceService
 {
     private readonly IDeviceRepository _repo;
+    private readonly IDeviceFolderRepository _folderRepo;
     private readonly ISessionStore _sessions;
     private readonly ILogger<DeviceService> _logger;
 
-    public DeviceService(IDeviceRepository repo, ISessionStore sessions, ILogger<DeviceService> logger)
+    public DeviceService(IDeviceRepository repo, IDeviceFolderRepository folderRepo, ISessionStore sessions, ILogger<DeviceService> logger)
     {
         _repo = repo;
+        _folderRepo = folderRepo;
         _sessions = sessions;
         _logger = logger;
     }
@@ -65,6 +67,52 @@ public class DeviceService : IDeviceService
         if (!belongs)
             _logger.LogDebug("BelongsToUser: device {DeviceId} not owned by {UserId}", deviceId, userId);
         return belongs;
+    }
+
+    public async Task<DeviceFolder?> TryClaimFolderAsync(Guid deviceId, Guid folderId, bool force, CancellationToken ct = default)
+    {
+        if (!force)
+        {
+            var existing = await _folderRepo.GetByFolderIdAsync(folderId, ct);
+            if (existing is not null && existing.DeviceId != deviceId)
+            {
+                _logger.LogDebug("ClaimFolder conflict: folder {FolderId} already on device {ExistingDevice}, requester={DeviceId}",
+                    folderId, existing.DeviceId, deviceId);
+                return existing; // conflict
+            }
+        }
+
+        await _folderRepo.ClaimAsync(deviceId, folderId, ct);
+        _logger.LogInformation("Folder {FolderId} claimed by device {DeviceId} (force={Force})", folderId, deviceId, force);
+        return null; // success
+    }
+
+    public async Task ReleaseFolderAsync(Guid deviceId, Guid folderId, CancellationToken ct = default)
+    {
+        await _folderRepo.ReleaseAsync(deviceId, folderId, ct);
+        _logger.LogInformation("Folder {FolderId} released from device {DeviceId}", folderId, deviceId);
+    }
+
+    public async Task<List<FolderDeviceResponse>> GetFolderDevicesAsync(IEnumerable<Guid> folderIds, Guid userId, CancellationToken ct = default)
+    {
+        var bindings = await _folderRepo.GetByFolderIdsAsync(folderIds, userId, ct);
+        var result = new List<FolderDeviceResponse>(bindings.Count);
+
+        foreach (var b in bindings)
+        {
+            var isOnline = await _sessions.IsDeviceOnlineAsync(b.DeviceId, ct);
+            result.Add(new FolderDeviceResponse
+            {
+                FolderId = b.FolderId,
+                DeviceId = b.DeviceId,
+                DeviceName = b.Device.DeviceName,
+                Platform = b.Device.Platform,
+                IsOnline = isOnline,
+                ClaimedAt = b.ClaimedAt,
+            });
+        }
+
+        return result;
     }
 
     private static DeviceResponse MapToResponse(Device d, bool isOnline) => new()

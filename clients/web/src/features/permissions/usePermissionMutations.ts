@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { notification } from 'antd';
 import { permissionsApi } from '../../api/permissions.api';
+import { toast } from '../../shared/useToast';
 import type { GrantPermissionRequest, PermissionResponse } from '../../types/permission';
 
 export function permissionsKey(folderId: string) {
@@ -18,9 +18,9 @@ export function useGrantPermission(folderId: string) {
       qc.setQueryData<PermissionResponse[]>(permissionsKey(folderId), prev =>
         [...(prev ?? []).filter(p => p.userId !== perm.userId), { ...perm, email: variables.email }]
       );
-      notification.success({ message: 'Права выданы' });
+      toast('Права выданы');
     },
-    onError: () => notification.error({ message: 'Не удалось выдать права' }),
+    onError: () => toast('Не удалось выдать права'),
   });
 }
 
@@ -32,8 +32,8 @@ export function useRevokePermission(folderId: string) {
       qc.setQueryData<PermissionResponse[]>(permissionsKey(folderId), prev =>
         (prev ?? []).filter(p => p.userId !== userId)
       );
-      notification.success({ message: 'Права отозваны' });
+      toast('Права отозваны');
     },
-    onError: () => notification.error({ message: 'Не удалось отозвать права' }),
+    onError: () => toast('Не удалось отозвать права'),
   });
 }

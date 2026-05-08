@@ -321,6 +321,8 @@ services:
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
       RabbitMQ__Password: ${RABBITMQ_DEFAULT_PASS}
+      ShareLinkEncryption__Key: ${SHARE_TOKEN_ENCRYPTION_KEY}
+      App__BaseUrl: ${APP_BASE_URL}
     ports:
       - "${SHARING_SERVICE_PORT_HOST}:${SERVICE_PORT_CONTAINER}"
     depends_on:

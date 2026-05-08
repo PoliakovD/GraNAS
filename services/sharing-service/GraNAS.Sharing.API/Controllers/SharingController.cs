@@ -79,6 +79,24 @@ public class SharingController : ControllerBase
         return Ok(links);
     }
 
+    /// <summary>Все share-ссылки текущего пользователя по всем папкам</summary>
+    [HttpGet("api/share-links")]
+    [ProducesResponseType(typeof(ShareLinkOwnerResponse[]), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ListMyShares(
+        [FromQuery] bool activeOnly = true,
+        [FromQuery] int take = 200,
+        CancellationToken ct = default)
+    {
+        var ownerId = GetCurrentUserId();
+        if (ownerId is null)
+            return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
+
+        take = Math.Min(take, 500);
+        var result = await _shareService.ListByOwnerAsync(ownerId.Value, activeOnly, take, ct);
+        return Ok(result);
+    }
+
     /// <summary>Отозвать share-ссылку по внутреннему ID (когда исходный токен утерян)</summary>
     [HttpDelete("api/share-links/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

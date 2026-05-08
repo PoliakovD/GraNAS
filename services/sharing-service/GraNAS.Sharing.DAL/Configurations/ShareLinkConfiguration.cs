@@ -26,6 +26,12 @@ public class ShareLinkConfiguration : IEntityTypeConfiguration<ShareLink>
             .HasColumnName("token_hash")
             .HasMaxLength(64);
 
+        builder.Property(s => s.TokenEncrypted)
+            .IsRequired()
+            .HasColumnName("token_encrypted")
+            .HasMaxLength(512)
+            .HasDefaultValue(string.Empty);
+
         builder.Property(s => s.Path)
             .HasColumnName("path")
             .HasMaxLength(1024);

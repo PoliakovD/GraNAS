@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Metadata.Models;
 using GraNAS.Metadata.Models.Repositories;
@@ -50,5 +51,14 @@ public class FolderRepository : IFolderRepository
       _context.Folders.Remove(folder);
       await _context.SaveChangesAsync();
     }
+  }
+
+  public async Task<bool> TouchAsync(Guid folderId, CancellationToken ct)
+  {
+    var folder = await _context.Folders.FindAsync([folderId], ct);
+    if (folder is null) return false;
+    folder.LastAccessedAt = DateTime.UtcNow;
+    await _context.SaveChangesAsync(ct);
+    return true;
   }
 }

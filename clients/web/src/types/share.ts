@@ -2,6 +2,7 @@ export interface ShareLinkResponse {
   id: string;
   folderId: string;
   path: string | null;
+  shareUrl: string;
   expiresAt: string | null;
   revoked: boolean;
   createdAt: string;
@@ -27,4 +28,9 @@ export interface ShareDetailsResponse {
   ownerId: string;
   path: string | null;
   expiresAt: string | null;
+}
+
+export interface ShareLinkOwnerResponse extends ShareLinkResponse {
+  folderName: string;
+  openCount?: number;
 }

@@ -20,6 +20,8 @@ public class ShellViewModel : ViewModelBase
   private readonly INotificationService _notifications;
   private readonly IP2PHost _p2pHost;
   private readonly IFolderShareRegistry _registry;
+  private readonly ISignalingApi _signalingApi;
+  private readonly IDeviceIdentity _deviceIdentity;
 
   private ViewModelBase? _currentPage;
   private string _currentNav = "folders";
@@ -60,7 +62,9 @@ public class ShellViewModel : ViewModelBase
     IDialogService dialogs,
     INotificationService notifications,
     IP2PHost p2pHost,
-    IFolderShareRegistry registry)
+    IFolderShareRegistry registry,
+    ISignalingApi signalingApi,
+    IDeviceIdentity deviceIdentity)
   {
     _session = session;
     _authApi = authApi;
@@ -71,6 +75,8 @@ public class ShellViewModel : ViewModelBase
     _notifications = notifications;
     _p2pHost = p2pHost;
     _registry = registry;
+    _signalingApi = signalingApi;
+    _deviceIdentity = deviceIdentity;
 
     LogoutCommand = ReactiveCommand.CreateFromTask(LogoutAsync);
     NavFoldersCommand = ReactiveCommand.Create(() => ShowFolders());
@@ -155,7 +161,7 @@ public class ShellViewModel : ViewModelBase
 
   public void ShowFolders()
   {
-    var vm = new MyFoldersViewModel(_foldersApi, _session, _dialogs, _notifications, _registry, _p2pHost);
+    var vm = new MyFoldersViewModel(_foldersApi, _session, _dialogs, _notifications, _registry, _p2pHost, _signalingApi, _deviceIdentity);
     vm.FolderOpened += (_, folder) => ShowFolderDetail(folder);
     CurrentPage = vm;
     CurrentNav = "folders";

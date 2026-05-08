@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models;
 using GraNAS.Auth.Models.Repositories;
@@ -23,6 +26,13 @@ public class UserRepository : IUserRepository
   public async Task<User?> GetByIdAsync(Guid id)
   {
     return await _context.Users.FindAsync(id);
+  }
+
+  public async Task<IEnumerable<User>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct)
+  {
+    var distinct = ids.Distinct().Take(200).ToArray();
+    if (distinct.Length == 0) return Array.Empty<User>();
+    return await _context.Users.Where(u => distinct.Contains(u.Id)).ToListAsync(ct);
   }
 
   public async Task CreateAsync(User user)

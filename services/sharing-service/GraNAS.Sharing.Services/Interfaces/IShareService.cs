@@ -9,6 +9,7 @@ public interface IShareService
     Task<ShareDetailsResponse?> GetByTokenAsync(string token, CancellationToken ct = default);
     Task<bool> IsRevokedAsync(string token);
     Task<IEnumerable<ShareLinkResponse>> ListByFolderAsync(Guid ownerId, Guid folderId);
+    Task<IEnumerable<ShareLinkOwnerResponse>> ListByOwnerAsync(Guid ownerId, bool activeOnly, int take, CancellationToken ct);
     Task<RevokeShareResult> RevokeByTokenAsync(Guid ownerId, string token);
     Task<RevokeShareResult> RevokeByIdAsync(Guid ownerId, Guid id);
     Task<int> DeleteExpiredAsync(CancellationToken ct = default);

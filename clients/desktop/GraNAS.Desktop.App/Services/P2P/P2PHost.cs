@@ -193,7 +193,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
             };
 
             var offer = pc.createOffer(null);
-            pc.setLocalDescription(offer);
+            await pc.setLocalDescription(offer);
 
             if (_hub?.State == HubConnectionState.Connected)
                 await _hub.InvokeAsync("SendOffer", receiverConnId, offer.sdp);

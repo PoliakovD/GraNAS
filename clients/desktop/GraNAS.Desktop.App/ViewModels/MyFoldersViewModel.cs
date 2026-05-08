@@ -18,6 +18,8 @@ public class MyFoldersViewModel : ViewModelBase
   private readonly INotificationService _notifications;
   private readonly IFolderShareRegistry _registry;
   private readonly IP2PHost _p2pHost;
+  private readonly ISignalingApi _signalingApi;
+  private readonly IDeviceIdentity _deviceIdentity;
 
   private ObservableCollection<FolderNode> _roots = [];
   private FolderNode? _selectedNode;
@@ -56,7 +58,9 @@ public class MyFoldersViewModel : ViewModelBase
     IDialogService dialogs,
     INotificationService notifications,
     IFolderShareRegistry registry,
-    IP2PHost p2pHost)
+    IP2PHost p2pHost,
+    ISignalingApi signalingApi,
+    IDeviceIdentity deviceIdentity)
   {
     _foldersApi = foldersApi;
     _session = session;
@@ -64,6 +68,8 @@ public class MyFoldersViewModel : ViewModelBase
     _notifications = notifications;
     _registry = registry;
     _p2pHost = p2pHost;
+    _signalingApi = signalingApi;
+    _deviceIdentity = deviceIdentity;
 
     LoadCommand = ReactiveCommand.CreateFromTask(LoadFoldersAsync);
     CreateRootCommand = ReactiveCommand.CreateFromTask(() => CreateFolderAsync(null));
@@ -120,10 +126,24 @@ public class MyFoldersViewModel : ViewModelBase
     var path = await _dialogs.ShowFolderPickerAsync("Выберите локальную папку для P2P-шаринга");
     if (path is null) return;
 
+    // Попытка привязать папку к этому устройству на сервере
+    var conflict = await _signalingApi.ClaimFolderAsync(_deviceIdentity.DeviceId, node.Folder.Id);
+    if (conflict is not null)
+    {
+      var confirmed = await _dialogs.ShowConfirmAsync(
+        "Переназначить устройство?",
+        $"Папка «{node.Folder.Name}» уже привязана к «{conflict.DeviceName}». Переназначить на это устройство?",
+        "Переназначить");
+      if (!confirmed) return;
+
+      await _signalingApi.ClaimFolderAsync(_deviceIdentity.DeviceId, node.Folder.Id, force: true);
+    }
+
     _registry.SetLocalPath(node.Folder.Id, path);
     await _p2pHost.JoinFolderAsync(node.Folder.Id);
     _notifications.Success($"Папка «{node.Folder.Name}» привязана к {path}. P2P-доступ активен.");
   }
+
 
   private async Task DeleteFolderAsync(FolderNode node)
   {

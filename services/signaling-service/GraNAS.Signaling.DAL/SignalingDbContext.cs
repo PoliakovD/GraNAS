@@ -5,6 +5,7 @@ namespace GraNAS.Signaling.DAL;
 public class SignalingDbContext : DbContext
 {
     public DbSet<GraNAS.Signaling.Models.Device> Devices => Set<GraNAS.Signaling.Models.Device>();
+    public DbSet<GraNAS.Signaling.Models.DeviceFolder> DeviceFolders => Set<GraNAS.Signaling.Models.DeviceFolder>();
 
     public SignalingDbContext(DbContextOptions<SignalingDbContext> options) : base(options)
     {

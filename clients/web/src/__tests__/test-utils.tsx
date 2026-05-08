@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
-import { App as AntApp } from 'antd';
 import type { ReactNode } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { setAccessToken } from '../api/client';
@@ -35,11 +34,9 @@ export function renderWithProviders(
   function Wrapper() {
     return (
       <QueryClientProvider client={queryClient}>
-        <AntApp>
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </AntApp>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
       </QueryClientProvider>
     );
   }
