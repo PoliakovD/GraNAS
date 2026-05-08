@@ -56,6 +56,63 @@ public class DevicesController : ControllerBase
         return Ok(devices);
     }
 
+    /// <summary>Batch: какой девайс привязан к каждой из указанных папок.</summary>
+    [HttpGet("folder-devices")]
+    [ProducesResponseType(typeof(List<FolderDeviceResponse>), 200)]
+    public async Task<ActionResult<List<FolderDeviceResponse>>> GetFolderDevices(
+        [FromQuery] Guid[] folderIds, CancellationToken ct)
+    {
+        if (folderIds.Length == 0) return Ok(Array.Empty<FolderDeviceResponse>());
+        var userId = GetUserId();
+        return Ok(await _deviceService.GetFolderDevicesAsync(folderIds, userId, ct));
+    }
+
+    /// <summary>Явно привязать папку к этому девайсу.</summary>
+    [HttpPost("{deviceId:guid}/folders/{folderId:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(typeof(FolderDeviceResponse), 409)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> ClaimFolder(
+        Guid deviceId, Guid folderId,
+        [FromQuery] bool force = false,
+        CancellationToken ct = default)
+    {
+        var userId = GetUserId();
+        if (!await _deviceService.BelongsToUserAsync(deviceId, userId, ct))
+            return Forbid();
+
+        var conflict = await _deviceService.TryClaimFolderAsync(deviceId, folderId, force, ct);
+        if (conflict is not null)
+        {
+            var resp = new FolderDeviceResponse
+            {
+                FolderId = conflict.FolderId,
+                DeviceId = conflict.DeviceId,
+                DeviceName = conflict.Device.DeviceName,
+                Platform = conflict.Device.Platform,
+                ClaimedAt = conflict.ClaimedAt,
+            };
+            return Conflict(resp);
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>Снять привязку папки с этого девайса.</summary>
+    [HttpDelete("{deviceId:guid}/folders/{folderId:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> ReleaseFolder(
+        Guid deviceId, Guid folderId, CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (!await _deviceService.BelongsToUserAsync(deviceId, userId, ct))
+            return Forbid();
+
+        await _deviceService.ReleaseFolderAsync(deviceId, folderId, ct);
+        return NoContent();
+    }
+
     private Guid GetUserId()
     {
         var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

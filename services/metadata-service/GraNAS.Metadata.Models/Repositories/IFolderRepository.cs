@@ -11,4 +11,5 @@ public interface IFolderRepository
   Task<Folder?> GetByIdForOwnerAsync(Guid id, Guid ownerId);
   Task CreateAsync(Folder folder);
   Task DeleteAsync(Guid id);
+  Task<bool> TouchAsync(Guid folderId, System.Threading.CancellationToken ct);
 }

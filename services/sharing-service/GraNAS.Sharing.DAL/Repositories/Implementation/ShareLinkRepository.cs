@@ -39,6 +39,17 @@ public class ShareLinkRepository : IShareLinkRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<ShareLink>> ListByOwnerAsync(Guid ownerId, bool activeOnly, int take, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        return await _context.ShareLinks
+            .Where(s => s.OwnerId == ownerId)
+            .Where(s => !activeOnly || (!s.Revoked && s.ExpiresAt > now))
+            .OrderByDescending(s => s.CreatedAt)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
     public async Task UpdateAsync(ShareLink shareLink)
     {
         _context.ShareLinks.Update(shareLink);

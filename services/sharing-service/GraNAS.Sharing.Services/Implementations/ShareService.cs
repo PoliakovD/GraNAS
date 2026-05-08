@@ -4,6 +4,7 @@ using GraNAS.Sharing.Models;
 using GraNAS.Sharing.Models.DTO;
 using GraNAS.Sharing.Models.Repositories;
 using GraNAS.Sharing.Services.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Sharing.Services.Implementations;
@@ -12,22 +13,30 @@ public class ShareService : IShareService
 {
     private readonly IShareLinkRepository _repository;
     private readonly ITokenGenerator _tokenGenerator;
+    private readonly ITokenEncryptionService _encryption;
     private readonly IMetadataServiceClient _metadataClient;
     private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<ShareService> _logger;
+    private readonly string _baseUrl;
 
     public ShareService(
         IShareLinkRepository repository,
         ITokenGenerator tokenGenerator,
+        ITokenEncryptionService encryption,
         IMetadataServiceClient metadataClient,
         IEventPublisher eventPublisher,
-        ILogger<ShareService> logger)
+        ILogger<ShareService> logger,
+        IConfiguration configuration)
     {
         _repository = repository;
         _tokenGenerator = tokenGenerator;
+        _encryption = encryption;
         _metadataClient = metadataClient;
         _eventPublisher = eventPublisher;
         _logger = logger;
+        _baseUrl = (configuration["App:BaseUrl"]
+            ?? throw new InvalidOperationException("App:BaseUrl is not configured."))
+            .TrimEnd('/');
     }
 
     public async Task<CreateShareResult> CreateAsync(
@@ -42,6 +51,7 @@ public class ShareService : IShareService
 
         var token = _tokenGenerator.GenerateToken();
         var tokenHash = _tokenGenerator.ComputeHash(token);
+        var tokenEncrypted = _encryption.Encrypt(token);
 
         var shareLink = new ShareLink
         {
@@ -49,6 +59,7 @@ public class ShareService : IShareService
             FolderId = folderId,
             OwnerId = ownerId,
             TokenHash = tokenHash,
+            TokenEncrypted = tokenEncrypted,
             Path = request.Path,
             ExpiresAt = request.ExpiresAt,
             Revoked = false,
@@ -121,10 +132,55 @@ public class ShareService : IShareService
             Id = s.Id,
             FolderId = s.FolderId,
             Path = s.Path,
+            ShareUrl = BuildShareUrl(s.TokenEncrypted),
             ExpiresAt = s.ExpiresAt,
             Revoked = s.Revoked,
             CreatedAt = s.CreatedAt
         });
+    }
+
+    public async Task<IEnumerable<ShareLinkOwnerResponse>> ListByOwnerAsync(
+        Guid ownerId, bool activeOnly, int take, CancellationToken ct)
+    {
+        var links = (await _repository.ListByOwnerAsync(ownerId, activeOnly, take, ct)).ToList();
+
+        // Batch-fetch folder names via Task.WhenAll (TODO: replace with batch endpoint when available)
+        var folderIds = links.Select(l => l.FolderId).Distinct().ToList();
+        var folderTasks = folderIds.ToDictionary(
+            id => id,
+            id => _metadataClient.GetFolderAsync(id, ct));
+        await Task.WhenAll(folderTasks.Values);
+        var folderNames = folderTasks.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.Result?.Name ?? "—");
+
+        return links.Select(l => new ShareLinkOwnerResponse
+        {
+            Id = l.Id,
+            FolderId = l.FolderId,
+            FolderName = folderNames.GetValueOrDefault(l.FolderId, "—"),
+            Path = l.Path,
+            ShareUrl = BuildShareUrl(l.TokenEncrypted),
+            ExpiresAt = l.ExpiresAt,
+            Revoked = l.Revoked,
+            CreatedAt = l.CreatedAt,
+            OpenCount = 0,
+        });
+    }
+
+    private string BuildShareUrl(string tokenEncrypted)
+    {
+        if (string.IsNullOrEmpty(tokenEncrypted))
+            return string.Empty;
+        try
+        {
+            var token = _encryption.Decrypt(tokenEncrypted);
+            return $"{_baseUrl}/s/{token}";
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     public async Task<RevokeShareResult> RevokeByTokenAsync(Guid ownerId, string token)

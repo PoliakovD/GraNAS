@@ -25,7 +25,15 @@ public sealed class MetadataWebApplicationFactory : WebApplicationFactory<Progra
     .WithPassword("postgres")
     .Build();
 
-  public Mock<IAuthServiceClient> AuthClientMock { get; } = new();
+  public Mock<IAuthServiceClient> AuthClientMock { get; } = CreateAuthClientMock();
+
+  private static Mock<IAuthServiceClient> CreateAuthClientMock()
+  {
+    var mock = new Mock<IAuthServiceClient>();
+    mock.Setup(c => c.GetUserEmailsAsync(It.IsAny<System.Collections.Generic.IEnumerable<Guid>>(), It.IsAny<System.Threading.CancellationToken>()))
+        .ReturnsAsync(new System.Collections.Generic.Dictionary<Guid, string>());
+    return mock;
+  }
 
   public async Task InitializeAsync()
   {

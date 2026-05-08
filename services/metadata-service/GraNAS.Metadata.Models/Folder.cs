@@ -11,6 +11,7 @@ public class Folder
   public string Name { get; set; } = null!;
   public DateTime CreatedAt { get; set; }
   public DateTime? UpdatedAt { get; set; }
+  public DateTime? LastAccessedAt { get; set; }
 
   // Навигационные свойства для self-referencing relationship
   public Folder? ParentFolder { get; set; }

@@ -10,6 +10,8 @@ public record DeviceResponse(Guid DeviceId, string DeviceName, string Platform,
 public record ActiveSessionResponse(Guid DeviceId, string DeviceName, string Platform,
     string Ip, DateTime ConnectedAt);
 
+public record FolderDeviceConflict(Guid FolderId, Guid DeviceId, string DeviceName, string Platform);
+
 public interface ISignalingApi
 {
     Task<TurnCredentials?> GetTurnCredentialsAsync(CancellationToken ct = default);
@@ -17,4 +19,7 @@ public interface ISignalingApi
     Task<List<DeviceResponse>> GetDevicesAsync(CancellationToken ct = default);
     Task<List<ActiveSessionResponse>> GetActiveSessionsAsync(CancellationToken ct = default);
     Task TerminateSessionAsync(Guid deviceId, CancellationToken ct = default);
+    /// <returns>null = success; FolderDeviceConflict = folder already claimed by another device</returns>
+    Task<FolderDeviceConflict?> ClaimFolderAsync(Guid deviceId, Guid folderId, bool force = false, CancellationToken ct = default);
+    Task ReleaseFolderAsync(Guid deviceId, Guid folderId, CancellationToken ct = default);
 }

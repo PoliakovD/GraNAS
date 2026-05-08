@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -49,6 +51,24 @@ public class AuthServiceClient : IAuthServiceClient
 
     response.EnsureSuccessStatusCode();
     return await response.Content.ReadFromJsonAsync<UserInfo>(ct);
+  }
+
+  public async Task<IReadOnlyDictionary<Guid, string>> GetUserEmailsAsync(
+    IEnumerable<Guid> userIds, CancellationToken ct = default)
+  {
+    var ids = userIds.Distinct().ToArray();
+    if (ids.Length == 0) return new Dictionary<Guid, string>();
+
+    var query = string.Join("&", ids.Select(id => $"ids={id}"));
+    var request = new HttpRequestMessage(HttpMethod.Get, $"api/internal/users/batch?{query}");
+    ForwardAuthorization(request);
+
+    var response = await _http.SendAsync(request, ct);
+    response.EnsureSuccessStatusCode();
+
+    var users = await response.Content.ReadFromJsonAsync<UserInfo[]>(ct);
+    return users?.ToDictionary(u => u.Id, u => u.Email)
+           ?? (IReadOnlyDictionary<Guid, string>)new Dictionary<Guid, string>();
   }
 
   private void ForwardAuthorization(HttpRequestMessage request)

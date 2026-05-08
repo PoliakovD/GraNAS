@@ -1,4 +1,3 @@
-import { Button, Result } from 'antd';
 import React from 'react';
 
 interface State { hasError: boolean }
@@ -11,11 +10,12 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   render() {
     if (this.state.hasError) {
       return (
-        <Result
-          status="error"
-          title="Что-то пошло не так"
-          extra={<Button onClick={() => this.setState({ hasError: false })}>Попробовать снова</Button>}
-        />
+        <div className="error-state">
+          <div className="error-state-title">Что-то пошло не так</div>
+          <button className="btn primary" onClick={() => this.setState({ hasError: false })}>
+            Попробовать снова
+          </button>
+        </div>
       );
     }
     return this.props.children;

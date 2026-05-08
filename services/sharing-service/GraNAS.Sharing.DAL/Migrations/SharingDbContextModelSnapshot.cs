@@ -56,6 +56,13 @@ namespace GraNAS.Sharing.DAL.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("revoked");
 
+                    b.Property<string>("TokenEncrypted")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("token_encrypted")
+                        .HasDefaultValue("");
+
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(64)

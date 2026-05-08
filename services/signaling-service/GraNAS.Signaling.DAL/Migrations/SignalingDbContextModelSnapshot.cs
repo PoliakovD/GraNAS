@@ -22,6 +22,29 @@ namespace GraNAS.Signaling.DAL.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("GraNAS.Signaling.Models.DeviceFolder", b =>
+                {
+                    b.Property<Guid>("FolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("folder_id");
+
+                    b.Property<DateTime>("ClaimedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("device_id");
+
+                    b.HasKey("FolderId");
+
+                    b.HasIndex(new[] { "DeviceId" }, "IX_device_folders_device_id");
+
+                    b.ToTable("table_device_folders", (string)null);
+                });
+
             modelBuilder.Entity("GraNAS.Signaling.Models.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -62,6 +85,17 @@ namespace GraNAS.Signaling.DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("table_devices", (string)null);
+                });
+
+            modelBuilder.Entity("GraNAS.Signaling.Models.DeviceFolder", b =>
+                {
+                    b.HasOne("GraNAS.Signaling.Models.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Device");
                 });
 #pragma warning restore 612, 618
         }

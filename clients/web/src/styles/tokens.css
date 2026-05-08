@@ -1,0 +1,44 @@
+:root {
+  /* Brand */
+  --brand-primary: #6938EF;
+  --brand-primary-hover: #5B25E8;
+  --brand-primary-soft: #F4EFFF;
+  --brand-accent: #00C2A8;
+
+  /* Neutrals — cool slate */
+  --ink-900: #0F1222;
+  --ink-700: #2A2E45;
+  --ink-500: #5A607A;
+  --ink-400: #8A90A6;
+  --ink-300: #B6BACA;
+  --ink-200: #DCDEE7;
+  --ink-100: #EEF0F5;
+  --ink-50:  #F7F8FB;
+  --bg:      #FBFBFD;
+  --surface: #FFFFFF;
+  --surface-2: #F4F5F9;
+
+  /* Status */
+  --success: #16B364;
+  --success-soft: #E5F8EE;
+  --warn: #F79009;
+  --warn-soft: #FEF3DA;
+  --danger: #E5484D;
+  --danger-soft: #FDECEC;
+  --info: #2E90FA;
+  --info-soft: #E5F1FE;
+
+  /* Radius / shadow */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --shadow-sm: 0 1px 2px rgba(15, 18, 34, 0.06), 0 1px 1px rgba(15, 18, 34, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 18, 34, 0.08), 0 1px 2px rgba(15, 18, 34, 0.04);
+  --shadow-lg: 0 16px 40px -8px rgba(15, 18, 34, 0.18), 0 4px 12px rgba(15, 18, 34, 0.06);
+  --shadow-pop: 0 24px 60px -12px rgba(15, 18, 34, 0.30);
+
+  /* Type */
+  --font-sans: 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+}

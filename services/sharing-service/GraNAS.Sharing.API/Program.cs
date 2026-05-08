@@ -10,8 +10,10 @@ using GraNAS.Shared.Messaging.DependencyInjection;
 using GraNAS.Sharing.DAL;
 using GraNAS.Sharing.DAL.Extensions;
 using GraNAS.Sharing.Services.Extensions;
+using GraNAS.Sharing.Services.Implementations;
 using GraNAS.Sharing.Services.Interfaces;
 using GraNAS.Shared.Correlation;
+using Microsoft.Extensions.Configuration;
 using GraNAS.Shared.Infrastructure.Extensions;
 using GraNAS.Shared.Infrastructure.Middleware;
 using GraNAS.Shared.LoggingService;
@@ -169,6 +171,17 @@ public class Program
     builder.Services.AddHostedService<ExpiredShareCleanupService>();
 
     builder.Services.AddSharingDal();
+
+    // ITokenEncryptionService: resolved lazily so WebApplicationFactory can override config via ConfigureWebHost
+    builder.Services.AddSingleton<ITokenEncryptionService>(sp =>
+    {
+        var cfg = sp.GetRequiredService<IConfiguration>();
+        var keyB64 = cfg["ShareLinkEncryption:Key"]
+            ?? throw new InvalidOperationException("ShareLinkEncryption:Key is not configured. " +
+                "Generate: [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))");
+        return new TokenEncryptionService(Convert.FromBase64String(keyB64));
+    });
+
     builder.Services.AddSharingApplication();
 
     builder.Services.AddEndpointsApiExplorer();

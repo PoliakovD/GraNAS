@@ -7,8 +7,10 @@ export interface FolderResponse {
   ownerId: string;
   accessLevel: AccessLevel;
   path: string | null;
+  ownerEmail: string | null;
   createdAt: string;
   updatedAt: string | null;
+  lastAccessedAt: string | null;
 }
 
 export interface CreateFolderRequest {

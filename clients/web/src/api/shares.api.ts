@@ -1,4 +1,4 @@
-import type { CreateShareRequest, CreateShareResponse, ShareDetailsResponse, ShareLinkResponse } from '../types/share';
+import type { CreateShareRequest, CreateShareResponse, ShareDetailsResponse, ShareLinkOwnerResponse, ShareLinkResponse } from '../types/share';
 import { api } from './client';
 
 export const sharesApi = {
@@ -16,4 +16,8 @@ export const sharesApi = {
 
   getByToken: (token: string) =>
     api.get<ShareDetailsResponse>(`/api/sharing/share/${token}`),
+
+  // TODO: backend GET /api/share-links not yet implemented — see docs/sharing-service-global-listing.md
+  listAll: () =>
+    api.get<ShareLinkOwnerResponse[]>('/api/share-links'),
 };

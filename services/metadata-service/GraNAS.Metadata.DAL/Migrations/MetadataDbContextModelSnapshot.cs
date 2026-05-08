@@ -34,6 +34,10 @@ namespace GraNAS.Metadata.DAL.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("NOW()");
 
+                    b.Property<DateTime?>("LastAccessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_accessed_at");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -53,6 +57,8 @@ namespace GraNAS.Metadata.DAL.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex(new[] { "OwnerId", "LastAccessedAt" }, "IX_folders_last_accessed_at");
 
                     b.HasIndex(new[] { "OwnerId" }, "IX_folders_owner_id");
 

@@ -4,6 +4,7 @@ using GraNAS.Sharing.Models.DTO;
 using GraNAS.Sharing.Models.Repositories;
 using GraNAS.Sharing.Services.Implementations;
 using GraNAS.Sharing.Services.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -13,6 +14,7 @@ public class ShareServiceTests
 {
     private readonly Mock<IShareLinkRepository> _repo = new();
     private readonly Mock<ITokenGenerator> _tokenGen = new();
+    private readonly Mock<ITokenEncryptionService> _encryption = new();
     private readonly Mock<IMetadataServiceClient> _metadataClient = new();
     private readonly Mock<IEventPublisher> _eventPublisher = new();
     private readonly ShareService _sut;
@@ -21,7 +23,21 @@ public class ShareServiceTests
     {
         _tokenGen.Setup(t => t.GenerateToken()).Returns("test_token_value");
         _tokenGen.Setup(t => t.ComputeHash(It.IsAny<string>())).Returns("testhash64charslong000000000000000000000000000000000000000000");
-        _sut = new ShareService(_repo.Object, _tokenGen.Object, _metadataClient.Object, _eventPublisher.Object, NullLogger<ShareService>.Instance);
+        _encryption.Setup(e => e.Encrypt(It.IsAny<string>())).Returns("encrypted_token");
+        _encryption.Setup(e => e.Decrypt(It.IsAny<string>())).Returns("test_token_value");
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["App:BaseUrl"] = "https://test.granas.io" })
+            .Build();
+
+        _sut = new ShareService(
+            _repo.Object,
+            _tokenGen.Object,
+            _encryption.Object,
+            _metadataClient.Object,
+            _eventPublisher.Object,
+            NullLogger<ShareService>.Instance,
+            config);
     }
 
     // ──────────────── CreateAsync ────────────────
