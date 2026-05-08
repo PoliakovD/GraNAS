@@ -5,6 +5,7 @@ import { FolderGrid } from '../features/folders/FolderGrid';
 import { FolderListView } from '../features/folders/FolderListView';
 import { CreateFolderModal } from '../features/folders/CreateFolderModal';
 import { useFoldersQuery } from '../features/folders/useFoldersQuery';
+import { useFolderDevices } from '../features/folders/useFolderDevices';
 import { Icon } from '../shared/Icon';
 import type { FolderResponse } from '../types/folder';
 
@@ -18,6 +19,7 @@ export function FoldersPage() {
   const { openContext } = useOutletContext<OutletCtx>();
 
   const owned = folders.filter(f => f.ownerId === user.id && !f.parentFolderId);
+  const { data: deviceMap } = useFolderDevices(owned.map(f => f.id));
 
   const [view, setView] = useState<View>('grid');
   const [selected, setSelected] = useState<string | null>(null);
@@ -76,6 +78,7 @@ export function FoldersPage() {
         <FolderGrid
           folders={owned}
           currentUserId={user.id}
+          deviceMap={deviceMap}
           selectedId={selected}
           onOpen={openFolder}
           onSelect={f => setSelected(f.id)}

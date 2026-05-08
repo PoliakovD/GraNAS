@@ -9,6 +9,7 @@ public static class DalServiceCollectionExtensions
     public static IServiceCollection AddSignalingDal(this IServiceCollection services)
     {
         services.AddScoped<IDeviceRepository, DeviceRepository>();
+        services.AddScoped<IDeviceFolderRepository, DeviceFolderRepository>();
         return services;
     }
 }

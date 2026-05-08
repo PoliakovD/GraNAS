@@ -9,4 +9,5 @@ public interface IDialogService
   Task<DateTime?> ShowCreateShareAsync();
   Task ShowShareCreatedAsync(string token);
   Task<string?> ShowFolderPickerAsync(string title = "Выберите папку");
+  Task<bool> ShowConfirmAsync(string title, string message, string confirmText = "Подтвердить", string cancelText = "Отмена");
 }

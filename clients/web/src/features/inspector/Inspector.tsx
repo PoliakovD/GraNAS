@@ -4,6 +4,7 @@ import { Icon } from '../../shared/Icon';
 import { initials, colorFromString, relTime } from '../../shared/format';
 import { permissionsKey, useGrantPermission, useRevokePermission } from '../permissions/usePermissionMutations';
 import { useSharesQuery, useRevokeShare } from '../shares/useShareMutations';
+import { useFolderDevices } from '../folders/useFolderDevices';
 import type { FolderResponse } from '../../types/folder';
 import type { PermissionResponse } from '../../types/permission';
 import type { ShareLinkResponse } from '../../types/share';
@@ -67,6 +68,8 @@ interface InspectorProps {
 
 export function Inspector({ folder, isOwner, onCreateShare }: InspectorProps) {
   const [tab, setTab] = useState<'people' | 'links' | 'info'>('people');
+  const { data: deviceMap } = useFolderDevices(isOwner ? [folder.id] : []);
+  const device = deviceMap?.[folder.id];
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AccessLevel>('View');
 
@@ -260,6 +263,19 @@ export function Inspector({ folder, isOwner, onCreateShare }: InspectorProps) {
                   <span style={{ color: 'var(--ink-500)' }}>Владелец</span>
                   <span>{folder.ownerEmail ?? (folder.ownerId.slice(0, 8) + '…')}</span>
                 </div>
+                {isOwner && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--ink-500)' }}>Устройство</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {device ? (
+                        <>
+                          <span className={`live-dot${device.isOnline ? ' green' : ''}`} />
+                          {device.deviceName}
+                        </>
+                      ) : '—'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div>

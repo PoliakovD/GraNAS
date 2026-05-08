@@ -1,6 +1,7 @@
 import { Icon } from '../../shared/Icon';
 import { initials, colorFromString, relTime } from '../../shared/format';
 import type { FolderResponse } from '../../types/folder';
+import type { FolderDeviceResponse } from '../../types/device';
 import type { ContextMenuItem } from '../../shared/ContextMenu';
 
 interface FolderCardProps {
@@ -8,12 +9,13 @@ interface FolderCardProps {
   selected: boolean;
   ownerEmail: string | null;
   isOwner: boolean;
+  device?: FolderDeviceResponse;
   onOpen: (f: FolderResponse) => void;
   onSelect: (f: FolderResponse) => void;
   onContext: (f: FolderResponse, x: number, y: number) => void;
 }
 
-function FolderCard({ folder, selected, ownerEmail, isOwner, onOpen, onSelect, onContext }: FolderCardProps) {
+function FolderCard({ folder, selected, ownerEmail, isOwner, device, onOpen, onSelect, onContext }: FolderCardProps) {
   const iconCls = !isOwner ? 'shared' : '';
 
   return (
@@ -42,6 +44,13 @@ function FolderCard({ folder, selected, ownerEmail, isOwner, onOpen, onSelect, o
           <span>обновлено {relTime(folder.updatedAt)}</span>
         </div>
       </div>
+
+      {isOwner && device && (
+        <div className="folder-device-badge">
+          <span className={`live-dot${device.isOnline ? ' green' : ''}`} />
+          <span>{device.deviceName}</span>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
         {ownerEmail ? (
@@ -73,13 +82,14 @@ interface FolderGridProps {
   folders: FolderResponse[];
   currentUserId: string;
   ownerEmailMap?: Record<string, string>;
+  deviceMap?: Record<string, FolderDeviceResponse>;
   selectedId?: string | null;
   onOpen: (f: FolderResponse) => void;
   onSelect: (f: FolderResponse) => void;
   onContext: (f: FolderResponse, x: number, y: number) => void;
 }
 
-export function FolderGrid({ folders, currentUserId, ownerEmailMap, selectedId, onOpen, onSelect, onContext }: FolderGridProps) {
+export function FolderGrid({ folders, currentUserId, ownerEmailMap, deviceMap, selectedId, onOpen, onSelect, onContext }: FolderGridProps) {
   return (
     <div className="folder-grid">
       {folders.map(f => (
@@ -89,6 +99,7 @@ export function FolderGrid({ folders, currentUserId, ownerEmailMap, selectedId, 
           selected={selectedId === f.id}
           ownerEmail={ownerEmailMap?.[f.ownerId] ?? null}
           isOwner={f.ownerId === currentUserId}
+          device={deviceMap?.[f.id]}
           onOpen={onOpen}
           onSelect={onSelect}
           onContext={onContext}

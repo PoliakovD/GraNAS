@@ -402,6 +402,15 @@
 }
 .folder-card:hover .card-actions { opacity: 1; }
 
+.folder-device-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ink-500);
+  margin-bottom: 6px;
+}
+
 .tag {
   display: inline-flex;
   align-items: center;
