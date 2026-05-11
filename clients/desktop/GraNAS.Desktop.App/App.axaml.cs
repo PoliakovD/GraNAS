@@ -18,10 +18,15 @@ using Polly.Extensions.Http;
 
 namespace GraNAS.Desktop.App;
 
+/// <summary>
+/// Корневой класс Avalonia-приложения GraNAS Desktop.
+/// Отвечает за инициализацию DI-контейнера и запуск главного окна.
+/// </summary>
 public partial class App : Application
 {
   private readonly IConfiguration _config;
   private IServiceProvider? _services;
+  /// <summary>DI-контейнер приложения; доступен после <see cref="OnFrameworkInitializationCompleted"/>.</summary>
   public IServiceProvider? Services => _services;
 
   public App(IConfiguration config)
@@ -29,11 +34,16 @@ public partial class App : Application
     _config = config;
   }
 
+  /// <summary>Загружает XAML-разметку приложения.</summary>
   public override void Initialize()
   {
     AvaloniaXamlLoader.Load(this);
   }
 
+  /// <summary>
+  /// Строит DI-контейнер, создаёт главное окно и запускает восстановление сессии.
+  /// При успешном восстановлении JWT автоматически подключает P2P, если <c>ShouldBeOnline=true</c>.
+  /// </summary>
   public override void OnFrameworkInitializationCompleted()
   {
     _services = BuildServices();
@@ -72,6 +82,18 @@ public partial class App : Application
     base.OnFrameworkInitializationCompleted();
   }
 
+  /// <summary>
+  /// Конфигурирует DI-сервисы приложения.
+  /// </summary>
+  /// <remarks>
+  /// Особенности:
+  /// <list type="bullet">
+  /// <item><c>IAuthSession</c> регистрируется последним, чтобы разорвать цикл: <c>AuthSession → AuthApi → BearerHandler → AuthSession</c>.</item>
+  /// <item>P2P-сервисы (<see cref="IP2PHost"/>, <see cref="IFolderShareRegistry"/>, <see cref="IDeviceIdentity"/>) — Singleton.</item>
+  /// <item>Hub URL формируется как <c>ApiGateway:BaseUrl + Signaling:HubPath</c>.</item>
+  /// <item>Все HttpClient'ы оснащены <c>BearerTokenHandler</c> + <c>RefreshOn401Handler</c> + Polly-retry.</item>
+  /// </list>
+  /// </remarks>
   private IServiceProvider BuildServices()
   {
     var services = new ServiceCollection();

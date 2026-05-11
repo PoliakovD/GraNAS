@@ -5,8 +5,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace GraNAS.Signaling.DAL.Configurations;
 
+/// <summary>
+/// Конфигурация маппинга сущности <see cref="Device"/> на таблицу <c>table_devices</c>.
+/// Уникальный индекс по паре <c>(user_id, device_name)</c> запрещает одному пользователю
+/// иметь два устройства с одинаковым именем. Платформа хранится как строка.
+/// </summary>
 public class DeviceConfiguration : IEntityTypeConfiguration<Device>
 {
+    /// <inheritdoc/>
     public void Configure(EntityTypeBuilder<Device> builder)
     {
         builder.ToTable("table_devices");

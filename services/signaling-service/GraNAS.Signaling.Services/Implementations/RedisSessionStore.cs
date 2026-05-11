@@ -6,6 +6,22 @@ using StackExchange.Redis;
 
 namespace GraNAS.Signaling.Services.Implementations;
 
+/// <summary>
+/// Реализация <see cref="ISessionStore"/> на базе Redis.
+/// Хранит исключительно эфемерное состояние (TTL 24 ч для устройств, 1 ч для P2P-пар);
+/// при перезапуске устройство должно заново вызвать <c>RegisterDevice</c> в SignalR-хабе.
+/// </summary>
+/// <remarks>
+/// Схема ключей Redis:
+/// <list type="bullet">
+/// <item><c>signaling:conn:{deviceId}</c> — string: текущий SignalR connectionId устройства</item>
+/// <item><c>signaling:device:{connId}</c> — string: deviceId по connectionId</item>
+/// <item><c>signaling:user-sessions:{userId}</c> — set: deviceId всех онлайн-устройств пользователя</item>
+/// <item><c>signaling:session:{deviceId}</c> — string JSON: <see cref="SessionInfo"/> (IP, время подключения)</item>
+/// <item><c>signaling:folder-owners:{folderId}</c> — set: deviceId онлайн-owner'ов папки</item>
+/// <item><c>signaling:pair:{connId}</c> — set: connectionId партнёра по P2P-сессии</item>
+/// </list>
+/// </remarks>
 public class RedisSessionStore : ISessionStore
 {
     private readonly IDatabase _db;
@@ -29,6 +45,8 @@ public class RedisSessionStore : ISessionStore
 
     // ── Device ↔ Connection ───────────────────────────────────────────────────
 
+    /// <inheritdoc/>
+    /// <remarks>Все записи сохраняются атомарным <c>batch</c>; TTL каждого ключа — 24 ч.</remarks>
     public async Task RegisterDeviceConnectionAsync(Guid deviceId, string connectionId, Guid userId, string ip, CancellationToken ct = default)
     {
         var info = new SessionInfo
@@ -50,6 +68,7 @@ public class RedisSessionStore : ISessionStore
         await Task.WhenAll(t1, t2, t3, t4, t5);
     }
 
+    /// <inheritdoc/>
     public async Task RemoveDeviceConnectionAsync(Guid deviceId, string connectionId, Guid userId, CancellationToken ct = default)
     {
         var current = (string?)await _db.StringGetAsync(ConnKey(deviceId));
@@ -68,21 +87,25 @@ public class RedisSessionStore : ISessionStore
         await Task.WhenAll(t1, t2, t3, t4);
     }
 
+    /// <inheritdoc/>
     public async Task<string?> GetConnectionIdByDeviceAsync(Guid deviceId, CancellationToken ct = default)
     {
         var val = await _db.StringGetAsync(ConnKey(deviceId));
         return val.HasValue ? (string?)val : null;
     }
 
+    /// <inheritdoc/>
     public async Task<Guid?> GetDeviceIdByConnectionAsync(string connectionId, CancellationToken ct = default)
     {
         var val = await _db.StringGetAsync(DeviceKey(connectionId));
         return val.HasValue && Guid.TryParse((string?)val, out var id) ? id : null;
     }
 
+    /// <inheritdoc/>
     public Task<bool> IsDeviceOnlineAsync(Guid deviceId, CancellationToken ct = default)
         => _db.KeyExistsAsync(ConnKey(deviceId));
 
+    /// <inheritdoc/>
     public async Task<List<Guid>> GetOnlineDevicesByUserAsync(Guid userId, CancellationToken ct = default)
     {
         var members = await _db.SetMembersAsync(UserSessionsKey(userId));
@@ -94,6 +117,7 @@ public class RedisSessionStore : ISessionStore
             .ToList();
     }
 
+    /// <inheritdoc/>
     public async Task<SessionInfo?> GetSessionInfoAsync(Guid deviceId, CancellationToken ct = default)
     {
         var val = await _db.StringGetAsync(SessionInfoKey(deviceId));
@@ -103,12 +127,14 @@ public class RedisSessionStore : ISessionStore
 
     // ── Folder owner tracking ─────────────────────────────────────────────────
 
+    /// <inheritdoc/>
     public async Task RegisterOwnerAsync(Guid folderId, Guid deviceId, CancellationToken ct = default)
     {
         await _db.SetAddAsync(FolderOwnersKey(folderId), deviceId.ToString());
         await _db.KeyExpireAsync(FolderOwnersKey(folderId), DeviceTtl);
     }
 
+    /// <inheritdoc/>
     public async Task<bool> RemoveOwnerAsync(Guid folderId, Guid deviceId, CancellationToken ct = default)
     {
         await _db.SetRemoveAsync(FolderOwnersKey(folderId), deviceId.ToString());
@@ -116,12 +142,18 @@ public class RedisSessionStore : ISessionStore
         return remaining == 0;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Использует <c>SetRandomMember</c> для выбора одного из зарегистрированных owner'ов.
+    /// Если у выбранного устройства нет активного соединения — удаляет устаревшую запись (lazy cleanup)
+    /// и возвращает <c>null</c>, не повторяя попытку.
+    /// </remarks>
     public async Task<Guid?> GetOwnerDeviceIdAsync(Guid folderId, CancellationToken ct = default)
     {
         var val = await _db.SetRandomMemberAsync(FolderOwnersKey(folderId));
         if (!val.HasValue || !Guid.TryParse((string?)val, out var deviceId)) return null;
 
-        // Lazy cleanup: if the connection is gone, remove stale entry
+        // Ленивая очистка: если соединение уже закрыто — удаляем устаревшую запись
         var connId = await GetConnectionIdByDeviceAsync(deviceId, ct);
         if (connId is null)
         {
@@ -134,6 +166,12 @@ public class RedisSessionStore : ISessionStore
 
     // ── P2P session pairs ─────────────────────────────────────────────────────
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Регистрация симметрична: каждый участник добавляется в pair-set другого.
+    /// TTL обоих ключей — 1 ч. Пара используется в <c>AssertValidSessionAsync</c>
+    /// для проверки, что SDP/ICE пересылается только между легитимными участниками сессии.
+    /// </remarks>
     public async Task RegisterSessionPairAsync(string receiverConnId, string ownerConnId, Guid folderId, CancellationToken ct = default)
     {
         var batch = _db.CreateBatch();
@@ -147,9 +185,11 @@ public class RedisSessionStore : ISessionStore
             receiverConnId, ownerConnId, folderId);
     }
 
+    /// <inheritdoc/>
     public Task<bool> IsValidSessionPairAsync(string connA, string connB, CancellationToken ct = default)
         => _db.SetContainsAsync(PairKey(connA), connB);
 
+    /// <inheritdoc/>
     public async Task RemoveConnectionAsync(string connectionId, CancellationToken ct = default)
     {
         var peers = await _db.SetMembersAsync(PairKey(connectionId));

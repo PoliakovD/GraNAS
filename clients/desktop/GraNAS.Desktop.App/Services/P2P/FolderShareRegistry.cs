@@ -2,12 +2,19 @@ using System.Text.Json;
 
 namespace GraNAS.Desktop.App.Services.P2P;
 
+/// <summary>
+/// Персистентный реестр маппингов <c>folderId → локальный путь</c>.
+/// Хранит данные в JSON-файле <c>%LOCALAPPDATA%\GraNAS\folder-mappings.json</c>.
+/// Используется <see cref="P2PHost"/> для определения, из какой локальной директории
+/// отдавать файлы при P2P-запросах.
+/// </summary>
 public class FolderShareRegistry : IFolderShareRegistry
 {
     private readonly string _filePath;
     private Dictionary<Guid, string> _mappings;
     private static readonly JsonSerializerOptions Opts = new(JsonSerializerDefaults.Web);
 
+    /// <summary>Инициализирует реестр: создаёт директорию <c>%LOCALAPPDATA%\GraNAS</c> при необходимости и загружает маппинги.</summary>
     public FolderShareRegistry()
     {
         var dir = Path.Combine(

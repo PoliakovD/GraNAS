@@ -8,6 +8,20 @@ using SIPSorcery.Net;
 
 namespace GraNAS.Desktop.App.Services.P2P;
 
+/// <summary>
+/// Реализация P2P-хоста для desktop-клиента. Управляет SignalR-подключением к хабу сигналинга,
+/// обрабатывает входящие P2P-запросы от receiver'ов и отдаёт файлы через WebRTC data channel.
+/// </summary>
+/// <remarks>
+/// Жизненный цикл соединения:
+/// <list type="number">
+/// <item><c>ConnectAsync</c>: регистрация устройства в REST API (единожды per user) → получение TURN-кред → <c>RegisterDevice</c> в хабе → <c>JoinAsOwner</c> для всех папок из реестра.</item>
+/// <item>При получении <c>IncomingPeerRequest</c>: создаётся <c>RTCPeerConnection</c> + data channel, генерируется SDP-offer → <c>SendOffer</c> в хаб.</item>
+/// <item>После установки data channel: ECDH-рукопожатие → <c>list_request</c>/<c>file_request</c> → передача зашифрованных чанков.</item>
+/// <item>При переподключении: автоматически re-issue TURN + повторный <c>RegisterDevice</c> + <c>JoinAsOwner</c> для всех папок.</item>
+/// <item><c>ForceDisconnect</c> от сервера: устанавливает <c>ShouldBeOnline=false</c> и вызывает <c>DisconnectAsync</c>.</item>
+/// </list>
+/// </remarks>
 public sealed class P2PHost : IP2PHost, IAsyncDisposable
 {
     private readonly IFolderShareRegistry _registry;
@@ -41,6 +55,12 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         _hubUrl = hubUrl;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// При первом подключении данного пользователя регистрирует устройство через REST API.
+    /// Получает TURN-учётные данные, строит <c>HubConnection</c> с JWT в AccessTokenProvider
+    /// и подписывается на события хаба.
+    /// </remarks>
     public async Task ConnectAsync(CancellationToken ct = default)
     {
         if (_hub?.State == HubConnectionState.Connected) return;
@@ -82,6 +102,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         Log.Information("P2PHost connected to signaling hub (device {DeviceId})", _deviceIdentity.DeviceId);
     }
 
+    /// <inheritdoc/>
     public async Task DisconnectAsync()
     {
         _isOnline = false;
@@ -118,6 +139,10 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         catch (Exception ex) { Log.Warning(ex, "LeaveAsOwner failed for folder {FolderId}", folderId); }
     }
 
+    /// <summary>
+    /// Вызывает <c>RegisterDevice(deviceId)</c> в SignalR-хабе.
+    /// Должен вызываться сразу после <c>StartAsync</c> и при каждом переподключении.
+    /// </summary>
     private async Task RegisterDeviceInHubAsync(CancellationToken ct = default)
     {
         if (_hub?.State != HubConnectionState.Connected) return;
@@ -132,6 +157,11 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Обрабатывает событие <c>ForceDisconnect</c> от сервера.
+    /// Сбрасывает <c>ShouldBeOnline</c> в <c>false</c>, чтобы подавить автопереподключение,
+    /// уведомляет пользователя и вызывает <c>DisconnectAsync</c>.
+    /// </summary>
     private async void HandleForceDisconnectAsync()
     {
         Log.Warning("ForceDisconnect received from server — disconnecting");
@@ -146,6 +176,14 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
             await JoinFolderAsync(folderId, ct);
     }
 
+    /// <summary>
+    /// Обрабатывает входящий P2P-запрос от receiver'а.
+    /// Проверяет, что папка локально доступна, создаёт <c>RTCPeerConnection</c> + data channel,
+    /// генерирует SDP-offer и отправляет его через хаб.
+    /// </summary>
+    /// <param name="receiverConnId">SignalR connectionId receiver'а — используется как ключ сессии.</param>
+    /// <param name="folderId">Папка, к которой запрашивается доступ.</param>
+    /// <param name="scopePath">Путь-подсказка для ограничения доступа. <c>null</c> = вся папка.</param>
     private async void HandleIncomingPeerRequestAsync(string receiverConnId, Guid folderId, string? scopePath)
     {
         var localPath = _registry.GetLocalPath(folderId);
@@ -207,6 +245,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         }
     }
 
+    /// <summary>Применяет SDP-answer от receiver'а к соответствующей <c>RTCPeerConnection</c>.</summary>
     private async Task HandleAnswerAsync(string senderConnId, string sdp)
     {
         if (!_peers.TryGetValue(senderConnId, out var session)) return;
@@ -222,6 +261,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         catch (Exception ex) { Log.Warning(ex, "HandleAnswer failed for {ConnId}", senderConnId); }
     }
 
+    /// <summary>Добавляет ICE-кандидата от receiver'а в соответствующую <c>RTCPeerConnection</c>.</summary>
     private async Task HandleIceCandidateAsync(string senderConnId, string candidate, string? sdpMid, int? sdpMLineIndex)
     {
         if (!_peers.TryGetValue(senderConnId, out var session)) return;
@@ -237,6 +277,10 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         catch (Exception ex) { Log.Warning(ex, "AddIceCandidate failed for {ConnId}", senderConnId); }
     }
 
+    /// <summary>
+    /// Маршрутизирует JSON-сообщение из data channel к соответствующему обработчику
+    /// по полю <c>type</c>. Неизвестные типы логируются и игнорируются.
+    /// </summary>
     private async Task HandleDataChannelMessageAsync(PeerSession session, string receiverConnId, string json)
     {
         var type = ProtocolSerializer.GetMessageType(json);
@@ -271,6 +315,10 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Обрабатывает <c>ecdh_offer</c> от receiver'а: инициализирует <see cref="EcdhSession"/>,
+    /// вычисляет общий ключ и отправляет свой публичный ключ в <c>ecdh_answer</c>.
+    /// </summary>
     private Task HandleEcdhOfferAsync(PeerSession session, string json)
     {
         var offer = ProtocolSerializer.Deserialize<EcdhOfferMessage>(json);
@@ -287,6 +335,10 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Обрабатывает <c>list_request</c>: рекурсивно перечисляет файлы в локальной папке
+    /// с учётом <c>ScopePath</c> и отправляет <c>list_response</c> с относительными путями.
+    /// </summary>
     private Task HandleListRequestAsync(PeerSession session)
     {
         var entries = new List<RemoteFileEntry>();
@@ -318,9 +370,15 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Обрабатывает <c>file_request</c>: валидирует путь, отправляет <c>file_header</c>
+    /// и передаёт зашифрованные чанки в бинарном формате <c>nonce(12) || ciphertext || tag(16)</c>.
+    /// При отсутствии завершённого ECDH чанки отправляются без шифрования (fallback).
+    /// </summary>
+    /// <param name="relativePath">Путь к файлу относительно корня shared-папки.</param>
     private async Task HandleFileRequestAsync(PeerSession session, string relativePath)
     {
-        // Prevent path traversal
+        // Защита от path traversal: разрешённый путь должен лежать внутри localPath
         var safePath = Path.GetFullPath(Path.Combine(session.LocalPath, relativePath));
         if (!safePath.StartsWith(session.LocalPath, StringComparison.OrdinalIgnoreCase))
         {
@@ -363,6 +421,10 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         Log.Information("File served: {Path} ({Size} bytes)", relativePath, size);
     }
 
+    /// <summary>
+    /// Создаёт <c>RTCPeerConnection</c> с конфигурацией ICE-серверов:
+    /// публичный STUN (Google) + TURN-сервер из текущих учётных данных.
+    /// </summary>
     private RTCPeerConnection CreatePeerConnection()
     {
         var config = new RTCConfiguration();
@@ -405,13 +467,20 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         await DisconnectAsync();
     }
 
+    /// <summary>
+    /// Состояние одной активной P2P-сессии с конкретным receiver'ом.
+    /// Существует с момента <c>IncomingPeerRequest</c> до закрытия соединения.
+    /// </summary>
     private sealed class PeerSession(Guid folderId, string localPath, string? scopePath) : IDisposable
     {
         public Guid FolderId { get; } = folderId;
+        /// <summary>Абсолютный путь к shared-папке на диске owner'а.</summary>
         public string LocalPath { get; } = localPath;
+        /// <summary>Путь-подсказка из <c>IncomingPeerRequest</c>. <c>null</c> = вся папка.</summary>
         public string? ScopePath { get; } = scopePath;
         public RTCPeerConnection? Pc { get; set; }
         public RTCDataChannel? DataChannel { get; set; }
+        /// <summary>ECDH-сессия для шифрования файловых чанков. <c>null</c> до завершения рукопожатия.</summary>
         public EcdhSession? Ecdh { get; set; }
 
         public void Dispose()

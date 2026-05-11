@@ -16,6 +16,10 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Controllers;
 
+/// <summary>
+/// Контроллер управления активными SignalR-сессиями устройств пользователя.
+/// Позволяет просматривать онлайн-устройства и принудительно завершать их сессии.
+/// </summary>
 [ApiController]
 [Route("api/sessions")]
 [Authorize]
@@ -38,6 +42,7 @@ public class SessionsController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>Возвращает список активных онлайн-сессий всех устройств текущего пользователя.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<ActiveSessionResponse>), 200)]
     public async Task<ActionResult<List<ActiveSessionResponse>>> List(CancellationToken ct)
@@ -68,6 +73,11 @@ public class SessionsController : ControllerBase
         return Ok(responses);
     }
 
+    /// <summary>
+    /// Принудительно завершает сессию указанного устройства.
+    /// Отправляет устройству событие <c>ForceDisconnect</c> через SignalR и очищает Redis-состояние.
+    /// Возвращает 404, если устройство не принадлежит текущему пользователю.
+    /// </summary>
     [HttpDelete("{deviceId:guid}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]

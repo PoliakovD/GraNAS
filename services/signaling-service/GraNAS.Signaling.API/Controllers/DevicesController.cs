@@ -12,6 +12,9 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Controllers;
 
+/// <summary>
+/// Контроллер управления устройствами пользователя и device-folder binding.
+/// </summary>
 [ApiController]
 [Route("api/devices")]
 [Authorize]
@@ -26,6 +29,10 @@ public class DevicesController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Регистрирует устройство или обновляет его имя и платформу.
+    /// Возвращает 409, если устройство с таким <c>DeviceId</c> принадлежит другому пользователю.
+    /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(DeviceResponse), 200)]
     [ProducesResponseType(409)]
@@ -46,6 +53,7 @@ public class DevicesController : ControllerBase
         }
     }
 
+    /// <summary>Возвращает список всех устройств текущего пользователя с актуальным онлайн-статусом.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<DeviceResponse>), 200)]
     public async Task<ActionResult<List<DeviceResponse>>> List(CancellationToken ct)

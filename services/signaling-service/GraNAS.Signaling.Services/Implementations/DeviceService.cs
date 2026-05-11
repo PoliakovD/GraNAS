@@ -10,6 +10,11 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.Services.Implementations;
 
+/// <summary>
+/// Сервис управления устройствами и device-folder binding.
+/// Оркестрирует взаимодействие между репозиториями PostgreSQL и Redis-сессиями
+/// для обеспечения актуального онлайн-статуса в ответах API.
+/// </summary>
 public class DeviceService : IDeviceService
 {
     private readonly IDeviceRepository _repo;

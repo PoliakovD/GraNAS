@@ -10,6 +10,10 @@ using ReactiveUI;
 
 namespace GraNAS.Desktop.App.ViewModels;
 
+/// <summary>
+/// ViewModel страницы «Мои папки». Отображает дерево папок пользователя,
+/// управляет созданием/удалением и P2P-привязкой папок к локальным путям.
+/// </summary>
 public class MyFoldersViewModel : ViewModelBase
 {
   private readonly IFoldersApi _foldersApi;
@@ -25,31 +29,41 @@ public class MyFoldersViewModel : ViewModelBase
   private FolderNode? _selectedNode;
   private bool _isLoading;
 
+  /// <summary>Корневые папки дерева (папки без родителя).</summary>
   public ObservableCollection<FolderNode> Roots
   {
     get => _roots;
     private set => this.RaiseAndSetIfChanged(ref _roots, value);
   }
 
+  /// <summary>Текущий выделенный узел дерева папок.</summary>
   public FolderNode? SelectedNode
   {
     get => _selectedNode;
     set => this.RaiseAndSetIfChanged(ref _selectedNode, value);
   }
 
+  /// <summary><c>true</c>, пока загружается список папок с сервера.</summary>
   public bool IsLoading
   {
     get => _isLoading;
     set => this.RaiseAndSetIfChanged(ref _isLoading, value);
   }
 
+  /// <summary>Загрузить/перезагрузить список папок с сервера.</summary>
   public ReactiveCommand<Unit, Unit> LoadCommand { get; }
+  /// <summary>Создать корневую папку.</summary>
   public ReactiveCommand<Unit, Unit> CreateRootCommand { get; }
+  /// <summary>Удалить папку (и все вложенные — по каскаду на сервере).</summary>
   public ReactiveCommand<FolderNode, Unit> DeleteCommand { get; }
+  /// <summary>Открыть детальный вид папки (навигация к <c>FolderDetailViewModel</c>).</summary>
   public ReactiveCommand<FolderNode, Unit> OpenCommand { get; }
+  /// <summary>Создать вложенную папку.</summary>
   public ReactiveCommand<FolderNode, Unit> CreateSubfolderCommand { get; }
+  /// <summary>Привязать локальную папку на диске для P2P-шаринга.</summary>
   public ReactiveCommand<FolderNode, Unit> BindLocalFolderCommand { get; }
 
+  /// <summary>Вызывается при открытии папки пользователем; передаёт объект <see cref="FolderResponse"/>.</summary>
   public event EventHandler<FolderResponse>? FolderOpened;
 
   public MyFoldersViewModel(
@@ -121,12 +135,17 @@ public class MyFoldersViewModel : ViewModelBase
     }
   }
 
+  /// <summary>
+  /// Связывает папку GraNAS с локальной директорией для P2P-шаринга.
+  /// Поток: выбор пути → Claim на сервере → при конфликте диалог подтверждения → re-Claim с <c>force=true</c>
+  /// → сохранение пути в <see cref="IFolderShareRegistry"/> → <c>JoinFolderAsync</c> в хабе.
+  /// </summary>
   private async Task BindLocalFolderAsync(FolderNode node)
   {
     var path = await _dialogs.ShowFolderPickerAsync("Выберите локальную папку для P2P-шаринга");
     if (path is null) return;
 
-    // Попытка привязать папку к этому устройству на сервере
+    // Привязываем папку к этому устройству на сервере (device-folder binding)
     var conflict = await _signalingApi.ClaimFolderAsync(_deviceIdentity.DeviceId, node.Folder.Id);
     if (conflict is not null)
     {
