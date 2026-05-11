@@ -233,6 +233,51 @@ public class SharingEndpointsTests : IClassFixture<SharingWebApplicationFactory>
         Assert.Equal(folderId, links[0].FolderId);
     }
 
+    [Fact]
+    public async Task ListShares_Unauthenticated_Returns401()
+    {
+        var folderId = Guid.NewGuid();
+        var resp = await AnonymousClient().GetAsync($"/api/folders/{folderId}/shares");
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListShares_NonOwnerFolder_Returns404()
+    {
+        var nonOwner = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        SetupOwnershipNotFound(folderId, nonOwner);
+
+        var resp = await ClientFor(nonOwner).GetAsync($"/api/folders/{folderId}/shares");
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+        var err = await resp.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal("folder_not_found", err!.Error);
+    }
+
+    [Fact]
+    public async Task ListShares_OwnedFolderWithLink_Returns200WithShareUrl()
+    {
+        var ownerId = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        var client = ClientFor(ownerId);
+        SetupOwnershipCheck(folderId, ownerId);
+
+        await client.PostAsJsonAsync($"/api/folders/{folderId}/share", new
+        {
+            expiresAt = DateTime.UtcNow.AddDays(7)
+        });
+
+        var listResp = await client.GetAsync($"/api/folders/{folderId}/shares");
+
+        Assert.Equal(HttpStatusCode.OK, listResp.StatusCode);
+        var links = await listResp.Content.ReadFromJsonAsync<ShareLinkResponse[]>();
+        Assert.NotNull(links);
+        Assert.NotEmpty(links!);
+        Assert.NotNull(links[0].ShareUrl);
+        Assert.Contains("/s/", links[0].ShareUrl!);
+    }
+
     // ──────────────── DELETE /api/share-links/{id} ────────────────
 
     [Fact]

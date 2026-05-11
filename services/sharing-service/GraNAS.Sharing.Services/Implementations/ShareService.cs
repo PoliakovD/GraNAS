@@ -124,8 +124,16 @@ public class ShareService : IShareService
         return shareLink is not null && shareLink.Revoked;
     }
 
-    public async Task<IEnumerable<ShareLinkResponse>> ListByFolderAsync(Guid ownerId, Guid folderId)
+    public async Task<IEnumerable<ShareLinkResponse>?> ListByFolderAsync(
+        Guid ownerId, Guid folderId, CancellationToken ct = default)
     {
+        var folder = await _metadataClient.GetFolderForOwnerAsync(folderId, ownerId, ct);
+        if (folder is null)
+        {
+            _logger.LogWarning("ListByFolder: folder {FolderId} not found or not owned by {OwnerId}", folderId, ownerId);
+            return null;
+        }
+
         var links = await _repository.ListByFolderForOwnerAsync(folderId, ownerId);
         return links.Select(s => new ShareLinkResponse
         {
@@ -136,7 +144,7 @@ public class ShareService : IShareService
             ExpiresAt = s.ExpiresAt,
             Revoked = s.Revoked,
             CreatedAt = s.CreatedAt
-        });
+        }).ToList();
     }
 
     public async Task<IEnumerable<ShareLinkOwnerResponse>> ListByOwnerAsync(
@@ -168,10 +176,10 @@ public class ShareService : IShareService
         });
     }
 
-    private string BuildShareUrl(string tokenEncrypted)
+    private string? BuildShareUrl(string tokenEncrypted)
     {
         if (string.IsNullOrEmpty(tokenEncrypted))
-            return string.Empty;
+            return null;
         try
         {
             var token = _encryption.Decrypt(tokenEncrypted);
@@ -179,7 +187,7 @@ public class ShareService : IShareService
         }
         catch
         {
-            return string.Empty;
+            return null;
         }
     }
 

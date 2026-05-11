@@ -247,6 +247,79 @@ public class ShareServiceTests
         Assert.Equal(RevokeShareError.NotFoundOrForbidden, result.Error);
     }
 
+    // ──────────────── ListByFolderAsync ────────────────
+
+    [Fact]
+    public async Task ListByFolderAsync_FolderNotOwnedByUser_ReturnsNull()
+    {
+        var ownerId = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        _metadataClient
+            .Setup(c => c.GetFolderForOwnerAsync(folderId, ownerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FolderInfo?)null);
+
+        var result = await _sut.ListByFolderAsync(ownerId, folderId);
+
+        Assert.Null(result);
+        _repo.Verify(r => r.ListByFolderForOwnerAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ListByFolderAsync_CorruptedTokenEncrypted_ReturnsNullShareUrl()
+    {
+        var ownerId = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        _metadataClient
+            .Setup(c => c.GetFolderForOwnerAsync(folderId, ownerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FolderInfo(folderId, "Test", ownerId));
+        _repo.Setup(r => r.ListByFolderForOwnerAsync(folderId, ownerId))
+            .ReturnsAsync(new[]
+            {
+                new ShareLink
+                {
+                    Id = Guid.NewGuid(), FolderId = folderId, OwnerId = ownerId,
+                    TokenHash = "hash", TokenEncrypted = "!!!not_valid_base64!!!",
+                    ExpiresAt = DateTime.UtcNow.AddDays(1), Revoked = false, CreatedAt = DateTime.UtcNow
+                }
+            });
+        _encryption.Setup(e => e.Decrypt("!!!not_valid_base64!!!")).Throws<FormatException>();
+
+        var result = await _sut.ListByFolderAsync(ownerId, folderId);
+
+        Assert.NotNull(result);
+        var items = result!.ToList();
+        Assert.Single(items);
+        Assert.Null(items[0].ShareUrl);
+    }
+
+    [Fact]
+    public async Task ListByFolderAsync_OwnedFolderWithLink_ReturnsListWithShareUrl()
+    {
+        var ownerId = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        var linkId = Guid.NewGuid();
+        _metadataClient
+            .Setup(c => c.GetFolderForOwnerAsync(folderId, ownerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FolderInfo(folderId, "Test", ownerId));
+        _repo.Setup(r => r.ListByFolderForOwnerAsync(folderId, ownerId))
+            .ReturnsAsync(new[]
+            {
+                new ShareLink
+                {
+                    Id = linkId, FolderId = folderId, OwnerId = ownerId,
+                    TokenHash = "hash", TokenEncrypted = "encrypted_token",
+                    ExpiresAt = DateTime.UtcNow.AddDays(1), Revoked = false, CreatedAt = DateTime.UtcNow
+                }
+            });
+
+        var result = await _sut.ListByFolderAsync(ownerId, folderId);
+
+        Assert.NotNull(result);
+        var items = result!.ToList();
+        Assert.Single(items);
+        Assert.Equal("https://test.granas.io/s/test_token_value", items[0].ShareUrl);
+    }
+
     // ──────────────── DeleteExpiredAsync ────────────────
 
     [Fact]
