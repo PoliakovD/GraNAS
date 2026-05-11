@@ -207,6 +207,12 @@ jobs:
             COMPOSE="docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml"
             if ! docker volume inspect granas-dev_certbot_certs >/dev/null 2>&1; then
               echo "==> First run: bootstrapping HTTPS..."
+              RESOLVED=$(dig +short "$DOMAIN" | tail -1)
+              PUBLIC_IP=$(curl -fsS --max-time 5 https://api.ipify.org || true)
+              if [ "$RESOLVED" != "$PUBLIC_IP" ]; then
+                echo "ERROR: DNS $DOMAIN -> $RESOLVED, VDS public IP -> $PUBLIC_IP. Выставь A-запись и подожди propagate." >&2
+                exit 1
+              fi
               bash init-letsencrypt.sh
             fi
             $COMPOSE up -d --build --remove-orphans
@@ -216,4 +222,4 @@ jobs:
       - name: Smoke test
         run: |
           sleep 20
-          curl -fsS --max-time 10 "https://$DOMAIN/api/auth/health"
+          curl -fsSk --max-time 10 "https://$DOMAIN/api/auth/health"

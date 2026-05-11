@@ -38,7 +38,15 @@ $COMPOSE up -d nginx web-client api-gateway
 echo "   Ожидание готовности nginx..."
 sleep 6
 
-# ── 3. Получаем настоящий сертификат Let's Encrypt через webroot ──
+# ── 3. Удаляем self-signed cert из volume: nginx его уже загрузил в память,
+#       а certbot должен создать lineage с чистым именем без суффикса -0001 ──
+$COMPOSE run --rm --entrypoint sh certbot -c "
+  rm -rf /etc/letsencrypt/live/${DOMAIN}
+  rm -rf /etc/letsencrypt/archive/${DOMAIN}
+  rm -f  /etc/letsencrypt/renewal/${DOMAIN}.conf
+"
+
+# ── 4. Получаем настоящий сертификат Let's Encrypt через webroot ──
 echo "==> Получение сертификата Let's Encrypt для ${DOMAIN}..."
 $COMPOSE run --rm certbot certonly \
   --webroot -w /var/www/certbot \
@@ -46,11 +54,11 @@ $COMPOSE run --rm certbot certonly \
   --agree-tos --no-eff-email \
   -d "${DOMAIN}"
 
-# ── 4. Перезагружаем nginx с настоящим сертификатом ──
+# ── 5. Перезагружаем nginx с настоящим сертификатом ──
 echo "==> Перезагрузка nginx..."
 $COMPOSE exec nginx nginx -s reload
 
-# ── 5. Регистрируем cron для ежемесячной перезагрузки nginx (подхватывает обновлённый сертификат) ──
+# ── 6. Регистрируем cron для ежемесячной перезагрузки nginx (подхватывает обновлённый сертификат) ──
 CRON_CMD="0 4 1 * * docker compose --env-file ${SCRIPT_DIR}/vds.env -f ${SCRIPT_DIR}/compose.yaml -f ${SCRIPT_DIR}/compose.vds.yaml exec -T nginx nginx -s reload >> /var/log/nginx-reload.log 2>&1"
 ( crontab -l 2>/dev/null | grep -v "nginx -s reload" ; echo "$CRON_CMD" ) | crontab -
 echo "==> Cron для перезагрузки nginx зарегистрирован (1-е число каждого месяца)."
