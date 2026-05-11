@@ -8,6 +8,11 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.Services.Implementations;
 
+/// <summary>
+/// Реализация проверки прав доступа к папке перед установкой P2P-сессии.
+/// Поддерживает два пути: JWT-авторизация через metadata-service и share-токен через sharing-service.
+/// При любой ошибке внешних сервисов возвращает <c>null</c> (запрет доступа), не выбрасывает исключений.
+/// </summary>
 public class AccessChecker : IAccessChecker
 {
     private readonly IMetadataServiceClient _metadata;
@@ -21,6 +26,7 @@ public class AccessChecker : IAccessChecker
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public async Task<FolderAccessResult?> CheckJwtAccessAsync(Guid folderId, Guid userId, CancellationToken ct = default)
     {
         try
@@ -41,8 +47,10 @@ public class AccessChecker : IAccessChecker
         }
     }
 
+    /// <inheritdoc/>
     public async Task<FolderAccessResult?> CheckShareTokenAsync(Guid folderId, string shareToken, CancellationToken ct = default)
     {
+        // Вычисляем SHA-256(token) → hex lower; в sharing-service хранится только хеш
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(shareToken))).ToLowerInvariant();
         var info = await _sharing.GetShareByTokenHashAsync(hash, ct);
 

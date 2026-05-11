@@ -10,6 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Controllers;
 
+/// <summary>
+/// Контроллер выдачи краткосрочных TURN-учётных данных для WebRTC-соединений.
+/// Только для аутентифицированных пользователей.
+/// </summary>
 [Authorize]
 [ApiController]
 [Route("api/turn")]
@@ -25,7 +29,11 @@ public class TurnController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Получить временные TURN-учётки для WebRTC (TTL ≈ 10 мин, RFC 8489)</summary>
+    /// <summary>Возвращает краткосрочные TURN-учётные данные для текущего пользователя (RFC 8489, TTL ≈ 10 мин).</summary>
+    /// <remarks>
+    /// UserId извлекается из JWT-клейма (<c>NameIdentifier</c> или <c>sub</c>).
+    /// Учётные данные передаются клиенту для конфигурации <c>RTCPeerConnection.iceServers</c>.
+    /// </remarks>
     [HttpGet("credentials")]
     [ProducesResponseType(typeof(TurnCredentialsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]

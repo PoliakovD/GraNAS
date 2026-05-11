@@ -3,10 +3,17 @@ using System.Security.Cryptography;
 
 namespace GraNAS.Desktop.App.Services.P2P;
 
+/// <summary>Утилиты чтения файла чанками и вычисления его SHA-256 хеша.</summary>
 public static class FileChunker
 {
+    /// <summary>Размер одного чанка при передаче файла: 64 KB.</summary>
     public const int ChunkSize = 64 * 1024; // 64 KB
 
+    /// <summary>
+    /// Асинхронно читает файл и возвращает последовательность чанков по <see cref="ChunkSize"/> байт.
+    /// Последний чанк может быть меньше.
+    /// </summary>
+    /// <param name="filePath">Путь к файлу на диске.</param>
     public static async IAsyncEnumerable<byte[]> ReadChunksAsync(
         string filePath,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -22,6 +29,10 @@ public static class FileChunker
         }
     }
 
+    /// <summary>
+    /// Вычисляет SHA-256 хеш файла и возвращает его в виде строки hex (нижний регистр).
+    /// Значение включается в <c>file_header.sha256</c> для верификации на receiver'е.
+    /// </summary>
     public static async Task<string> ComputeSha256HexAsync(string filePath, CancellationToken ct = default)
     {
         await using var fs = File.OpenRead(filePath);
@@ -29,5 +40,6 @@ public static class FileChunker
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
+    /// <summary>Возвращает размер файла в байтах. Используется при формировании <c>file_header.size</c>.</summary>
     public static long GetFileSize(string filePath) => new FileInfo(filePath).Length;
 }

@@ -6,6 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Desktop.App.Services;
 
+/// <summary>
+/// Клиент SignalR-хаба уведомлений (<c>/hubs/notifications</c>).
+/// Получает push-события от backend в реальном времени и обновляет <see cref="Notifications"/>
+/// на UI-потоке. При недоступности хаба <c>MarkReadAsync</c> падает обратно на REST API.
+/// </summary>
 public class BackendNotificationClient : IBackendNotificationService, IAsyncDisposable
 {
     private readonly string _hubUrl;
@@ -24,6 +29,7 @@ public class BackendNotificationClient : IBackendNotificationService, IAsyncDisp
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public async Task ConnectAsync(string accessToken, CancellationToken ct = default)
     {
         if (_connection is not null) return;
@@ -71,6 +77,7 @@ public class BackendNotificationClient : IBackendNotificationService, IAsyncDisp
         }
     }
 
+    /// <inheritdoc/>
     public async Task DisconnectAsync()
     {
         if (_connection is null) return;
@@ -79,6 +86,7 @@ public class BackendNotificationClient : IBackendNotificationService, IAsyncDisp
         _connection = null;
     }
 
+    /// <inheritdoc/>
     public async Task MarkReadAsync(Guid id)
     {
         if (_connection?.State == HubConnectionState.Connected)
@@ -91,6 +99,7 @@ public class BackendNotificationClient : IBackendNotificationService, IAsyncDisp
         }
     }
 
+    /// <inheritdoc/>
     public async Task LoadHistoryAsync()
     {
         try
@@ -115,6 +124,10 @@ public class BackendNotificationClient : IBackendNotificationService, IAsyncDisp
         }
     }
 
+    /// <summary>
+    /// Преобразует JSON-элемент уведомления из API в UI-модель.
+    /// Локализует заголовок по типу события и извлекает имя папки из поля <c>data.FolderName</c>.
+    /// </summary>
     private static BackendNotificationVm MapToVm(JsonElement el)
     {
         var type = el.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";

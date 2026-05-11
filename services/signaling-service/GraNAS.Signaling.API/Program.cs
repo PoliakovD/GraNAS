@@ -30,8 +30,24 @@ using StackExchange.Redis;
 
 namespace GraNAS.Signaling.API;
 
+/// <summary>
+/// Точка входа и композиционный корень сервиса сигналинга GraNAS.
+/// Настраивает DI, аутентификацию, SignalR-хаб, Redis, EF Core и HTTP-клиенты.
+/// </summary>
 public class Program
 {
+  /// <summary>
+  /// Запускает сервис сигналинга: конфигурирует pipeline, применяет EF-миграции и запускает приложение.
+  /// </summary>
+  /// <remarks>
+  /// Ключевые аспекты конфигурации:
+  /// <list type="bullet">
+  /// <item>JWT через query-параметр <c>?access_token=</c> для WebSocket SignalR (обработчик <c>OnMessageReceived</c>).</item>
+  /// <item>SignalR с Redis backplane (prefix <c>signaling</c>) — необходим для горизонтального масштабирования.</item>
+  /// <item>EF-миграции применяются автоматически в <c>using scope</c> перед <c>app.RunAsync()</c>.</item>
+  /// <item><c>IMetadataServiceClient</c> и <c>ISharingServiceClient</c> — typed HttpClient'ы с <c>BaseAddress</c> из конфигурации.</item>
+  /// </list>
+  /// </remarks>
   public static async Task Main(string[] args)
   {
     const string versionApi = "v1";
