@@ -190,6 +190,19 @@ public class FoldersControllerTests : IClassFixture<MetadataWebApplicationFactor
     // ──────────────── GET /api/folders ────────────────
 
     [Fact]
+    public async Task GetFolders_NoFolders_Returns200WithEmptyArray()
+    {
+        var client = ClientFor(Guid.NewGuid());
+
+        var resp = await client.GetAsync("/api/folders");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var list = await resp.Content.ReadFromJsonAsync<FolderResponse[]>();
+        Assert.NotNull(list);
+        Assert.Empty(list!);
+    }
+
+    [Fact]
     public async Task GetFolders_ReturnsFlatListWithParentFolderIds()
     {
         var client = ClientFor(Guid.NewGuid());
