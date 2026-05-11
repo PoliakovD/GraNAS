@@ -8,9 +8,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-set -a
-source vds.env
-set +a
+DOMAIN=$(grep -m1 '^DOMAIN=' vds.env | cut -d= -f2- | tr -d '"' | tr -d "'")
+CERTBOT_EMAIL=$(grep -m1 '^CERTBOT_EMAIL=' vds.env | cut -d= -f2- | tr -d '"' | tr -d "'")
 
 : "${DOMAIN:?Установи DOMAIN в vds.env}"
 : "${CERTBOT_EMAIL:?Установи CERTBOT_EMAIL в vds.env}"
