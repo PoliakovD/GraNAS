@@ -9,6 +9,10 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Infrastructure;
 
+/// <summary>
+/// HTTP-клиент к sharing-service для разрешения share-токенов анонимного доступа.
+/// Запрашивает информацию о ссылке по SHA-256 хешу токена — сырой токен серверу не передаётся.
+/// </summary>
 public class SharingServiceClient : ISharingServiceClient
 {
     private readonly HttpClient _http;
@@ -20,6 +24,7 @@ public class SharingServiceClient : ISharingServiceClient
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public async Task<ShareInfo?> GetShareByTokenHashAsync(string tokenHash, CancellationToken ct = default)
     {
         var path = $"api/internal/shares/by-token-hash/{tokenHash}";

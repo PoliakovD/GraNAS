@@ -5,12 +5,20 @@ using Microsoft.Extensions.Configuration;
 
 namespace GraNAS.Signaling.Services.Implementations;
 
+/// <summary>
+/// Генератор краткосрочных TURN-учётных данных по RFC 8489 (Long-Term Credentials Mechanism).
+/// Использует общий секрет (<c>Turn:StaticAuthSecret</c>), синхронизированный с конфигурацией coturn.
+/// </summary>
 public class TurnCredentialService : ITurnCredentialService
 {
     private readonly byte[] _secret;
     private readonly string[] _uris;
     private readonly int _ttl;
 
+    /// <summary>
+    /// Инициализирует сервис, читая конфигурацию TURN из <see cref="IConfiguration"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Если <c>Turn:StaticAuthSecret</c> или <c>Turn:Uris</c> не заданы.</exception>
     public TurnCredentialService(IConfiguration config)
     {
         var secret = config["Turn:StaticAuthSecret"]
@@ -21,6 +29,12 @@ public class TurnCredentialService : ITurnCredentialService
         _ttl = int.TryParse(config["Turn:TtlSeconds"], out var v) ? v : 600;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Алгоритм: <c>expiry = now + ttl</c>; <c>username = "{expiry}:{userId}"</c>;
+    /// <c>credential = Base64(HMAC-SHA1(secret, username))</c>.
+    /// Учётные данные действительны до наступления <c>expiry</c> (Unix timestamp).
+    /// </remarks>
     public TurnCredentials Generate(string userId)
     {
         var expiry = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + _ttl;

@@ -4,8 +4,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace GraNAS.Signaling.DAL.Configurations;
 
+/// <summary>
+/// Конфигурация маппинга сущности <see cref="DeviceFolder"/> на таблицу <c>table_device_folders</c>.
+/// Первичный ключ — <c>folder_id</c>: одна папка может быть привязана ровно к одному устройству.
+/// При удалении устройства все его привязки каскадно удаляются (<c>ON DELETE CASCADE</c>).
+/// </summary>
 public class DeviceFolderConfiguration : IEntityTypeConfiguration<DeviceFolder>
 {
+    /// <inheritdoc/>
     public void Configure(EntityTypeBuilder<DeviceFolder> builder)
     {
         builder.ToTable("table_device_folders");

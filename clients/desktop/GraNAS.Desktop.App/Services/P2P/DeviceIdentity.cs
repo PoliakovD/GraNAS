@@ -2,6 +2,15 @@ using GraNAS.Desktop.App.Services.Auth;
 
 namespace GraNAS.Desktop.App.Services.P2P;
 
+/// <summary>
+/// Реализация идентификации устройства на основе Windows Credential Manager.
+/// </summary>
+/// <remarks>
+/// <c>DeviceId</c> хранится под ключом <c>GraNAS:deviceId</c> в Credential Manager.
+/// При отсутствии — генерируется новый UUID и сохраняется.
+/// Факт регистрации устройства для каждого пользователя хранится отдельно:
+/// <c>GraNAS:deviceRegistered:{deviceId}:{userId}</c>.
+/// </remarks>
 public class DeviceIdentity : IDeviceIdentity
 {
     private const string DeviceIdKey = "deviceId";
@@ -12,6 +21,10 @@ public class DeviceIdentity : IDeviceIdentity
     public string DeviceName { get; }
     public string Platform => "windows";
 
+    /// <summary>
+    /// Инициализирует идентификацию устройства: читает или генерирует <c>DeviceId</c>,
+    /// использует <c>Environment.MachineName</c> как имя устройства.
+    /// </summary>
     public DeviceIdentity(ICredentialStore store)
     {
         _store = store;
@@ -28,9 +41,11 @@ public class DeviceIdentity : IDeviceIdentity
         DeviceName = Environment.MachineName;
     }
 
+    /// <inheritdoc/>
     public bool IsRegisteredForUser(Guid userId) =>
         _store.Get($"deviceRegistered:{DeviceId}:{userId}") == "1";
 
+    /// <inheritdoc/>
     public void MarkRegisteredForUser(Guid userId) =>
         _store.Save($"deviceRegistered:{DeviceId}:{userId}", "1");
 }

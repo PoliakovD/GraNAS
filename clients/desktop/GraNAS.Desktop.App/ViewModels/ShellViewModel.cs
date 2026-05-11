@@ -9,6 +9,16 @@ using ReactiveUI;
 
 namespace GraNAS.Desktop.App.ViewModels;
 
+/// <summary>
+/// Главная ViewModel приложения. Управляет навигацией между страницами, состоянием аутентификации
+/// и P2P-подключением.
+/// </summary>
+/// <remarks>
+/// Реагирует на изменения <c>IAuthSession.IsAuthenticated</c> через ReactiveUI:
+/// при входе — переходит на страницу папок и (если <c>ShouldBeOnline</c>) запускает P2P;
+/// при выходе — показывает форму входа и отключает P2P.
+/// <c>OnlineToggleCommand</c> позволяет пользователю вручную управлять P2P-подключением.
+/// </remarks>
 public class ShellViewModel : ViewModelBase
 {
   private readonly IAuthSession _session;
@@ -27,18 +37,21 @@ public class ShellViewModel : ViewModelBase
   private string _currentNav = "folders";
   private bool _isOnline;
 
+  /// <summary>Текущая отображаемая страница (ViewModel активного экрана).</summary>
   public ViewModelBase? CurrentPage
   {
     get => _currentPage;
     private set => this.RaiseAndSetIfChanged(ref _currentPage, value);
   }
 
+  /// <summary>Идентификатор текущего раздела навигации: <c>folders</c>, <c>shared</c>, <c>login</c> и т.д.</summary>
   public string CurrentNav
   {
     get => _currentNav;
     set => this.RaiseAndSetIfChanged(ref _currentNav, value);
   }
 
+  /// <summary><c>true</c>, если P2P-подключение к хабу сигналинга активно.</summary>
   public bool IsOnline
   {
     get => _isOnline;
@@ -47,10 +60,12 @@ public class ShellViewModel : ViewModelBase
 
   public IAuthSession Session => _session;
 
+  /// <summary>Команда выхода из аккаунта. Вызывает logout API и <c>SignOutAsync</c> сессии.</summary>
   public ReactiveCommand<Unit, Unit> LogoutCommand { get; }
   public ReactiveCommand<Unit, Unit> NavFoldersCommand { get; }
   public ReactiveCommand<Unit, Unit> NavSharedCommand { get; }
   public ReactiveCommand<Unit, Unit> NavPublicShareCommand { get; }
+  /// <summary>Переключает P2P-подключение: если онлайн — отключает; если офлайн — подключает.</summary>
   public ReactiveCommand<Unit, Unit> OnlineToggleCommand { get; }
 
   public ShellViewModel(
@@ -109,6 +124,7 @@ public class ShellViewModel : ViewModelBase
     ShowLogin();
   }
 
+  /// <summary>Запускает P2P-подключение и обновляет <see cref="IsOnline"/>. Ошибки логируются без исключений.</summary>
   private async Task ConnectP2PAsync()
   {
     try

@@ -11,6 +11,11 @@ using Microsoft.Extensions.Logging;
 
 namespace GraNAS.Signaling.API.Infrastructure;
 
+/// <summary>
+/// HTTP-клиент к metadata-service для проверки прав доступа пользователя к папке.
+/// Автоматически пробрасывает JWT из текущего HTTP-запроса, в том числе из query-параметра
+/// <c>access_token</c>, который SignalR использует при WebSocket-подключении.
+/// </summary>
 public class MetadataServiceClient : IMetadataServiceClient
 {
     private readonly HttpClient _http;
@@ -24,6 +29,7 @@ public class MetadataServiceClient : IMetadataServiceClient
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public async Task<FolderAccessInfo?> GetFolderAccessAsync(Guid folderId, Guid userId, CancellationToken ct = default)
     {
         var path = $"api/internal/folders/{folderId}/access?userId={userId}";
@@ -50,6 +56,12 @@ public class MetadataServiceClient : IMetadataServiceClient
         }
     }
 
+    /// <summary>
+    /// Проксирует JWT текущего запроса в исходящий HTTP-запрос к metadata-service.
+    /// При обычных REST-запросах берёт заголовок <c>Authorization</c>.
+    /// При SignalR WebSocket-подключениях JWT передаётся в query-параметре <c>?access_token=</c>,
+    /// поэтому метод проверяет оба варианта.
+    /// </summary>
     private void ForwardAuthorization(HttpRequestMessage request)
     {
         var auth = _accessor.HttpContext?.Request.Headers["Authorization"].ToString();
@@ -59,7 +71,7 @@ public class MetadataServiceClient : IMetadataServiceClient
             return;
         }
 
-        // SignalR WebSocket sends JWT via ?access_token= query param, not Authorization header
+        // SignalR WebSocket передаёт JWT через ?access_token=, а не через заголовок Authorization
         var token = _accessor.HttpContext?.Request.Query["access_token"].ToString();
         if (!string.IsNullOrEmpty(token))
             request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
