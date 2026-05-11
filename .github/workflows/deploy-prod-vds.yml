@@ -1,0 +1,295 @@
+name: Deploy to prod VDS
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (short SHA or 'latest')"
+        required: false
+        default: "latest"
+
+concurrency:
+  group: prod-vds
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ── 1. Build & push all 8 images to GHCR ────────────────────────────────
+  build-images:
+    runs-on: ubuntu-latest
+    environment: prod-vds
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: auth-service
+            image: auth-service
+            dockerfile: services/auth-service/GraNAS.Auth.API/Dockerfile
+            context: .
+          - service: metadata-service
+            image: metadata-service
+            dockerfile: services/metadata-service/GraNAS.Metadata.API/Dockerfile
+            context: .
+          - service: log-service
+            image: log-service
+            dockerfile: services/log-service/GraNAS.LogService/Dockerfile
+            context: .
+          - service: sharing-service
+            image: sharing-service
+            dockerfile: services/sharing-service/GraNAS.Sharing.API/Dockerfile
+            context: .
+          - service: signaling-service
+            image: signaling-service
+            dockerfile: services/signaling-service/GraNAS.Signaling.API/Dockerfile
+            context: .
+          - service: notification-service
+            image: notification-service
+            dockerfile: services/notification-service/GraNAS.Notifications.API/Dockerfile
+            context: .
+          - service: api-gateway
+            image: api-gateway
+            dockerfile: services/api-gateway/GraNAS.Gateway/Dockerfile
+            context: .
+          - service: web-client
+            image: web-client
+            dockerfile: clients/web/Dockerfile
+            context: clients/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=,format=short
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_API_BASE_URL=https://${{ secrets.DOMAIN }}
+
+  # ── 2. SSH-deploy to prod VDS ────────────────────────────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-images
+    environment: prod-vds
+    env:
+      VDS_HOST: ${{ secrets.VDS_HOST }}
+      VDS_USER: ${{ secrets.VDS_USER }}
+      DOMAIN: ${{ secrets.DOMAIN }}
+      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SHARE_TOKEN_ENCRYPTION_KEY: ${{ secrets.SHARE_TOKEN_ENCRYPTION_KEY }}
+      TURN_SECRET: ${{ secrets.TURN_SECRET }}
+      AUTH_POSTGRES_PASSWORD: ${{ secrets.AUTH_POSTGRES_PASSWORD }}
+      METADATA_POSTGRES_PASSWORD: ${{ secrets.METADATA_POSTGRES_PASSWORD }}
+      LOG_POSTGRES_PASSWORD: ${{ secrets.LOG_POSTGRES_PASSWORD }}
+      SHARING_POSTGRES_PASSWORD: ${{ secrets.SHARING_POSTGRES_PASSWORD }}
+      SIGNALING_POSTGRES_PASSWORD: ${{ secrets.SIGNALING_POSTGRES_PASSWORD }}
+      NOTIFICATION_POSTGRES_PASSWORD: ${{ secrets.NOTIFICATION_POSTGRES_PASSWORD }}
+      RABBITMQ_DEFAULT_PASS: ${{ secrets.RABBITMQ_DEFAULT_PASS }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      SMTP_USE_STARTTLS: ${{ secrets.SMTP_USE_STARTTLS }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VDS_SSH_KEY }}
+
+      - name: Guard required secrets
+        run: |
+          : "${VDS_HOST:?Secret VDS_HOST is not set}"
+          : "${VDS_USER:?Secret VDS_USER is not set}"
+          : "${DOMAIN:?Secret DOMAIN is not set}"
+          : "${JWT_SECRET:?Secret JWT_SECRET is not set}"
+
+      - name: Add VDS to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$VDS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Render vds.env
+        working-directory: infrastructure/docker-compose
+        run: |
+          {
+            echo "DOMAIN=$DOMAIN"
+            echo "CERTBOT_EMAIL=$CERTBOT_EMAIL"
+            echo "APP_BASE_URL=$DOMAIN"
+            echo "SHARE_TOKEN_ENCRYPTION_KEY=$SHARE_TOKEN_ENCRYPTION_KEY"
+            echo "PREFIX=prod"
+            echo "ENVIRONMENT=Production"
+            echo "COMPOSE_PROJECT_NAME=granas-prod"
+            echo "POSTGRES_VERSION=16-alpine"
+            echo "REDIS_VERSION=7.2-alpine"
+            echo "OPENSEARCH_VERSION=3.6.0"
+            echo "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+            echo "OPENSEARCH_PORT_HOST=9200"
+            echo "OPENSEARCH_PORT_CONTAINER=9200"
+            echo "OPENSEARCH_URI=http://opensearch:9200"
+            echo "RABBITMQ_VERSION=4.3.0"
+            echo "AUTH_POSTGRES_PORT_HOST=5433"
+            echo "METADATA_POSTGRES_PORT_HOST=5434"
+            echo "LOG_POSTGRES_PORT_HOST=5435"
+            echo "POSTGRES_PORT_CONTAINER=5432"
+            echo "REDIS_PORT_HOST=6379"
+            echo "REDIS_PORT_CONTAINER=6379"
+            echo "RABBITMQ_AMQP_PORT_HOST=5672"
+            echo "RABBITMQ_AMQP_PORT_CONTAINER=5672"
+            echo "RABBITMQ_MANAGEMENT_PORT_HOST=15672"
+            echo "RABBITMQ_MANAGEMENT_PORT_CONTAINER=15672"
+            echo "AUTH_SERVICE_PORT_HOST=8081"
+            echo "METADATA_SERVICE_PORT_HOST=8082"
+            echo "LOG_SERVICE_PORT_HOST=8083"
+            echo "SERVICE_PORT_CONTAINER=8080"
+            echo "SHARING_SERVICE_PORT_HOST=8084"
+            echo "SHARING_POSTGRES_PORT_HOST=5436"
+            echo "SIGNALING_POSTGRES_PORT_HOST=5437"
+            echo "AUTH_POSTGRES_DB=auth_prod"
+            echo "AUTH_POSTGRES_USER=auth_user"
+            echo "AUTH_POSTGRES_PASSWORD=$AUTH_POSTGRES_PASSWORD"
+            echo "AUTH_POSTGRES_HOST=postgres-auth"
+            echo "METADATA_POSTGRES_DB=metadata_prod"
+            echo "METADATA_POSTGRES_USER=metadata_user"
+            echo "METADATA_POSTGRES_PASSWORD=$METADATA_POSTGRES_PASSWORD"
+            echo "METADATA_POSTGRES_HOST=postgres-metadata"
+            echo "LOG_POSTGRES_DB=logs_prod"
+            echo "LOG_POSTGRES_USER=log_user"
+            echo "LOG_POSTGRES_PASSWORD=$LOG_POSTGRES_PASSWORD"
+            echo "LOG_POSTGRES_HOST=postgres-log"
+            echo "REDIS_HOST=redis"
+            echo "REDIS_CONNECTION_STRING=redis:6379"
+            echo "RABBITMQ_HOST=rabbitmq"
+            echo "RABBITMQ_DEFAULT_USER=granas_prod"
+            echo "RABBITMQ_DEFAULT_PASS=$RABBITMQ_DEFAULT_PASS"
+            echo "JWT_SECRET=$JWT_SECRET"
+            echo "JWT_ISSUER=GraNAS"
+            echo "JWT_AUDIENCE=GraNASClients"
+            echo "JWT_ACCESS_MINUTES=15"
+            echo "JWT_REFRESH_DAYS=7"
+            echo "SHARING_POSTGRES_DB=sharing_prod"
+            echo "SHARING_POSTGRES_USER=sharing_user"
+            echo "SHARING_POSTGRES_PASSWORD=$SHARING_POSTGRES_PASSWORD"
+            echo "SHARING_POSTGRES_HOST=postgres-sharing"
+            echo "AUTH_DB_CONNECTION_STRING=Host=postgres-auth;Port=5432;Database=auth_prod;Username=auth_user;Password=$AUTH_POSTGRES_PASSWORD"
+            echo "METADATA_DB_CONNECTION_STRING=Host=postgres-metadata;Port=5432;Database=metadata_prod;Username=metadata_user;Password=$METADATA_POSTGRES_PASSWORD"
+            echo "LOG_DB_CONNECTION_STRING=Host=postgres-log;Port=5432;Database=logs_prod;Username=log_user;Password=$LOG_POSTGRES_PASSWORD"
+            echo "SHARING_DB_CONNECTION_STRING=Host=postgres-sharing;Port=5432;Database=sharing_prod;Username=sharing_user;Password=$SHARING_POSTGRES_PASSWORD"
+            echo "GATEWAY_PORT_HOST=8080"
+            echo "GATEWAY_SERVICE_IMAGE=granas-gateway"
+            echo "GATEWAY_SERVICE_VERSION=latest"
+            echo "WEB_CLIENT_ORIGIN=https://$DOMAIN"
+            echo "WEB_CLIENT_PORT_HOST=5173"
+            echo "VITE_API_BASE_URL=https://$DOMAIN"
+            echo "SIGNALING_POSTGRES_DB=signalingdb"
+            echo "SIGNALING_POSTGRES_USER=signaling"
+            echo "SIGNALING_POSTGRES_PASSWORD=$SIGNALING_POSTGRES_PASSWORD"
+            echo "SIGNALING_POSTGRES_HOST=postgres-signaling"
+            echo "SIGNALING_DB_CONNECTION_STRING=Host=postgres-signaling;Port=5432;Database=signalingdb;Username=signaling;Password=$SIGNALING_POSTGRES_PASSWORD"
+            echo "SIGNALING_SERVICE_PORT_HOST=8085"
+            echo "SIGNALING_REDIS_CONNECTION_STRING=redis:6379,defaultDatabase=2"
+            echo "SIGNALING_TTL_SECONDS=600"
+            echo "TURN_SECRET=$TURN_SECRET"
+            echo "TURN_REALM=$DOMAIN"
+            echo "TURN_HOST=$VDS_HOST"
+            echo "TURN_PORT=3478"
+            echo "NOTIFICATION_POSTGRES_DB=notification_prod"
+            echo "NOTIFICATION_POSTGRES_USER=notification_user"
+            echo "NOTIFICATION_POSTGRES_PASSWORD=$NOTIFICATION_POSTGRES_PASSWORD"
+            echo "NOTIFICATION_POSTGRES_HOST=postgres-notification"
+            echo "NOTIFICATION_POSTGRES_PORT_HOST=5438"
+            echo "NOTIFICATION_DB_CONNECTION_STRING=Host=postgres-notification;Port=5432;Database=notification_prod;Username=notification_user;Password=$NOTIFICATION_POSTGRES_PASSWORD"
+            echo "NOTIFICATION_SERVICE_PORT_HOST=8086"
+            echo "SMTP_HOST=$SMTP_HOST"
+            echo "SMTP_PORT=$SMTP_PORT"
+            echo "SMTP_USERNAME=$SMTP_USERNAME"
+            echo "SMTP_PASSWORD=$SMTP_PASSWORD"
+            echo "SMTP_FROM=$SMTP_FROM"
+            echo "SMTP_USE_STARTTLS=$SMTP_USE_STARTTLS"
+          } > vds.env
+
+      - name: Render vds.prod-images.env
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          TAG="${{ github.event.inputs.image_tag }}"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          IMAGE_TAG="${TAG:-$SHORT_SHA}"
+          {
+            echo "AUTH_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/auth-service"
+            echo "AUTH_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "METADATA_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/metadata-service"
+            echo "METADATA_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "LOG_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/log-service"
+            echo "LOG_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "SHARING_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/sharing-service"
+            echo "SHARING_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "SIGNALING_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/signaling-service"
+            echo "SIGNALING_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "NOTIFICATION_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/notification-service"
+            echo "NOTIFICATION_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "GATEWAY_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/api-gateway"
+            echo "GATEWAY_SERVICE_VERSION=${IMAGE_TAG}"
+            echo "WEB_CLIENT_IMAGE=${{ env.REGISTRY }}/${OWNER}/web-client"
+            echo "WEB_CLIENT_VERSION=${IMAGE_TAG}"
+          } > infrastructure/docker-compose/vds.prod-images.env
+
+      - name: Prepare VDS directory structure
+        run: |
+          ssh "${VDS_USER}@${VDS_HOST}" 'mkdir -p /opt/granas/infrastructure/docker-compose/nginx'
+
+      - name: Scp compose files and env to VDS
+        run: |
+          scp \
+            infrastructure/docker-compose/vds.env \
+            infrastructure/docker-compose/vds.prod-images.env \
+            infrastructure/docker-compose/compose.yaml \
+            infrastructure/docker-compose/compose.vds.yaml \
+            infrastructure/docker-compose/init-letsencrypt.sh \
+            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/"
+          scp \
+            infrastructure/docker-compose/nginx/app.conf.template \
+            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/nginx/"
+
+      - name: Bootstrap or deploy
+        run: |
+          ssh "${VDS_USER}@${VDS_HOST}" 'bash -s' << 'ENDSSH'
+            set -euo pipefail
+            cd /opt/granas/infrastructure/docker-compose
+            COMPOSE="docker compose --env-file vds.env --env-file vds.prod-images.env -f compose.yaml -f compose.vds.yaml"
+            if ! docker volume inspect granas-prod_certbot_certs >/dev/null 2>&1; then
+              echo "==> First run: bootstrapping HTTPS..."
+              bash init-letsencrypt.sh
+            fi
+            $COMPOSE pull
+            $COMPOSE up -d --remove-orphans
+          ENDSSH
+
+      - name: Smoke test
+        run: |
+          sleep 20
+          curl -fsS --max-time 10 "https://$DOMAIN/api/auth/health"
