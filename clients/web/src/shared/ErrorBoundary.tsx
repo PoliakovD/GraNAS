@@ -1,8 +1,10 @@
 import React from 'react';
+import { Outlet } from 'react-router-dom';
+import { ErrorPage } from './ErrorPage';
 
 interface State { hasError: boolean }
 
-export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
+export class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, State> {
   state: State = { hasError: false };
 
   static getDerivedStateFromError(): State { return { hasError: true }; }
@@ -10,14 +12,14 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="error-state">
-          <div className="error-state-title">Что-то пошло не так</div>
-          <button className="btn primary" onClick={() => this.setState({ hasError: false })}>
-            Попробовать снова
-          </button>
-        </div>
+        <ErrorPage
+          code="error"
+          title="Что-то пошло не так"
+          description="Произошла непредвиденная ошибка приложения"
+          action={{ label: 'Попробовать снова', onClick: () => this.setState({ hasError: false }) }}
+        />
       );
     }
-    return this.props.children;
+    return this.props.children ?? <Outlet />;
   }
 }
