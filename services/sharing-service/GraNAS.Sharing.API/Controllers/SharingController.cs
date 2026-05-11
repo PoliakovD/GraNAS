@@ -68,14 +68,21 @@ public class SharingController : ControllerBase
     /// <summary>Список share-ссылок для папки (только владелец, без исходных токенов)</summary>
     [HttpGet("api/folders/{folderId:guid}/shares")]
     [ProducesResponseType(typeof(ShareLinkResponse[]), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    public async Task<IActionResult> ListShares(Guid folderId)
+    public async Task<IActionResult> ListShares(Guid folderId, CancellationToken ct)
     {
         var ownerId = GetCurrentUserId();
         if (ownerId is null)
             return Unauthorized(new ErrorResponse { Error = "unauthorized", ErrorDescription = "User not identified." });
 
-        var links = await _shareService.ListByFolderAsync(ownerId.Value, folderId);
+        var links = await _shareService.ListByFolderAsync(ownerId.Value, folderId, ct);
+        if (links is null)
+            return NotFound(new ErrorResponse
+            {
+                Error = "folder_not_found",
+                ErrorDescription = "Folder not found or access denied."
+            });
         return Ok(links);
     }
 
