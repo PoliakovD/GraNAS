@@ -114,8 +114,8 @@ function AccountMenu({ onClose }: { onClose: () => void }) {
           <div style={{ fontSize: 11.5, color: 'var(--ink-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
         </div>
       </div>
-      <div className="ctx-item"><Icon name="user" size={14} /> Профиль</div>
-      <div className="ctx-item"><Icon name="settings" size={14} /> Настройки</div>
+      <div className="ctx-item" onClick={() => { onClose(); navigate('/settings/account'); }}><Icon name="user" size={14} /> Профиль</div>
+      <div className="ctx-item" onClick={() => { onClose(); navigate('/settings/notifications'); }}><Icon name="settings" size={14} /> Настройки</div>
       <div className="ctx-sep" />
       <div className="ctx-item danger" onClick={() => void handleLogout()}>
         <Icon name="logout" size={14} /> Выйти

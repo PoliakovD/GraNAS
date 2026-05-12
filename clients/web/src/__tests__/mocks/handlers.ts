@@ -79,6 +79,33 @@ export const handlers = [
   http.get(`${BASE}/api/signaling/turn/credentials`, () =>
     HttpResponse.json({ username: 'test', credential: 'test', uris: [], ttl: 600 })),
 
+  // notifications (basic)
+  http.get(`${BASE}/api/notifications`, () =>
+    HttpResponse.json({ items: [], nextCursor: null })),
+  http.get(`${BASE}/api/notifications/unread-count`, () =>
+    HttpResponse.json({ unreadCount: 0 })),
+
+  // settings
+  http.get(`${BASE}/api/auth/me/settings`, () =>
+    HttpResponse.json({
+      notificationPrefs: {
+        email:   { access_granted: true,  access_revoked: true,  share_revoked: true,  access_lost: true  },
+        inApp:   { access_granted: true,  access_revoked: true,  share_revoked: true,  access_lost: true  },
+        webPush: { access_granted: false, access_revoked: false, share_revoked: false, access_lost: false },
+      },
+    })),
+
+  http.put(`${BASE}/api/auth/me/settings`, () =>
+    new HttpResponse(null, { status: 204 })),
+
+  // push
+  http.get(`${BASE}/api/notifications/push/vapid-public-key`, () =>
+    HttpResponse.json({ publicKey: 'BExampleVAPIDPublicKey012345678901234567890123456789012345678' })),
+  http.post(`${BASE}/api/notifications/push-subscriptions`, () =>
+    new HttpResponse(null, { status: 201 })),
+  http.delete(`${BASE}/api/notifications/push-subscriptions`, () =>
+    new HttpResponse(null, { status: 204 })),
+
   // public share
   http.get(`${BASE}/api/sharing/share/:token`, ({ params }) => {
     if (params.token === 'revoked') return new HttpResponse(null, { status: 410 });

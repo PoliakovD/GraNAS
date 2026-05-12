@@ -10,14 +10,16 @@ namespace GraNAS.WebAPI.Tests.Unit;
 
 public class AuthServiceTests
 {
-    private readonly Mock<IUserRepository>  _userRepo      = new();
-    private readonly Mock<IPasswordHasher>  _hasher        = new();
-    private readonly Mock<ITokenService>    _tokenService  = new();
-    private readonly AuthService            _sut;
+    private readonly Mock<IUserRepository>         _userRepo     = new();
+    private readonly Mock<IUserSettingsRepository> _userSettings = new();
+    private readonly Mock<IPasswordHasher>         _hasher       = new();
+    private readonly Mock<ITokenService>           _tokenService = new();
+    private readonly AuthService                   _sut;
 
     public AuthServiceTests()
     {
-        _sut = new AuthService(_userRepo.Object, _hasher.Object, _tokenService.Object, NullLogger<AuthService>.Instance);
+        _userSettings.Setup(r => r.UpsertAsync(It.IsAny<UserSettings>(), default)).Returns(Task.CompletedTask);
+        _sut = new AuthService(_userRepo.Object, _userSettings.Object, _hasher.Object, _tokenService.Object, NullLogger<AuthService>.Instance);
     }
 
     // ──────────────────────────────── RegisterAsync ────────────────────────────────

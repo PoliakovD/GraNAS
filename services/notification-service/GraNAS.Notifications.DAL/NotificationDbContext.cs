@@ -9,6 +9,7 @@ public class NotificationDbContext : DbContext
 
     public DbSet<NotificationEvent> NotificationEvents => Set<NotificationEvent>();
     public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

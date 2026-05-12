@@ -149,6 +149,58 @@ namespace GraNAS.Notifications.DAL.Migrations
                     b.ToTable("table_notification_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("GraNAS.Notifications.Models.Entities.PushSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("auth");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("endpoint");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("p256dh");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text")
+                        .HasColumnName("user_agent");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_push_subscriptions_endpoint");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_push_subscriptions_user_id");
+
+                    b.ToTable("table_push_subscriptions", (string)null);
+                });
+
             modelBuilder.Entity("GraNAS.Notifications.Models.Entities.NotificationOutbox", b =>
                 {
                     b.HasOne("GraNAS.Notifications.Models.Entities.NotificationEvent", "NotificationEvent")

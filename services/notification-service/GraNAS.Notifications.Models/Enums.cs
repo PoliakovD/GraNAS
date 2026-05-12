@@ -3,7 +3,8 @@ namespace GraNAS.Notifications.Models;
 public enum DeliveryTarget
 {
     Email,
-    SignalR
+    SignalR,
+    WebPush
 }
 
 public enum OutboxStatus

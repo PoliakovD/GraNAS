@@ -132,6 +132,13 @@ public class Program
             c.BaseAddress = new Uri(baseUrl);
         }).AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
+        builder.Services.AddHttpClient<GraNAS.Notifications.Services.Implementations.AuthServiceUserSettingsResolver>(c =>
+        {
+            var baseUrl = builder.Configuration["AuthService:BaseUrl"]
+                ?? throw new InvalidOperationException("AuthService:BaseUrl is not configured");
+            c.BaseAddress = new Uri(baseUrl);
+        }).AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
+
         builder.Services.AddGraNasCentralLoggingMvc();
         builder.Services.AddControllers();
         builder.Services.AddSignalR();
@@ -174,10 +181,13 @@ public class Program
         builder.Services.AddHostedService<NotificationConsumerService>();
         builder.Services.AddHostedService<EmailDeliveryWorker>();
         builder.Services.AddHostedService<SignalRDeliveryWorker>();
+        builder.Services.AddHostedService<WebPushDeliveryWorker>();
 
         builder.Services.AddNotificationApplication(builder.Configuration);
 
         builder.Services.AddScoped<NotificationDeliveryService>();
+        builder.Services.AddScoped<GraNAS.Notifications.Services.Interfaces.IUserSettingsResolver,
+            GraNAS.Notifications.Services.Implementations.AuthServiceUserSettingsResolver>();
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerWithJwt(apiTitle, versionApi);

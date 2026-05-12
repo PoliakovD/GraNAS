@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Models.Repositories;
+using GraNAS.Auth.Services.Interfaces;
 using GraNAS.Shared.Models.DTO;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -20,11 +21,13 @@ namespace GraNAS.Auth.API.Controllers;
 public class InternalUsersController : ControllerBase
 {
   private readonly IUserRepository _users;
+  private readonly IUserSettingsService _settings;
   private readonly ILogger<InternalUsersController> _logger;
 
-  public InternalUsersController(IUserRepository users, ILogger<InternalUsersController> logger)
+  public InternalUsersController(IUserRepository users, IUserSettingsService settings, ILogger<InternalUsersController> logger)
   {
     _users = users;
+    _settings = settings;
     _logger = logger;
   }
 
@@ -79,5 +82,15 @@ public class InternalUsersController : ControllerBase
     }
 
     return Ok(new UserLookupResponse { Id = user.Id, Email = user.Email });
+  }
+
+  /// <summary>Получить настройки уведомлений пользователя (межсервисный вызов из notification-service)</summary>
+  [HttpGet("{id:guid}/settings")]
+  [ProducesResponseType(typeof(UserSettingsResponse), StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> GetSettings(Guid id, CancellationToken ct)
+  {
+    var prefs = await _settings.GetPrefsAsync(id, ct);
+    return Ok(new UserSettingsResponse { NotificationPrefs = prefs });
   }
 }
