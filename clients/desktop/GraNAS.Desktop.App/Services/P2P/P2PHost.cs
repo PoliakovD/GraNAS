@@ -22,7 +22,7 @@ namespace GraNAS.Desktop.App.Services.P2P;
 /// <item><c>ForceDisconnect</c> от сервера: устанавливает <c>ShouldBeOnline=false</c> и вызывает <c>DisconnectAsync</c>.</item>
 /// </list>
 /// </remarks>
-public sealed class P2PHost : IP2PHost, IAsyncDisposable
+public class P2PHost : IP2PHost, IAsyncDisposable
 {
     private readonly IFolderShareRegistry _registry;
     private readonly IAuthSession _session;
@@ -33,6 +33,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
 
     private HubConnection? _hub;
     private readonly ConcurrentDictionary<string, PeerSession> _peers = new();
+    private readonly ConcurrentDictionary<Guid, Guid?> _bindingCache = new();
     private TurnCredentials? _turnCredentials;
     private bool _isOnline;
 
@@ -53,6 +54,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         _deviceIdentity = deviceIdentity;
         _notifications = notifications;
         _hubUrl = hubUrl;
+        _registry.MappingChanged += folderId => _bindingCache.TryRemove(folderId, out _);
     }
 
     /// <inheritdoc/>
@@ -115,6 +117,7 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
         foreach (var peer in _peers.Values)
             peer.Dispose();
         _peers.Clear();
+        _bindingCache.Clear();
         Log.Information("P2PHost disconnected");
     }
 
@@ -178,13 +181,13 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
 
     /// <summary>
     /// Обрабатывает входящий P2P-запрос от receiver'а.
-    /// Проверяет, что папка локально доступна, создаёт <c>RTCPeerConnection</c> + data channel,
-    /// генерирует SDP-offer и отправляет его через хаб.
+    /// Проверяет локальное наличие папки и server-side device-folder binding,
+    /// затем создаёт <c>RTCPeerConnection</c> + data channel через <see cref="StartWebRtcSessionAsync"/>.
     /// </summary>
-    /// <param name="receiverConnId">SignalR connectionId receiver'а — используется как ключ сессии.</param>
-    /// <param name="folderId">Папка, к которой запрашивается доступ.</param>
-    /// <param name="scopePath">Путь-подсказка для ограничения доступа. <c>null</c> = вся папка.</param>
     private async void HandleIncomingPeerRequestAsync(string receiverConnId, Guid folderId, string? scopePath)
+        => await HandleIncomingPeerRequestCoreAsync(receiverConnId, folderId, scopePath);
+
+    internal async Task HandleIncomingPeerRequestCoreAsync(string receiverConnId, Guid folderId, string? scopePath)
     {
         var localPath = _registry.GetLocalPath(folderId);
         if (localPath is null || !Directory.Exists(localPath))
@@ -193,56 +196,85 @@ public sealed class P2PHost : IP2PHost, IAsyncDisposable
             return;
         }
 
-        try
+        var boundDeviceId = await ResolveBoundDeviceIdAsync(folderId);
+        if (boundDeviceId is { } bound && bound != _deviceIdentity.DeviceId)
         {
-            var session = new PeerSession(folderId, localPath, scopePath);
-            _peers[receiverConnId] = session;
-
-            var pc = CreatePeerConnection();
-            session.Pc = pc;
-
-            // Create data channel on owner side — receiver gets it via ondatachannel
-            var dc = await pc.createDataChannel("files");
-            session.DataChannel = dc;
-
-            dc.onopen += () =>
-            {
-                Log.Information("Data channel opened to receiver {ConnId}", receiverConnId);
-            };
-
-            dc.onmessage += (channel, protocol, data) =>
-            {
-                var text = Encoding.UTF8.GetString(data);
-                _ = HandleDataChannelMessageAsync(session, receiverConnId, text);
-            };
-
-            pc.onicecandidate += async iceCandidate =>
-            {
-                if (_hub?.State != HubConnectionState.Connected) return;
-                try
-                {
-                    await _hub.InvokeAsync("SendIceCandidate",
-                        receiverConnId,
-                        iceCandidate.candidate,
-                        iceCandidate.sdpMid,
-                        (int?)iceCandidate.sdpMLineIndex);
-                }
-                catch (Exception ex) { Log.Warning(ex, "ICE send failed"); }
-            };
-
-            var offer = pc.createOffer(null);
-            await pc.setLocalDescription(offer);
-
-            if (_hub?.State == HubConnectionState.Connected)
-                await _hub.InvokeAsync("SendOffer", receiverConnId, offer.sdp);
-
-            Log.Information("Offer sent to receiver {ConnId}", receiverConnId);
+            Log.Warning(
+                "Folder {FolderId} bound to device {BoundDeviceId}, refusing peer {ConnId}",
+                folderId, bound, receiverConnId);
+            await SendDenyAsync(receiverConnId, folderId, "folder_bound_to_another_device");
+            return;
         }
+
+        try { await StartWebRtcSessionAsync(receiverConnId, folderId, scopePath, localPath); }
         catch (Exception ex)
         {
             Log.Error(ex, "Error handling incoming peer request from {ConnId}", receiverConnId);
             _peers.TryRemove(receiverConnId, out _);
         }
+    }
+
+    private async Task<Guid?> ResolveBoundDeviceIdAsync(Guid folderId)
+    {
+        if (_bindingCache.TryGetValue(folderId, out var cached)) return cached;
+        var resp = await _signalingApi.GetFolderDevicesAsync(new[] { folderId });
+        var deviceId = resp.FirstOrDefault(r => r.FolderId == folderId)?.DeviceId;
+        _bindingCache[folderId] = deviceId;
+        return deviceId;
+    }
+
+    protected internal virtual async Task SendDenyAsync(string receiverConnId, Guid folderId, string reason)
+    {
+        if (_hub?.State != HubConnectionState.Connected) return;
+        try { await _hub.InvokeAsync("DenyPeerRequest", receiverConnId, folderId, reason); }
+        catch (Exception ex) { Log.Warning(ex, "DenyPeerRequest hub call failed for {ConnId}", receiverConnId); }
+    }
+
+    protected internal virtual async Task StartWebRtcSessionAsync(
+        string receiverConnId, Guid folderId, string? scopePath, string localPath)
+    {
+        var session = new PeerSession(folderId, localPath, scopePath);
+        _peers[receiverConnId] = session;
+
+        var pc = CreatePeerConnection();
+        session.Pc = pc;
+
+        // Create data channel on owner side — receiver gets it via ondatachannel
+        var dc = await pc.createDataChannel("files");
+        session.DataChannel = dc;
+
+        dc.onopen += () =>
+        {
+            Log.Information("Data channel opened to receiver {ConnId}", receiverConnId);
+        };
+
+        dc.onmessage += (channel, protocol, data) =>
+        {
+            var text = Encoding.UTF8.GetString(data);
+            _ = HandleDataChannelMessageAsync(session, receiverConnId, text);
+        };
+
+        pc.onicecandidate += async iceCandidate =>
+        {
+            if (_hub?.State != HubConnectionState.Connected) return;
+            try
+            {
+                await _hub.InvokeAsync("SendIceCandidate",
+                    receiverConnId,
+                    iceCandidate.candidate,
+                    iceCandidate.sdpMid,
+                    (int?)iceCandidate.sdpMLineIndex);
+            }
+            catch (Exception ex) { Log.Warning(ex, "ICE send failed"); }
+        };
+
+        var offer = pc.createOffer(null);
+        await pc.setLocalDescription(offer);
+
+        if (_hub?.State == HubConnectionState.Connected)
+            await _hub.InvokeAsync("SendOffer", receiverConnId, offer.sdp);
+
+        Log.Information("Offer sent to receiver {ConnId}", receiverConnId);
     }
 
     /// <summary>Применяет SDP-answer от receiver'а к соответствующей <c>RTCPeerConnection</c>.</summary>

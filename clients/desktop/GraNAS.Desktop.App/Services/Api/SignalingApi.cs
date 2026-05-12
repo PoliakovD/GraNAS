@@ -67,4 +67,16 @@ public class SignalingApi : ApiBase, ISignalingApi
         try { await DeleteAsync($"api/signaling/devices/{deviceId}/folders/{folderId}", ct); }
         catch { /* best-effort */ }
     }
+
+    /// <inheritdoc/>
+    public async Task<List<FolderDeviceBinding>> GetFolderDevicesAsync(IReadOnlyCollection<Guid> folderIds, CancellationToken ct = default)
+    {
+        if (folderIds.Count == 0) return [];
+        try
+        {
+            var query = string.Join("&", folderIds.Select(id => $"folderIds={id}"));
+            return await GetAsync<List<FolderDeviceBinding>>($"api/signaling/devices/folder-devices?{query}", ct);
+        }
+        catch { return []; }
+    }
 }
