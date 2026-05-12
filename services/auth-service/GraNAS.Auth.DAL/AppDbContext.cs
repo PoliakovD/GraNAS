@@ -7,6 +7,7 @@ public class AppDbContext : DbContext
 {
   public DbSet<User> Users => Set<User>();
   public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+  public DbSet<UserSettings> UserSettings => Set<UserSettings>();
 
   public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
   {

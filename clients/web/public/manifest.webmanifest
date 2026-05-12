@@ -1,0 +1,12 @@
+{
+  "name": "GraNAS",
+  "short_name": "GraNAS",
+  "description": "Peer-to-peer folder sharing platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6938EF",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

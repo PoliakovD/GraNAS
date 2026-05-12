@@ -96,6 +96,28 @@ namespace GraNAS.Auth.DAL.Migrations
                     b.ToTable("table_users", (string)null);
                 });
 
+            modelBuilder.Entity("GraNAS.Auth.Models.UserSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("NotificationPrefsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("notification_prefs");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("table_user_settings", (string)null);
+                });
+
             modelBuilder.Entity("GraNAS.Auth.Models.RefreshToken", b =>
                 {
                     b.HasOne("GraNAS.Auth.Models.User", "User")
@@ -105,6 +127,15 @@ namespace GraNAS.Auth.DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GraNAS.Auth.Models.UserSettings", b =>
+                {
+                    b.HasOne("GraNAS.Auth.Models.User", null)
+                        .WithOne()
+                        .HasForeignKey("GraNAS.Auth.Models.UserSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GraNAS.Auth.Models.User", b =>

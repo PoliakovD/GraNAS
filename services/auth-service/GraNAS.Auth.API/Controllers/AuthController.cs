@@ -1,6 +1,7 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Auth.Models.DTO;
 using GraNAS.Auth.Services.Interfaces;
@@ -25,12 +26,14 @@ public class AuthController : ControllerBase
   private const string RefreshTokenCookiePath = "/api/auth";
 
   private readonly IAuthService _authService;
+  private readonly IUserSettingsService _settings;
   private readonly IWebHostEnvironment _env;
   private readonly ILogger<AuthController> _logger;
 
-  public AuthController(IAuthService authService, IWebHostEnvironment env, ILogger<AuthController> logger)
+  public AuthController(IAuthService authService, IUserSettingsService settings, IWebHostEnvironment env, ILogger<AuthController> logger)
   {
     _authService = authService;
+    _settings = settings;
     _env = env;
     _logger = logger;
   }
@@ -264,5 +267,46 @@ public class AuthController : ControllerBase
     }
 
     return BadRequest();
+  }
+
+  /// <summary>Получить настройки текущего пользователя</summary>
+  [Authorize]
+  [HttpGet("me/settings")]
+  [ProducesResponseType(typeof(UserSettingsResponse), StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> GetSettings(CancellationToken ct)
+  {
+    var userId = ParseUserId();
+    if (userId == Guid.Empty)
+      return Unauthorized(new ErrorResponse { Error = "invalid_token", ErrorDescription = "Invalid user identifier." });
+
+    var prefs = await _settings.GetPrefsAsync(userId, ct);
+    return Ok(new UserSettingsResponse { NotificationPrefs = prefs });
+  }
+
+  /// <summary>Обновить настройки текущего пользователя</summary>
+  [Authorize]
+  [HttpPut("me/settings")]
+  [EnableRateLimiting("auth")]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> UpdateSettings([FromBody] UpdateUserSettingsRequest request, CancellationToken ct)
+  {
+    if (!ModelState.IsValid) return BadRequest(ModelState);
+
+    var userId = ParseUserId();
+    if (userId == Guid.Empty)
+      return Unauthorized(new ErrorResponse { Error = "invalid_token", ErrorDescription = "Invalid user identifier." });
+
+    await _settings.UpdatePrefsAsync(userId, request.NotificationPrefs, ct);
+    return NoContent();
+  }
+
+  private Guid ParseUserId()
+  {
+    var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+    return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
   }
 }

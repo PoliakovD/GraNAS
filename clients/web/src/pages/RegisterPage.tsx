@@ -10,6 +10,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailConsent, setEmailConsent] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +21,7 @@ export function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      await authApi.register({ email, password });
+      await authApi.register({ email, password, emailNotificationsConsent: emailConsent });
       await login({ email, password });
       navigate('/', { replace: true });
     } catch (err) {
@@ -78,6 +79,19 @@ export function RegisterPage() {
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
+        </div>
+
+        <div className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <input
+            id="reg-consent"
+            type="checkbox"
+            checked={emailConsent}
+            onChange={e => setEmailConsent(e.target.checked)}
+            style={{ width: 14, height: 14, flexShrink: 0 }}
+          />
+          <label htmlFor="reg-consent" style={{ fontSize: 12.5, color: 'var(--ink-600)', cursor: 'pointer', marginBottom: 0 }}>
+            Получать уведомления на email
+          </label>
         </div>
 
         {error && <div className="field-error" style={{ marginBottom: 12 }}>{error}</div>}

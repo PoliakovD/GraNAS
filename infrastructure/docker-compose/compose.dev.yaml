@@ -57,6 +57,12 @@ services:
       Smtp__Host: mailpit
       Smtp__Port: 1025
       Smtp__UseStartTls: "false"
+      # Generate once: npx web-push generate-vapid-keys
+      # Then set WEBPUSH__PUBLICKEY and WEBPUSH__PRIVATEKEY in .env.dev
+      WebPush__PublicKey: ${WEBPUSH_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${WEBPUSH_PRIVATE_KEY:-}
+      WebPush__Subject: "mailto:admin@granasapp.com"
+      WebClient__BaseUrl: "http://localhost:5173"
 
   api-gateway:
     environment:

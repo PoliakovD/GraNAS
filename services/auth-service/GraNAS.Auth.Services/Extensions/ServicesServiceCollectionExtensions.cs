@@ -11,6 +11,7 @@ public static class ServicesServiceCollectionExtensions
     services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
     services.AddScoped<ITokenService, JwtTokenService>();
     services.AddScoped<IAuthService, AuthService>();
+    services.AddScoped<IUserSettingsService, UserSettingsService>();
     return services;
   }
 }

@@ -11,6 +11,7 @@ import { LoginPage } from './pages/LoginPage';
 import { PublicSharePage } from './pages/PublicSharePage';
 import { RecentPage } from './pages/RecentPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { SharedPage } from './pages/SharedPage';
 import { AppLayout } from './shared/Layout';
 import { ErrorBoundary } from './shared/ErrorBoundary';
@@ -36,6 +37,7 @@ const router = createBrowserRouter([
               { path: '/shared', element: <SharedPage /> },
               { path: '/links', element: <LinksPage /> },
               { path: '/recent', element: <RecentPage /> },
+              { path: '/settings/*', element: <SettingsPage /> },
             ],
           },
         ],

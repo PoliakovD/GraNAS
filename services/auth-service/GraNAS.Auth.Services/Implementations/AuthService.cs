@@ -12,17 +12,20 @@ namespace GraNAS.Auth.Services.Implementations;
 public class AuthService : IAuthService
 {
   private readonly IUserRepository _userRepository;
+  private readonly IUserSettingsRepository _userSettings;
   private readonly IPasswordHasher _passwordHasher;
   private readonly ITokenService _tokenService;
   private readonly ILogger<AuthService> _logger;
 
   public AuthService(
     IUserRepository userRepository,
+    IUserSettingsRepository userSettings,
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     ILogger<AuthService> logger)
   {
     _userRepository = userRepository;
+    _userSettings = userSettings;
     _passwordHasher = passwordHasher;
     _tokenService = tokenService;
     _logger = logger;
@@ -52,6 +55,16 @@ public class AuthService : IAuthService
     };
 
     await _userRepository.CreateAsync(user);
+
+    var defaults = UserSettingsService.BuildDefaults(emailEnabled: request.EmailNotificationsConsent);
+    var prefsJson = System.Text.Json.JsonSerializer.Serialize(defaults, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+    await _userSettings.UpsertAsync(new UserSettings
+    {
+      UserId = user.Id,
+      NotificationPrefsJson = prefsJson,
+      UpdatedAt = DateTime.UtcNow,
+    });
+
     _logger.LogInformation("Register: user created {UserId} for {Email}", user.Id, user.Email);
 
     return new RegisterResult(RegisterError.None, new RegisterResponse

@@ -10,6 +10,7 @@ public static class DalServiceCollectionExtensions
     {
         services.AddScoped<INotificationEventRepository, NotificationEventRepository>();
         services.AddScoped<INotificationOutboxRepository, NotificationOutboxRepository>();
+        services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
         return services;
     }
 }
