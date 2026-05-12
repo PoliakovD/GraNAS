@@ -3,6 +3,8 @@ namespace GraNAS.Desktop.App.Services.P2P;
 /// <summary>Реестр локальных путей для shared-папок: хранит маппинг <c>folderId → локальный путь на диске</c>.</summary>
 public interface IFolderShareRegistry
 {
+    /// <summary>Срабатывает при <see cref="SetLocalPath"/> или <see cref="RemoveMapping"/> — позволяет инвалидировать зависимые кэши.</summary>
+    event Action<Guid>? MappingChanged;
     /// <summary>Возвращает локальный путь папки на диске или <c>null</c>, если папка не привязана локально.</summary>
     string? GetLocalPath(Guid folderId);
     /// <summary>Задаёт или обновляет локальный путь для папки. Изменение сохраняется на диск.</summary>

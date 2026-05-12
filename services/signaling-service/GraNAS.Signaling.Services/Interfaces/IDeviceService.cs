@@ -38,4 +38,10 @@ public interface IDeviceService
     /// Папки без привязки в результат не включаются. Онлайн-статус дополняется из Redis.
     /// </summary>
     Task<List<FolderDeviceResponse>> GetFolderDevicesAsync(IEnumerable<Guid> folderIds, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Возвращает <c>deviceId</c>, к которому привязана папка в <c>table_device_folders</c>,
+    /// или <c>null</c>, если явной привязки нет.
+    /// </summary>
+    Task<Guid?> GetBoundDeviceIdAsync(Guid folderId, CancellationToken ct = default);
 }

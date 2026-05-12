@@ -120,6 +120,12 @@ public class DeviceService : IDeviceService
         return result;
     }
 
+    public async Task<Guid?> GetBoundDeviceIdAsync(Guid folderId, CancellationToken ct = default)
+    {
+        var binding = await _folderRepo.GetByFolderIdAsync(folderId, ct);
+        return binding?.DeviceId;
+    }
+
     private static DeviceResponse MapToResponse(Device d, bool isOnline) => new()
     {
         DeviceId = d.Id,

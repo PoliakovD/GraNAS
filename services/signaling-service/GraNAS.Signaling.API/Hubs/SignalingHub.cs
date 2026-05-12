@@ -194,6 +194,26 @@ public class SignalingHub : Hub
             return;
         }
 
+        // Phase 6.5+: explicit binding в table_device_folders имеет приоритет над Redis JoinAsOwner.
+        // Защищает от сценария, когда несколько устройств вызвали JoinAsOwner для одной папки.
+        var boundDeviceId = await _devices.GetBoundDeviceIdAsync(folderId);
+        if (boundDeviceId is not null && boundDeviceId.Value != ownerDeviceId.Value)
+        {
+            var boundConnId = await _sessions.GetConnectionIdByDeviceAsync(boundDeviceId.Value);
+            if (boundConnId is null)
+            {
+                _logger.LogWarning(
+                    "RequestSession: folder {FolderId} bound to {BoundDeviceId} but it's offline; JoinAsOwner was on device {OnlineDeviceId}",
+                    folderId, boundDeviceId.Value, ownerDeviceId.Value);
+                await Clients.Caller.SendAsync("OwnerOffline", folderId);
+                return;
+            }
+            _logger.LogInformation(
+                "RequestSession: redirecting to bound device {BoundDeviceId} (JoinAsOwner was on {OnlineDeviceId}) for folder {FolderId}",
+                boundDeviceId.Value, ownerDeviceId.Value, folderId);
+            ownerDeviceId = boundDeviceId.Value;
+        }
+
         var ownerConnId = await _sessions.GetConnectionIdByDeviceAsync(ownerDeviceId.Value);
         if (ownerConnId is null)
         {
@@ -256,6 +276,20 @@ public class SignalingHub : Hub
         LogIceCandidateType(candidate);
         await Clients.Client(targetConnectionId)
             .SendAsync("IceCandidate", Context.ConnectionId, candidate, sdpMid, sdpMLineIndex);
+    }
+
+    /// <summary>
+    /// Owner явно отказывает receiver-у в P2P-сессии (например, папка привязана к другому устройству).
+    /// Сервер проверяет наличие зарегистрированной сессионной пары и форвардит
+    /// <c>AccessDenied(folderId, reason)</c> receiver-у.
+    /// </summary>
+    public async Task DenyPeerRequest(string receiverConnectionId, Guid folderId, string reason)
+    {
+        await AssertValidSessionAsync("DenyPeerRequest", receiverConnectionId);
+        await Clients.Client(receiverConnectionId).SendAsync("AccessDenied", folderId, reason);
+        _logger.LogInformation(
+            "Owner {OwnerConnId} denied peer request from {ReceiverConnId} for folder {FolderId}: {Reason}",
+            Context.ConnectionId, receiverConnectionId, folderId, reason);
     }
 
     /// <summary>

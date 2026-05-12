@@ -110,4 +110,30 @@ public class DeviceServiceTests
         var result = await CreateSut().BelongsToUserAsync(deviceId, userId);
         Assert.True(result);
     }
+
+    [Fact]
+    public async Task GetBoundDeviceIdAsync_NoBinding_ReturnsNull()
+    {
+        var folderId = Guid.NewGuid();
+        _folderRepoMock.Setup(r => r.GetByFolderIdAsync(folderId, default))
+            .ReturnsAsync((DeviceFolder?)null);
+
+        var result = await CreateSut().GetBoundDeviceIdAsync(folderId);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetBoundDeviceIdAsync_WithBinding_ReturnsDeviceId()
+    {
+        var folderId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var binding = new DeviceFolder { FolderId = folderId, DeviceId = deviceId, ClaimedAt = DateTime.UtcNow };
+        _folderRepoMock.Setup(r => r.GetByFolderIdAsync(folderId, default))
+            .ReturnsAsync(binding);
+
+        var result = await CreateSut().GetBoundDeviceIdAsync(folderId);
+
+        Assert.Equal(deviceId, result);
+    }
 }

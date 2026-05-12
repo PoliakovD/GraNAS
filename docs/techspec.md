@@ -30,7 +30,7 @@
 - **Email‑уведомления** – через внешний SMTP-сервер
 - **Ошибки** – возвращаются с соответствующим статусом и сообщением (истёкшая/отозванная ссылка, доступ к чужим данным и т.д.)
 - **Нет хранения файлов** – только метаданные и ссылки на локальные файлы
-- **signaling-service** ✅ — отдельный микросервис, сводит WebRTC-пиры (SignalR/WebSocket hub `/hubs/signaling`). TURN-credentials endpoint, Redis session store. Никаких файлов через него не проходит — только обмен SDP-offer/answer и ICE-кандидатов.
+- **signaling-service** ✅ — отдельный микросервис, сводит WebRTC-пиры (SignalR/WebSocket hub `/hubs/signaling`). TURN-credentials endpoint, Redis session store. Никаких файлов через него не проходит — только обмен SDP-offer/answer и ICE-кандидатов. **Phase 8.5:** server-side device-folder binding check в `RequestSession` + hub-метод `DenyPeerRequest` (owner явно отказывает receiver-у); desktop-side binding guard с кэшем в P2PHost.
 
 ### 🔀 P2P-транспорт файлов (WebRTC / ICE / DTLS)
 

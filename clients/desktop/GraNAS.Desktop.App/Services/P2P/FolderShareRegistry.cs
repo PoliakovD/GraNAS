@@ -25,6 +25,8 @@ public class FolderShareRegistry : IFolderShareRegistry
         _mappings = Load();
     }
 
+    public event Action<Guid>? MappingChanged;
+
     public string? GetLocalPath(Guid folderId)
         => _mappings.TryGetValue(folderId, out var path) ? path : null;
 
@@ -32,12 +34,14 @@ public class FolderShareRegistry : IFolderShareRegistry
     {
         _mappings[folderId] = localPath;
         Save();
+        MappingChanged?.Invoke(folderId);
     }
 
     public void RemoveMapping(Guid folderId)
     {
         _mappings.Remove(folderId);
         Save();
+        MappingChanged?.Invoke(folderId);
     }
 
     public IReadOnlyDictionary<Guid, string> GetAll() => _mappings;

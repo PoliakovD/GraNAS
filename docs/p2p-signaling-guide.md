@@ -290,9 +290,14 @@ public async Task JoinAsOwner(Guid folderId)
 ```
 1. Определить кто я: JWT-пользователь или анонимный с share-токеном
 2. Проверить доступ через AccessChecker
-3. Найти owner в Redis: GET signaling:owner:{folderId}
+3. Найти live-owner в Redis: GetOwnerDeviceIdAsync(folderId)
 4. Если owner не онлайн → отправить Caller "OwnerOffline"
-5. Если онлайн → RegisterSessionPair в Redis + отправить owner "IncomingPeerRequest"
+5. (Phase 8.5) Server-side binding guard:
+   a. GetBoundDeviceIdAsync(folderId) — читает table_device_folders
+   b. Если bound device != redis-owner:
+      - bound device online → перенаправить IncomingPeerRequest на него
+      - bound device offline → отправить "OwnerOffline"
+6. RegisterSessionPair в Redis + отправить owner "IncomingPeerRequest"
 ```
 
 `RegisterSessionPairAsync` создаёт двусторонние записи в Redis Sets:
@@ -304,6 +309,15 @@ SADD signaling:pair:{ownerConnId}    {receiverConnId} EX 3600
 Это позволяет в методах `SendOffer`/`SendAnswer`/`SendIceCandidate` проверять:
 «а вправе ли этот connectionId общаться с тем connectionId?» через `IsValidSessionPairAsync`.
 Без этой проверки любой подключённый клиент мог бы relay-ить пакеты кому угодно.
+
+#### Метод `DenyPeerRequest(receiverConnectionId, folderId, reason)`
+
+Вызывается **desktop owner-ом** когда он решает не открывать P2P-сессию
+(например, обнаружил что папка привязана к другому устройству в `table_device_folders`).
+Хаб проверяет валидность сессионной пары через `AssertValidSessionAsync` и форвардит
+`AccessDenied(folderId, reason)` receiver-у. Owner вызывает этот метод вместо `SendOffer`.
+
+Типичное значение `reason`: `"folder_bound_to_another_device"`.
 
 #### Relay-методы: SendOffer / SendAnswer / SendIceCandidate
 
@@ -650,45 +664,26 @@ public async Task ConnectAsync(CancellationToken ct = default)
 
 #### Обработка IncomingPeerRequest
 
-Когда браузер вызвал `RequestSession`, хаб шлёт owner`у `IncomingPeerRequest`.
-Метод `HandleIncomingPeerRequestAsync` запускает WebRTC negotiation:
+Когда браузер вызвал `RequestSession`, хаб шлёт owner-у `IncomingPeerRequest`.
+`HandleIncomingPeerRequestAsync` (async-void обёртка над `HandleIncomingPeerRequestCoreAsync`) выполняет:
+
+1. **Локальная проверка** — `GetLocalPath(folderId)` + `Directory.Exists` (папка физически есть на этом компьютере).
+2. **Desktop binding guard (Phase 8.5)** — запрос к `ISignalingApi.GetFolderDevicesAsync([folderId])`. Результат кэшируется в `_bindingCache` (очищается при `DisconnectAsync` и по событию `IFolderShareRegistry.MappingChanged`). Если binding существует и `DeviceId != DeviceIdentity.DeviceId` — вызывает `DenyPeerRequest` через хаб и выходит. Если binding отсутствует — разрешает (обратная совместимость с папками до Phase 6.5).
+3. **WebRTC negotiation** — через виртуальный метод `StartWebRtcSessionAsync`: создаёт `PeerSession`, `RTCPeerConnection`, data channel `"files"`, генерирует SDP-offer и отправляет через хаб.
 
 ```csharp
-private async void HandleIncomingPeerRequestAsync(
-    string receiverConnId, Guid folderId, string? scopePath)
+// Phase 8.5: Desktop binding guard
+private async Task<Guid?> ResolveBoundDeviceIdAsync(Guid folderId)
 {
-    // Проверяем: есть ли привязанная локальная папка?
-    var localPath = _registry.GetLocalPath(folderId);
-    if (localPath is null || !Directory.Exists(localPath)) return;
-
-    // Создаём контекст сессии с пиром
-    var session = new PeerSession(folderId, localPath, scopePath);
-    _peers[receiverConnId] = session;
-
-    // RTCPeerConnection с STUN + TURN серверами
-    var pc = CreatePeerConnection(); // SIPSorcery RTCPeerConnection
-    session.Pc = pc;
-
-    // Создаём Data Channel — owner всегда создаёт его
-    // receiver получит его через событие ondatachannel
-    var dc = await pc.createDataChannel("files");
-    session.DataChannel = dc;
-
-    // ICE: при нахождении кандидата — шлём через хаб
-    pc.onicecandidate += async iceCandidate => {
-        await _hub.InvokeAsync("SendIceCandidate",
-            receiverConnId,
-            iceCandidate.candidate, // строка вида "candidate:..."
-            iceCandidate.sdpMid,
-            (int?)iceCandidate.sdpMid);
-    };
-
-    // Создаём оффер и отправляем через хаб
-    var offer = pc.createOffer(null);    // SIPSorcery: sync метод
-    pc.setLocalDescription(offer);       // начинается сбор ICE
-    await _hub.InvokeAsync("SendOffer", receiverConnId, offer.sdp);
+    if (_bindingCache.TryGetValue(folderId, out var cached)) return cached;
+    var resp = await _signalingApi.GetFolderDevicesAsync(new[] { folderId });
+    var deviceId = resp.FirstOrDefault(r => r.FolderId == folderId)?.DeviceId;
+    _bindingCache[folderId] = deviceId; // null = «нет binding» — тоже кэшируем
+    return deviceId;
 }
 ```
+
+Методы `SendDenyAsync` и `StartWebRtcSessionAsync` объявлены `protected internal virtual` — это позволяет unit-тестам переопределить их в subclass без реального SignalR/SIPSorcery.
 
 **SIPSorcery API** отличается от браузерного: `createOffer()` и
 `setLocalDescription()` — синхронные (не `async`/`await`).
@@ -1219,7 +1214,8 @@ RTCPeerConnection: ICE candidates, DTLS state, Data Channel stats, bandwidth.
 | Все соединения type=relay | Жёсткий NAT | Норма, но latency выше |
 | SHA-256 mismatch | Corrupted данные | Редко; переподключение и retry |
 | `HubException: Invalid session` | TTL сессии истёк (1ч) | Переподключение к хабу |
-| `AccessDenied` | Права изменились после подключения | Reload страницы |
+| `AccessDenied: folder_bound_to_another_device` | Desktop guard: папка привязана к другому устройству в `table_device_folders` | Открыть правильное устройство или перепривязать через Bind Local Folder с `?force=true` |
+| `AccessDenied` (другие причины) | Права изменились после подключения | Reload страницы |
 
 ---
 
@@ -1255,4 +1251,4 @@ DATA CHANNEL FLOW:
 
 ---
 
-*Документ сгенерирован для GraNAS Phase 6. Версия от 2026-04-27.*
+*Документ обновлён для GraNAS Phase 8.5 (device-folder binding guard). Версия от 2026-05-11.*

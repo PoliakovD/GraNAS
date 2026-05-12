@@ -20,6 +20,11 @@ public record ActiveSessionResponse(Guid DeviceId, string DeviceName, string Pla
 /// </summary>
 public record FolderDeviceConflict(Guid FolderId, Guid DeviceId, string DeviceName, string Platform);
 
+/// <summary>Запись о привязке папки к устройству, возвращаемая батч-эндпоинтом <c>GET /api/signaling/devices/folder-devices</c>.</summary>
+public record FolderDeviceBinding(
+    Guid FolderId, Guid DeviceId, string DeviceName, string Platform,
+    bool IsOnline, DateTime ClaimedAt);
+
 /// <summary>REST-клиент к signaling-service для управления устройствами, сессиями и привязками папок.</summary>
 public interface ISignalingApi
 {
@@ -41,4 +46,9 @@ public interface ISignalingApi
     Task<FolderDeviceConflict?> ClaimFolderAsync(Guid deviceId, Guid folderId, bool force = false, CancellationToken ct = default);
     /// <summary>Освобождает привязку папки от устройства.</summary>
     Task ReleaseFolderAsync(Guid deviceId, Guid folderId, CancellationToken ct = default);
+    /// <summary>
+    /// Возвращает, к каким устройствам привязаны указанные папки.
+    /// Папки без binding-а в результат не включаются.
+    /// </summary>
+    Task<List<FolderDeviceBinding>> GetFolderDevicesAsync(IReadOnlyCollection<Guid> folderIds, CancellationToken ct = default);
 }
