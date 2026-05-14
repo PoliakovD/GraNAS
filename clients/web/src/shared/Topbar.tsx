@@ -7,6 +7,7 @@ import type { NotificationDto } from '../api/notifications.api';
 import { Icon } from './Icon';
 import { initials, relTime } from './format';
 import { useClickOutside } from './useClickOutside';
+import { useTheme } from './ThemeContext';
 import type { FolderResponse } from '../types/folder';
 
 function buildAncestors(folders: FolderResponse[], folderId: string): FolderResponse[] {
@@ -133,6 +134,7 @@ interface CrumbItem {
 export function Topbar() {
   const [showNotif, setShowNotif] = useState(false);
   const [showAcct, setShowAcct] = useState(false);
+  const { theme, toggle } = useTheme();
   const user = useCurrentUser();
   const location = useLocation();
   const navigate = useNavigate();
@@ -185,6 +187,13 @@ export function Topbar() {
 
       <div className="topbar-spacer" />
 
+      <button
+        className="icon-btn"
+        onClick={toggle}
+        title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+      >
+        <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+      </button>
       <button className="icon-btn" onClick={() => { setShowNotif(s => !s); setShowAcct(false); }}>
         <Icon name="bell" size={18} />
         {unread > 0 && <span className="dot" />}

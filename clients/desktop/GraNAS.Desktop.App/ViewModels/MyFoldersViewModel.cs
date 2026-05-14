@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Reactive;
 using GraNAS.Desktop.App.Services;
 using GraNAS.Desktop.App.Services.Api;
@@ -9,6 +10,9 @@ using GraNAS.Desktop.Contracts.Metadata;
 using ReactiveUI;
 
 namespace GraNAS.Desktop.App.ViewModels;
+
+/// <summary>Строка списка привязок текущего устройства в <see cref="MyFoldersViewModel"/>.</summary>
+public record LocalBindingRow(Guid FolderId, string FolderName, string LocalPath);
 
 /// <summary>
 /// ViewModel страницы «Мои папки». Отображает дерево папок пользователя,
@@ -28,6 +32,7 @@ public class MyFoldersViewModel : ViewModelBase
   private ObservableCollection<FolderNode> _roots = [];
   private FolderNode? _selectedNode;
   private bool _isLoading;
+  private ObservableCollection<LocalBindingRow> _localBindings = [];
 
   /// <summary>Корневые папки дерева (папки без родителя).</summary>
   public ObservableCollection<FolderNode> Roots
@@ -50,6 +55,13 @@ public class MyFoldersViewModel : ViewModelBase
     set => this.RaiseAndSetIfChanged(ref _isLoading, value);
   }
 
+  /// <summary>Привязки папок к текущему устройству (папка → локальный путь).</summary>
+  public ObservableCollection<LocalBindingRow> LocalBindings
+  {
+    get => _localBindings;
+    private set => this.RaiseAndSetIfChanged(ref _localBindings, value);
+  }
+
   /// <summary>Загрузить/перезагрузить список папок с сервера.</summary>
   public ReactiveCommand<Unit, Unit> LoadCommand { get; }
   /// <summary>Создать корневую папку.</summary>
@@ -62,6 +74,8 @@ public class MyFoldersViewModel : ViewModelBase
   public ReactiveCommand<FolderNode, Unit> CreateSubfolderCommand { get; }
   /// <summary>Привязать локальную папку на диске для P2P-шаринга.</summary>
   public ReactiveCommand<FolderNode, Unit> BindLocalFolderCommand { get; }
+  /// <summary>Отвязать папку от текущего устройства.</summary>
+  public ReactiveCommand<LocalBindingRow, Unit> ReleaseBindingCommand { get; }
 
   /// <summary>Вызывается при открытии папки пользователем; передаёт объект <see cref="FolderResponse"/>.</summary>
   public event EventHandler<FolderResponse>? FolderOpened;
@@ -91,6 +105,7 @@ public class MyFoldersViewModel : ViewModelBase
     OpenCommand = ReactiveCommand.Create<FolderNode>(n => FolderOpened?.Invoke(this, n.Folder));
     CreateSubfolderCommand = ReactiveCommand.CreateFromTask<FolderNode>(n => CreateFolderAsync(n.Folder.Id));
     BindLocalFolderCommand = ReactiveCommand.CreateFromTask<FolderNode>(BindLocalFolderAsync);
+    ReleaseBindingCommand = ReactiveCommand.CreateFromTask<LocalBindingRow>(ReleaseBindingAsync);
 
     this.WhenActivated((System.Reactive.Disposables.CompositeDisposable _) => LoadCommand.Execute().Subscribe());
   }
@@ -103,6 +118,7 @@ public class MyFoldersViewModel : ViewModelBase
       var all = await _foldersApi.GetFoldersAsync();
       var tree = FolderTreeBuilder.Build(all, _session.CurrentUserId);
       Roots = new ObservableCollection<FolderNode>(tree);
+      await ReloadLocalBindingsAsync(all);
     }
     catch
     {
@@ -112,6 +128,25 @@ public class MyFoldersViewModel : ViewModelBase
     {
       IsLoading = false;
     }
+  }
+
+  private async Task ReloadLocalBindingsAsync(List<FolderResponse>? allFolders = null)
+  {
+    var deviceId = _deviceIdentity.DeviceId;
+    var serverBindings = await _signalingApi.GetDeviceFoldersAsync(deviceId);
+    var registryAll = _registry.GetAll();
+    var folderNameMap = allFolders?.ToDictionary(f => f.Id, f => f.Name)
+                        ?? new Dictionary<Guid, string>();
+
+    var rows = serverBindings
+      .Where(b => registryAll.ContainsKey(b.FolderId))
+      .Select(b => new LocalBindingRow(
+        b.FolderId,
+        folderNameMap.TryGetValue(b.FolderId, out var name) ? name : b.FolderId.ToString("N")[..8],
+        registryAll[b.FolderId]))
+      .ToList();
+
+    LocalBindings = new ObservableCollection<LocalBindingRow>(rows);
   }
 
   private async Task CreateFolderAsync(Guid? parentId)
@@ -161,6 +196,15 @@ public class MyFoldersViewModel : ViewModelBase
     _registry.SetLocalPath(node.Folder.Id, path);
     await _p2pHost.JoinFolderAsync(node.Folder.Id);
     _notifications.Success($"Папка «{node.Folder.Name}» привязана к {path}. P2P-доступ активен.");
+    await ReloadLocalBindingsAsync();
+  }
+
+  private async Task ReleaseBindingAsync(LocalBindingRow row)
+  {
+    await _signalingApi.ReleaseFolderAsync(_deviceIdentity.DeviceId, row.FolderId);
+    _registry.RemoveMapping(row.FolderId);
+    LocalBindings.Remove(row);
+    _notifications.Success($"Папка отвязана от этого устройства.");
   }
 
 

@@ -8,6 +8,9 @@ public interface IDeviceIdentity
     string DeviceName { get; }
     string Platform { get; }
 
+    /// <summary>Задаёт пользовательское имя устройства и сохраняет его в Credential Manager.</summary>
+    void SetDeviceName(string deviceName);
+
     /// <summary>Проверяет, было ли устройство уже зарегистрировано в signaling-service для указанного пользователя.</summary>
     bool IsRegisteredForUser(Guid userId);
     /// <summary>Отмечает устройство как зарегистрированное для указанного пользователя.</summary>

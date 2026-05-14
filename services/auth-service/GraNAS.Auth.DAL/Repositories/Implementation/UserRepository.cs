@@ -45,4 +45,14 @@ public class UserRepository : IUserRepository
   {
     return await _context.Users.AnyAsync(u => u.Email == email);
   }
+
+  public async Task SaveAvatarAsync(Guid id, byte[]? bytes, string? contentType, CancellationToken ct)
+  {
+    await _context.Users
+      .Where(u => u.Id == id)
+      .ExecuteUpdateAsync(s => s
+        .SetProperty(u => u.Avatar, bytes)
+        .SetProperty(u => u.AvatarContentType, contentType)
+        .SetProperty(u => u.AvatarUpdatedAt, bytes != null ? DateTime.UtcNow : (DateTime?)null), ct);
+  }
 }

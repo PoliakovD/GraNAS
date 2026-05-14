@@ -25,6 +25,12 @@ public record FolderDeviceBinding(
     Guid FolderId, Guid DeviceId, string DeviceName, string Platform,
     bool IsOnline, DateTime ClaimedAt);
 
+/// <summary>Запись о привязке папки к текущему устройству (device → folders).</summary>
+public record DeviceFolderInfo(Guid FolderId, DateTime ClaimedAt);
+
+/// <summary>Запрос на переименование устройства.</summary>
+public record DeviceRenameRequest(string DeviceName);
+
 /// <summary>REST-клиент к signaling-service для управления устройствами, сессиями и привязками папок.</summary>
 public interface ISignalingApi
 {
@@ -51,4 +57,14 @@ public interface ISignalingApi
     /// Папки без binding-а в результат не включаются.
     /// </summary>
     Task<List<FolderDeviceBinding>> GetFolderDevicesAsync(IReadOnlyCollection<Guid> folderIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// Возвращает все папки, привязанные к указанному устройству.
+    /// </summary>
+    Task<List<DeviceFolderInfo>> GetDeviceFoldersAsync(Guid deviceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Переименовывает устройство. Бросает <see cref="ApiException"/> со статусом 409, если имя занято.
+    /// </summary>
+    Task<DeviceResponse> RenameDeviceAsync(Guid deviceId, string deviceName, CancellationToken ct = default);
 }

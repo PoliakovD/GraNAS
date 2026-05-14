@@ -9,7 +9,8 @@ export type IconName =
   | 'lock' | 'shield' | 'globe' | 'circle' | 'sparkle'
   | 'wifi' | 'user' | 'eye'
   | 'arrow-right' | 'arrow-left'
-  | 'cloud' | 'image' | 'file' | 'send';
+  | 'cloud' | 'image' | 'file' | 'send'
+  | 'sun' | 'moon';
 
 interface IconProps {
   name: IconName;
@@ -73,6 +74,8 @@ export function Icon({ name, size = 16, stroke = 1.75, className }: IconProps) {
     case 'image': return <svg {...props}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>;
     case 'file': return <svg {...props}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></svg>;
     case 'send': return <svg {...props}><path d="m22 2-10 20-2-9-9-2 21-9Z"/></svg>;
+    case 'sun': return <svg {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>;
+    case 'moon': return <svg {...props}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>;
     default: return null;
   }
 }

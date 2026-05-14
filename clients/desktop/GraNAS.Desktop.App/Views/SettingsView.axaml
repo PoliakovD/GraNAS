@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             x:DataType="vm:SettingsViewModel"
+             x:Class="GraNAS.Desktop.App.Views.SettingsView">
+
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="24" MaxWidth="520">
+
+            <TextBlock Text="Настройки" FontSize="22" FontWeight="Bold" />
+
+            <!-- Account section -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Аккаунт" FontSize="14" FontWeight="SemiBold" Opacity="0.6" />
+                <Border Background="#f5f5f5" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="120,*">
+                            <TextBlock Grid.Column="0" Text="Email" Opacity="0.6" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Email}" FontWeight="Medium" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid ColumnDefinitions="120,*">
+                            <TextBlock Grid.Column="0" Text="ID пользователя" Opacity="0.6" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding UserIdDisplay}"
+                                       FontFamily="JetBrains Mono,Consolas,monospace"
+                                       FontSize="12" Opacity="0.7" VerticalAlignment="Center"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Device section -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Устройство" FontSize="14" FontWeight="SemiBold" Opacity="0.6" />
+                <Border Background="#f5f5f5" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="120,*">
+                            <TextBlock Grid.Column="0" Text="ID устройства" Opacity="0.6" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding DeviceIdDisplay}"
+                                       FontFamily="JetBrains Mono,Consolas,monospace"
+                                       FontSize="12" Opacity="0.7" VerticalAlignment="Center"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                        <Grid ColumnDefinitions="120,*">
+                            <TextBlock Grid.Column="0" Text="Платформа" Opacity="0.6" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Platform}" FontWeight="Medium" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid ColumnDefinitions="120,*">
+                            <TextBlock Grid.Column="0" Text="Имя устройства" Opacity="0.6" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding DeviceName, Mode=TwoWay}"
+                                     MaxLength="100"
+                                     Watermark="Введите имя устройства" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Action buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Сохранить"
+                        Command="{Binding SaveCommand}"
+                        Background="#722ed1"
+                        Foreground="White"
+                        Padding="14,8" />
+                <Button Content="Отменить"
+                        Command="{Binding ResetCommand}"
+                        Padding="14,8" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

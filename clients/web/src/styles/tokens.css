@@ -3,11 +3,16 @@
   --brand-primary: #6938EF;
   --brand-primary-hover: #5B25E8;
   --brand-primary-soft: #F4EFFF;
+  --brand-surface: #F4EFFF;
   --brand-accent: #00C2A8;
+  --brand-primary-rgb: 105, 56, 239;
+  --brand-primary-light: #9162FF;
 
   /* Neutrals — cool slate */
   --ink-900: #0F1222;
+  --ink-800: #1C2035;
   --ink-700: #2A2E45;
+  --ink-600: #3E4460;
   --ink-500: #5A607A;
   --ink-400: #8A90A6;
   --ink-300: #B6BACA;
@@ -28,6 +33,9 @@
   --info: #2E90FA;
   --info-soft: #E5F1FE;
 
+  /* Overlay */
+  --overlay-bg: rgba(15, 18, 34, 0.32);
+
   /* Radius / shadow */
   --r-sm: 6px;
   --r-md: 10px;
@@ -41,4 +49,42 @@
   /* Type */
   --font-sans: 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+}
+
+[data-theme="dark"] {
+  /* Surfaces */
+  --bg:       #0E1019;
+  --surface:  #161A25;
+  --surface-2: #1F2333;
+
+  /* Ink scale — inverted */
+  --ink-900: #F2F3F8;
+  --ink-800: #E7E9F1;
+  --ink-700: #D5D9E6;
+  --ink-600: #BAC0D2;
+  --ink-500: #9AA0B7;
+  --ink-400: #6F7591;
+  --ink-300: #4A5070;
+  --ink-200: #2F3447;
+  --ink-100: #232839;
+  --ink-50:  #1A1E2A;
+
+  /* Brand */
+  --brand-primary-soft: #2D1F5E;
+  --brand-surface: #2D1F5E;
+
+  /* Status soft — darkened */
+  --success-soft: #0E2A1B;
+  --warn-soft:    #2A1E08;
+  --danger-soft:  #2A0F10;
+  --info-soft:    #0A1B2E;
+
+  /* Overlay */
+  --overlay-bg: rgba(0, 0, 0, 0.60);
+
+  /* Shadows — black-based for dark bg */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.20), 0 1px 1px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.20);
+  --shadow-pop: 0 24px 60px -12px rgba(0, 0, 0, 0.60);
 }

@@ -14,16 +14,17 @@ namespace GraNAS.Desktop.App.Services.P2P;
 public class DeviceIdentity : IDeviceIdentity
 {
     private const string DeviceIdKey = "deviceId";
+    private const string DeviceNameKey = "deviceName";
 
     private readonly ICredentialStore _store;
 
     public Guid DeviceId { get; }
-    public string DeviceName { get; }
+    public string DeviceName { get; private set; }
     public string Platform => "windows";
 
     /// <summary>
     /// Инициализирует идентификацию устройства: читает или генерирует <c>DeviceId</c>,
-    /// использует <c>Environment.MachineName</c> как имя устройства.
+    /// читает сохранённое имя из Credential Manager или использует <c>Environment.MachineName</c>.
     /// </summary>
     public DeviceIdentity(ICredentialStore store)
     {
@@ -38,7 +39,15 @@ public class DeviceIdentity : IDeviceIdentity
             DeviceId = Guid.NewGuid();
             store.Save(DeviceIdKey, DeviceId.ToString());
         }
-        DeviceName = Environment.MachineName;
+        var savedName = store.Get(DeviceNameKey);
+        DeviceName = !string.IsNullOrWhiteSpace(savedName) ? savedName : Environment.MachineName;
+    }
+
+    /// <inheritdoc/>
+    public void SetDeviceName(string deviceName)
+    {
+        _store.Save(DeviceNameKey, deviceName);
+        DeviceName = deviceName;
     }
 
     /// <inheritdoc/>

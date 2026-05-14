@@ -79,4 +79,20 @@ public class SignalingApi : ApiBase, ISignalingApi
         }
         catch { return []; }
     }
+
+    /// <inheritdoc/>
+    public async Task<List<DeviceFolderInfo>> GetDeviceFoldersAsync(Guid deviceId, CancellationToken ct = default)
+    {
+        try { return await GetAsync<List<DeviceFolderInfo>>($"api/signaling/devices/{deviceId}/folders", ct); }
+        catch { return []; }
+    }
+
+    /// <inheritdoc/>
+    public async Task<DeviceResponse> RenameDeviceAsync(Guid deviceId, string deviceName, CancellationToken ct = default)
+    {
+        return await PatchAsync<DeviceResponse>(
+            $"api/signaling/devices/{deviceId}",
+            new DeviceRenameRequest(deviceName),
+            ct);
+    }
 }

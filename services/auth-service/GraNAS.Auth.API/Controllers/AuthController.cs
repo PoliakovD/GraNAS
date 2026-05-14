@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading;
@@ -25,15 +26,21 @@ public class AuthController : ControllerBase
   private const string RefreshTokenCookieName = "refresh_token";
   private const string RefreshTokenCookiePath = "/api/auth";
 
+  private static readonly HashSet<string> AllowedAvatarTypes =
+      ["image/png", "image/jpeg", "image/webp"];
+  private const long MaxAvatarBytes = 256 * 1024;
+
   private readonly IAuthService _authService;
   private readonly IUserSettingsService _settings;
+  private readonly IAvatarService _avatar;
   private readonly IWebHostEnvironment _env;
   private readonly ILogger<AuthController> _logger;
 
-  public AuthController(IAuthService authService, IUserSettingsService settings, IWebHostEnvironment env, ILogger<AuthController> logger)
+  public AuthController(IAuthService authService, IUserSettingsService settings, IAvatarService avatar, IWebHostEnvironment env, ILogger<AuthController> logger)
   {
     _authService = authService;
     _settings = settings;
+    _avatar = avatar;
     _env = env;
     _logger = logger;
   }
@@ -300,6 +307,69 @@ public class AuthController : ControllerBase
       return Unauthorized(new ErrorResponse { Error = "invalid_token", ErrorDescription = "Invalid user identifier." });
 
     await _settings.UpdatePrefsAsync(userId, request.NotificationPrefs, ct);
+    return NoContent();
+  }
+
+  /// <summary>Загрузить или заменить аватар текущего пользователя (multipart/form-data, ≤256 KB, image/png|jpeg|webp).</summary>
+  [Authorize]
+  [HttpPost("me/avatar")]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> UploadAvatar(IFormFile file, CancellationToken ct)
+  {
+    var userId = ParseUserId();
+    if (userId == Guid.Empty)
+      return Unauthorized(new ErrorResponse { Error = "invalid_token", ErrorDescription = "Invalid user identifier." });
+
+    if (file is null || file.Length == 0)
+      return BadRequest(new ErrorResponse { Error = "no_file", ErrorDescription = "Файл не прикреплён." });
+    if (file.Length > MaxAvatarBytes)
+      return BadRequest(new ErrorResponse { Error = "file_too_large", ErrorDescription = "Аватар не должен превышать 256 КБ." });
+    if (!AllowedAvatarTypes.Contains(file.ContentType))
+      return BadRequest(new ErrorResponse { Error = "invalid_content_type", ErrorDescription = "Допустимые форматы: PNG, JPEG, WebP." });
+
+    using var ms = new System.IO.MemoryStream();
+    await file.CopyToAsync(ms, ct);
+    await _avatar.SetAsync(userId, ms.ToArray(), file.ContentType, ct);
+
+    _logger.LogInformation("Avatar uploaded: userId={UserId} size={Size}", userId, file.Length);
+    return NoContent();
+  }
+
+  /// <summary>Получить аватар текущего пользователя. Возвращает 404, если аватар не загружен.</summary>
+  [Authorize]
+  [HttpGet("me/avatar")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  [ResponseCache(NoStore = true)]
+  public async Task<IActionResult> GetAvatar(CancellationToken ct)
+  {
+    var userId = ParseUserId();
+    if (userId == Guid.Empty)
+      return Unauthorized(new ErrorResponse { Error = "invalid_token", ErrorDescription = "Invalid user identifier." });
+
+    var data = await _avatar.GetAsync(userId, ct);
+    if (data is null) return NotFound();
+
+    Response.Headers["Last-Modified"] = data.UpdatedAt.ToString("R");
+    return File(data.Bytes, data.ContentType);
+  }
+
+  /// <summary>Удалить аватар текущего пользователя.</summary>
+  [Authorize]
+  [HttpDelete("me/avatar")]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+  public async Task<IActionResult> DeleteAvatar(CancellationToken ct)
+  {
+    var userId = ParseUserId();
+    if (userId == Guid.Empty)
+      return Unauthorized(new ErrorResponse { Error = "invalid_token", ErrorDescription = "Invalid user identifier." });
+
+    await _avatar.SetAsync(userId, null, null, ct);
+    _logger.LogInformation("Avatar deleted: userId={UserId}", userId);
     return NoContent();
   }
 

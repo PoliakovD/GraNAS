@@ -33,6 +33,19 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
       .HasDefaultValueSql("NOW()")
       .ValueGeneratedOnAdd();
 
+    builder.Property(u => u.Avatar)
+      .HasColumnName("avatar")
+      .IsRequired(false);
+
+    builder.Property(u => u.AvatarContentType)
+      .HasColumnName("avatar_content_type")
+      .HasMaxLength(64)
+      .IsRequired(false);
+
+    builder.Property(u => u.AvatarUpdatedAt)
+      .HasColumnName("avatar_updated_at")
+      .IsRequired(false);
+
     builder.HasMany(u => u.RefreshTokens)
       .WithOne(rt => rt.User)
       .HasForeignKey(rt => rt.UserId)

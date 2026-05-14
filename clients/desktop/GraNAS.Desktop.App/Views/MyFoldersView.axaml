@@ -5,7 +5,7 @@
              x:DataType="vm:MyFoldersViewModel"
              x:Class="GraNAS.Desktop.App.Views.MyFoldersView">
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
 
         <!-- Toolbar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="16,12">
@@ -57,8 +57,35 @@
             </TreeView>
         </ScrollViewer>
 
+        <!-- Device folder bindings -->
+        <Expander Grid.Row="2"
+                  Header="Привязки на этом устройстве"
+                  Margin="16,4,16,0"
+                  IsExpanded="False">
+            <ItemsControl ItemsSource="{Binding LocalBindings}" Margin="0,4">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:LocalBindingRow">
+                        <Grid ColumnDefinitions="*,2*,Auto" Margin="0,2">
+                            <TextBlock Text="{Binding FolderName}"
+                                       VerticalAlignment="Center" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding LocalPath}"
+                                       Foreground="Gray"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Column="2"
+                                    Content="Отвязать"
+                                    Command="{Binding $parent[ItemsControl].((vm:MyFoldersViewModel)DataContext).ReleaseBindingCommand}"
+                                    CommandParameter="{Binding}"
+                                    Padding="6,2" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Expander>
+
         <!-- Loading indicator -->
-        <TextBlock Grid.Row="2"
+        <TextBlock Grid.Row="3"
                    Text="Загрузка..."
                    IsVisible="{Binding IsLoading}"
                    Foreground="Gray"

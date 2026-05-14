@@ -65,6 +65,7 @@ public class ShellViewModel : ViewModelBase
   public ReactiveCommand<Unit, Unit> NavFoldersCommand { get; }
   public ReactiveCommand<Unit, Unit> NavSharedCommand { get; }
   public ReactiveCommand<Unit, Unit> NavPublicShareCommand { get; }
+  public ReactiveCommand<Unit, Unit> NavSettingsCommand { get; }
   /// <summary>Переключает P2P-подключение: если онлайн — отключает; если офлайн — подключает.</summary>
   public ReactiveCommand<Unit, Unit> OnlineToggleCommand { get; }
 
@@ -97,6 +98,7 @@ public class ShellViewModel : ViewModelBase
     NavFoldersCommand = ReactiveCommand.Create(() => ShowFolders());
     NavSharedCommand = ReactiveCommand.Create(() => ShowSharedWithMe());
     NavPublicShareCommand = ReactiveCommand.Create(() => ShowPublicShare());
+    NavSettingsCommand = ReactiveCommand.Create(() => ShowSettings());
     OnlineToggleCommand = ReactiveCommand.CreateFromTask(ToggleOnlineAsync);
 
     // React to auth state changes: login/restore → Folders; logout/expire → Login.
@@ -199,6 +201,12 @@ public class ShellViewModel : ViewModelBase
   {
     CurrentPage = new PublicShareViewModel(_sharesApi, _notifications);
     CurrentNav = "public-share";
+  }
+
+  public void ShowSettings()
+  {
+    CurrentPage = new SettingsViewModel(_session, _signalingApi, _deviceIdentity, _notifications);
+    CurrentNav = "settings";
   }
 
   private async Task LogoutAsync()

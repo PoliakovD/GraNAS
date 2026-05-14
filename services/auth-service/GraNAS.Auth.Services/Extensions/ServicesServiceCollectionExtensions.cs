@@ -12,6 +12,7 @@ public static class ServicesServiceCollectionExtensions
     services.AddScoped<ITokenService, JwtTokenService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IUserSettingsService, UserSettingsService>();
+    services.AddScoped<IAvatarService, AvatarService>();
     return services;
   }
 }

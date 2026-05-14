@@ -59,4 +59,22 @@ public class DeviceRepository : IDeviceRepository
             .Where(d => d.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenAt, DateTime.UtcNow), ct);
     }
+
+    /// <inheritdoc/>
+    public async Task<bool> RenameAsync(Guid id, string newName, CancellationToken ct = default)
+    {
+        var device = await _db.Devices.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (device is null) return false;
+        device.DeviceName = newName;
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            _db.Entry(device).State = Microsoft.EntityFrameworkCore.EntityState.Unchanged;
+            return false;
+        }
+    }
 }

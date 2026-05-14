@@ -44,4 +44,15 @@ public interface IDeviceService
     /// или <c>null</c>, если явной привязки нет.
     /// </summary>
     Task<Guid?> GetBoundDeviceIdAsync(Guid folderId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Переименовывает устройство. Возвращает обновлённый <see cref="DeviceResponse"/> при успехе,
+    /// или <c>null</c>, если имя нарушает уникальный индекс <c>(user_id, device_name)</c>.
+    /// </summary>
+    Task<DeviceResponse?> RenameAsync(Guid deviceId, string newName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Возвращает все папки, привязанные к указанному устройству (device → folders).
+    /// </summary>
+    Task<List<DeviceFolderResponse>> GetFoldersByDeviceAsync(Guid deviceId, CancellationToken ct = default);
 }
