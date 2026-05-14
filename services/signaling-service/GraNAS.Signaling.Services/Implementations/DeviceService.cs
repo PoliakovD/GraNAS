@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using GraNAS.Signaling.Models;
@@ -124,6 +125,32 @@ public class DeviceService : IDeviceService
     {
         var binding = await _folderRepo.GetByFolderIdAsync(folderId, ct);
         return binding?.DeviceId;
+    }
+
+    public async Task<DeviceResponse?> RenameAsync(Guid deviceId, string newName, CancellationToken ct = default)
+    {
+        var ok = await _repo.RenameAsync(deviceId, newName, ct);
+        if (!ok)
+        {
+            _logger.LogDebug("Rename conflict: device {DeviceId} name={Name}", deviceId, newName);
+            return null;
+        }
+
+        var device = await _repo.GetByIdAsync(deviceId, ct);
+        if (device is null) return null;
+        var isOnline = await _sessions.IsDeviceOnlineAsync(deviceId, ct);
+        _logger.LogInformation("Device renamed: id={DeviceId} newName={Name}", deviceId, newName);
+        return MapToResponse(device, isOnline);
+    }
+
+    public async Task<List<DeviceFolderResponse>> GetFoldersByDeviceAsync(Guid deviceId, CancellationToken ct = default)
+    {
+        var bindings = await _folderRepo.GetByDeviceIdAsync(deviceId, ct);
+        return bindings.Select(b => new DeviceFolderResponse
+        {
+            FolderId = b.FolderId,
+            ClaimedAt = b.ClaimedAt,
+        }).ToList();
     }
 
     private static DeviceResponse MapToResponse(Device d, bool isOnline) => new()

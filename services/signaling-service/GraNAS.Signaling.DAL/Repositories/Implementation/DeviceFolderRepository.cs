@@ -52,4 +52,10 @@ public class DeviceFolderRepository : IDeviceFolderRepository
             .Where(df => df.DeviceId == deviceId)
             .ExecuteDeleteAsync(ct);
     }
+
+    /// <inheritdoc/>
+    public Task<List<DeviceFolder>> GetByDeviceIdAsync(Guid deviceId, CancellationToken ct = default)
+        => _db.DeviceFolders
+            .Where(df => df.DeviceId == deviceId)
+            .ToListAsync(ct);
 }

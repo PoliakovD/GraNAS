@@ -136,4 +136,35 @@ public class DeviceServiceTests
 
         Assert.Equal(deviceId, result);
     }
+
+    [Fact]
+    public async Task RenameAsync_DuplicateName_ReturnsNull()
+    {
+        var deviceId = Guid.NewGuid();
+        _repoMock.Setup(r => r.RenameAsync(deviceId, "Duplicate", default)).ReturnsAsync(false);
+
+        var result = await CreateSut().RenameAsync(deviceId, "Duplicate");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetFoldersByDeviceAsync_ReturnsCorrectBindings()
+    {
+        var deviceId = Guid.NewGuid();
+        var folderId1 = Guid.NewGuid();
+        var folderId2 = Guid.NewGuid();
+        var bindings = new List<DeviceFolder>
+        {
+            new() { FolderId = folderId1, DeviceId = deviceId, ClaimedAt = DateTime.UtcNow },
+            new() { FolderId = folderId2, DeviceId = deviceId, ClaimedAt = DateTime.UtcNow },
+        };
+        _folderRepoMock.Setup(r => r.GetByDeviceIdAsync(deviceId, default)).ReturnsAsync(bindings);
+
+        var result = await CreateSut().GetFoldersByDeviceAsync(deviceId);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, r => r.FolderId == folderId1);
+        Assert.Contains(result, r => r.FolderId == folderId2);
+    }
 }

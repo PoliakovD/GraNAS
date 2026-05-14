@@ -20,4 +20,6 @@ public interface IDeviceFolderRepository
     Task<List<DeviceFolder>> GetByFolderIdsAsync(IEnumerable<Guid> folderIds, Guid userId, CancellationToken ct = default);
     /// <summary>Удаляет все привязки папок к устройству. Используется при удалении или переносе устройства.</summary>
     Task RemoveAllByDeviceAsync(Guid deviceId, CancellationToken ct = default);
+    /// <summary>Возвращает все привязки указанного устройства.</summary>
+    Task<List<DeviceFolder>> GetByDeviceIdAsync(Guid deviceId, CancellationToken ct = default);
 }

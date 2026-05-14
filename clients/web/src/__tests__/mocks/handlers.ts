@@ -79,6 +79,41 @@ export const handlers = [
   http.get(`${BASE}/api/signaling/turn/credentials`, () =>
     HttpResponse.json({ username: 'test', credential: 'test', uris: [], ttl: 600 })),
 
+  // devices
+  http.get(`${BASE}/api/signaling/devices`, () =>
+    HttpResponse.json([
+      { deviceId: 'dev-1', deviceName: 'MyPC', platform: 'Windows', createdAt: '2026-01-01T00:00:00Z', lastSeenAt: '2026-05-13T10:00:00Z', isOnline: true },
+      { deviceId: 'dev-2', deviceName: 'Laptop', platform: 'Linux', createdAt: '2026-01-01T00:00:00Z', lastSeenAt: '2026-05-12T08:00:00Z', isOnline: false },
+    ])),
+
+  http.patch(`${BASE}/api/signaling/devices/:deviceId`, ({ params }) =>
+    HttpResponse.json({ deviceId: params.deviceId, deviceName: 'RenamedPC', platform: 'Windows', createdAt: '2026-01-01T00:00:00Z', lastSeenAt: '2026-05-13T10:00:00Z', isOnline: true })),
+
+  http.get(`${BASE}/api/signaling/devices/:deviceId/folders`, () =>
+    HttpResponse.json([
+      { folderId: 'folder-1', claimedAt: '2026-05-10T00:00:00Z' },
+    ])),
+
+  http.delete(`${BASE}/api/signaling/devices/:deviceId/folders/:folderId`, () =>
+    new HttpResponse(null, { status: 204 })),
+
+  http.delete(`${BASE}/api/signaling/sessions/:deviceId`, () =>
+    new HttpResponse(null, { status: 204 })),
+
+  // folder-devices batch
+  http.get(`${BASE}/api/signaling/devices/folder-devices`, () =>
+    HttpResponse.json([])),
+
+  // avatar
+  http.get(`${BASE}/api/auth/me/avatar`, () =>
+    new HttpResponse(null, { status: 404 })),
+
+  http.post(`${BASE}/api/auth/me/avatar`, () =>
+    new HttpResponse(null, { status: 204 })),
+
+  http.delete(`${BASE}/api/auth/me/avatar`, () =>
+    new HttpResponse(null, { status: 204 })),
+
   // notifications (basic)
   http.get(`${BASE}/api/notifications`, () =>
     HttpResponse.json({ items: [], nextCursor: null })),

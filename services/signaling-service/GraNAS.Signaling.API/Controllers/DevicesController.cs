@@ -121,6 +121,51 @@ public class DevicesController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Переименовывает устройство.
+    /// Возвращает 404, если устройство не найдено или не принадлежит текущему пользователю.
+    /// Возвращает 409, если имя уже занято другим устройством того же пользователя.
+    /// </summary>
+    [HttpPatch("{deviceId:guid}")]
+    [ProducesResponseType(typeof(DeviceResponse), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(409)]
+    public async Task<ActionResult<DeviceResponse>> Rename(
+        Guid deviceId, [FromBody] DeviceRenameRequest req, CancellationToken ct)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var userId = GetUserId();
+        if (!await _deviceService.BelongsToUserAsync(deviceId, userId, ct))
+            return Forbid();
+
+        var result = await _deviceService.RenameAsync(deviceId, req.DeviceName, ct);
+        if (result is null)
+        {
+            _logger.LogWarning("Rename conflict: device {DeviceId} name={Name}", deviceId, req.DeviceName);
+            return Conflict(new { error = "NAME_CONFLICT", message = "Устройство с таким именем уже существует." });
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>Возвращает список папок, привязанных к указанному устройству.</summary>
+    [HttpGet("{deviceId:guid}/folders")]
+    [ProducesResponseType(typeof(List<DeviceFolderResponse>), 200)]
+    [ProducesResponseType(403)]
+    public async Task<ActionResult<List<DeviceFolderResponse>>> GetDeviceFolders(
+        Guid deviceId, CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (!await _deviceService.BelongsToUserAsync(deviceId, userId, ct))
+            return Forbid();
+
+        var folders = await _deviceService.GetFoldersByDeviceAsync(deviceId, ct);
+        _logger.LogDebug("Device folders listed: deviceId={DeviceId} count={Count}", deviceId, folders.Count);
+        return Ok(folders);
+    }
+
     private Guid GetUserId()
     {
         var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

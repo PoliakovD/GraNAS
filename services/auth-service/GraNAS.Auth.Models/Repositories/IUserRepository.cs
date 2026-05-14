@@ -12,4 +12,5 @@ public interface IUserRepository
   Task<IEnumerable<User>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct);
   Task CreateAsync(User user);
   Task<bool> EmailExistsAsync(string email);
+  Task SaveAvatarAsync(Guid id, byte[]? bytes, string? contentType, CancellationToken ct);
 }

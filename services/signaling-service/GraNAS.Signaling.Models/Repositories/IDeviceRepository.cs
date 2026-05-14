@@ -15,4 +15,9 @@ public interface IDeviceRepository
     Task<bool> BelongsToUserAsync(Guid deviceId, Guid userId, CancellationToken ct = default);
     /// <summary>Обновляет <see cref="Device.LastSeenAt"/> без загрузки сущности в память (<c>ExecuteUpdateAsync</c>).</summary>
     Task TouchLastSeenAsync(Guid id, CancellationToken ct = default);
+    /// <summary>
+    /// Переименовывает устройство. Возвращает <c>true</c> при успехе или <c>false</c>,
+    /// если имя нарушает уникальный индекс <c>(user_id, device_name)</c>.
+    /// </summary>
+    Task<bool> RenameAsync(Guid id, string newName, CancellationToken ct = default);
 }
