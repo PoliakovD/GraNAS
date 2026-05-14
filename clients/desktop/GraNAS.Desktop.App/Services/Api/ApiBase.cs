@@ -32,6 +32,17 @@ public abstract class ApiBase
     await EnsureSuccessAsync(response);
   }
 
+  protected async Task<T> PatchAsync<T>(string url, object body, CancellationToken ct = default)
+  {
+    var request = new HttpRequestMessage(HttpMethod.Patch, url)
+    {
+      Content = JsonContent.Create(body, options: JsonOpts),
+    };
+    var response = await Http.SendAsync(request, ct);
+    await EnsureSuccessAsync(response);
+    return (await response.Content.ReadFromJsonAsync<T>(JsonOpts, ct))!;
+  }
+
   protected async Task DeleteAsync(string url, CancellationToken ct = default)
   {
     var response = await Http.DeleteAsync(url, ct);

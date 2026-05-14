@@ -34,6 +34,11 @@
                             Classes="header-nav"
                             Background="Transparent"
                             Foreground="White" />
+                    <Button Content="Настройки"
+                            Command="{Binding NavSettingsCommand}"
+                            Classes="header-nav"
+                            Background="Transparent"
+                            Foreground="White" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
                     <!-- P2P online/offline toggle -->
@@ -83,6 +88,9 @@
                 </DataTemplate>
                 <DataTemplate DataType="vm:PublicShareViewModel">
                     <views:PublicShareView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:SettingsViewModel">
+                    <views:SettingsView />
                 </DataTemplate>
             </ContentControl.DataTemplates>
         </ContentControl>

@@ -30,8 +30,8 @@
     <PackageReference Include="ReactiveUI" Version="20.1.1" />
 
     <!-- DI + Configuration + HTTP -->
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-preview.4.25258.110" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0-preview.4.25258.110" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
 
     <!-- Retry / resilience -->
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.11" />
@@ -53,6 +53,7 @@
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.93.0" />
   </ItemGroup>
 
   <ItemGroup>
