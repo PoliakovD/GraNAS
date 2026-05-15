@@ -44,7 +44,7 @@ public class MetadataServiceClient : IMetadataServiceClient
 
             return await response.Content.ReadFromJsonAsync<FolderInfo>(ct);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
             _logger.LogError(ex, "MetadataClient: request to {Path} failed", path);
             return null;
@@ -71,7 +71,7 @@ public class MetadataServiceClient : IMetadataServiceClient
 
             return await response.Content.ReadFromJsonAsync<FolderInfo>(ct);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
             _logger.LogError(ex, "MetadataClient: request to {Path} failed", path);
             return null;

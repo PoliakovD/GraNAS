@@ -17,7 +17,6 @@ export const sharesApi = {
   getByToken: (token: string) =>
     api.get<ShareDetailsResponse>(`/api/sharing/share/${token}`),
 
-  // TODO: backend GET /api/share-links not yet implemented — see docs/sharing-service-global-listing.md
   listAll: () =>
-    api.get<ShareLinkOwnerResponse[]>('/api/share-links'),
+    api.get<ShareLinkOwnerResponse[]>('/api/sharing/share-links'),
 };
