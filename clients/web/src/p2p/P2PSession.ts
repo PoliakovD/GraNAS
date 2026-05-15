@@ -205,6 +205,7 @@ export function createP2PSession(
       hub.on('Offer', (senderConnId: string, sdp: string) => void handleOffer(senderConnId, sdp));
       hub.on('IceCandidate', (_: string, candidate: string, sdpMid: string | null, sdpMLineIndex: number | null) =>
         handleIceCandidate(candidate, sdpMid, sdpMLineIndex));
+      hub.on('OwnerOnlineStatusChanged', () => { /* handled by useOwnerOnlineStatus */ });
       await hub.start();
       await hub.invoke('WatchFolder', folderId);
       await requestSession();
