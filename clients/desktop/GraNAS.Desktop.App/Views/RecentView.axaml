@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             xmlns:contracts="using:GraNAS.Desktop.Contracts.Metadata"
+             x:DataType="vm:RecentViewModel"
+             x:Class="GraNAS.Desktop.App.Views.RecentView">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="24,16,24,12">
+            <TextBlock Text="Недавние" FontSize="22" FontWeight="Bold"
+                       VerticalAlignment="Center" />
+            <Button Classes="ghost sm" Content="↻" Command="{Binding LoadCommand}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="24,0,24,24" Spacing="8">
+
+                <TextBlock Text="Загрузка…" IsVisible="{Binding IsLoading}"
+                           Foreground="{DynamicResource Ink500Brush}" FontSize="13" />
+
+                <ItemsControl ItemsSource="{Binding RecentFolders}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="contracts:FolderResponse">
+                            <Button Classes="ghost"
+                                    Margin="0,0,12,12"
+                                    Padding="0"
+                                    Command="{Binding $parent[ItemsControl].((vm:RecentViewModel)DataContext).OpenCommand}"
+                                    CommandParameter="{Binding}">
+                                <Border Classes="card" Width="200" Height="110">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold" FontSize="14"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding OwnerEmail}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource Ink500Brush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsVisible="{Binding OwnerEmail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Text="{Binding LastAccessedAt, StringFormat='Открыто: {0:dd.MM.yyyy}'}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource Ink400Brush}"
+                                                   IsVisible="{Binding LastAccessedAt, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </Grid>
+
+</UserControl>

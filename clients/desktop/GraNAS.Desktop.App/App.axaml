@@ -3,10 +3,55 @@
              x:Class="GraNAS.Desktop.App.App"
              RequestedThemeVariant="Light">
 
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- Brand palette (matches web tokens.css) -->
+            <Color x:Key="BrandPrimary">#6938EF</Color>
+            <Color x:Key="BrandPrimaryHover">#5B25E8</Color>
+            <Color x:Key="BrandPrimaryLight">#9162FF</Color>
+            <Color x:Key="BrandAccent">#00C2A8</Color>
+            <SolidColorBrush x:Key="BrandPrimaryBrush" Color="{StaticResource BrandPrimary}" />
+            <SolidColorBrush x:Key="BrandPrimaryHoverBrush" Color="{StaticResource BrandPrimaryHover}" />
+            <SolidColorBrush x:Key="BrandPrimarySoftBrush" Color="#F4EFFF" />
+
+            <!-- Ink scale -->
+            <SolidColorBrush x:Key="Ink900Brush" Color="#0F1222" />
+            <SolidColorBrush x:Key="Ink700Brush" Color="#2A2E45" />
+            <SolidColorBrush x:Key="Ink500Brush" Color="#5A607A" />
+            <SolidColorBrush x:Key="Ink400Brush" Color="#8A90A6" />
+            <SolidColorBrush x:Key="Ink300Brush" Color="#B6BACA" />
+            <SolidColorBrush x:Key="Ink200Brush" Color="#DCDEE7" />
+            <SolidColorBrush x:Key="Ink100Brush" Color="#EEF0F5" />
+
+            <!-- Surfaces -->
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="Surface2Brush" Color="#F4F5F9" />
+            <SolidColorBrush x:Key="BgBrush" Color="#FBFBFD" />
+
+            <!-- Status -->
+            <SolidColorBrush x:Key="SuccessBrush" Color="#16B364" />
+            <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E5F8EE" />
+            <SolidColorBrush x:Key="DangerBrush" Color="#E5484D" />
+            <SolidColorBrush x:Key="DangerSoftBrush" Color="#FDECEC" />
+            <SolidColorBrush x:Key="WarnBrush" Color="#F79009" />
+            <SolidColorBrush x:Key="WarnSoftBrush" Color="#FEF3DA" />
+            <SolidColorBrush x:Key="InfoBrush" Color="#2E90FA" />
+            <SolidColorBrush x:Key="InfoSoftBrush" Color="#E5F1FE" />
+
+            <!-- Radius -->
+            <CornerRadius x:Key="RadiusSm">6</CornerRadius>
+            <CornerRadius x:Key="RadiusMd">10</CornerRadius>
+            <CornerRadius x:Key="RadiusLg">14</CornerRadius>
+
+            <!-- Typography -->
+            <FontFamily x:Key="FontSans">avares://Avalonia.Fonts.Inter/Assets#Inter</FontFamily>
+            <FontFamily x:Key="FontMono">JetBrains Mono,Consolas,monospace</FontFamily>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
-        <StyleInclude Source="avares://Semi.Avalonia/SemiTheme.axaml" />
-        <StyleInclude Source="/Assets/Themes/SemiOverrides.axaml" />
+        <StyleInclude Source="/Assets/Themes/AppStyles.axaml" />
     </Application.Styles>
 </Application>

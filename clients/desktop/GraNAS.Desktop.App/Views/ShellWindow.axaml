@@ -7,75 +7,123 @@
         Title="GraNAS"
         Width="1100"
         Height="720"
-        MinWidth="800"
-        MinHeight="500">
+        MinWidth="820"
+        MinHeight="500"
+        Background="{DynamicResource BgBrush}">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- Auto collapses to 0 when sidebar is hidden (not authenticated) -->
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <!-- Header bar (hidden when not authenticated) -->
-        <Border Grid.Row="0"
-                Background="#722ed1"
-                Padding="16,10"
+        <!-- ══════════════════════════════ LEFT SIDEBAR ══════════════════════════════ -->
+        <Border Grid.Column="0"
+                Width="220"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource Ink100Brush}"
+                BorderThickness="0,0,1,0"
                 IsVisible="{Binding Session.IsAuthenticated}">
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                    <Button Content="Мои папки"
-                            Command="{Binding NavFoldersCommand}"
-                            Classes="header-nav"
-                            Background="Transparent"
-                            Foreground="White" />
-                    <Button Content="Доступные папки"
-                            Command="{Binding NavSharedCommand}"
-                            Classes="header-nav"
-                            Background="Transparent"
-                            Foreground="White" />
-                    <Button Content="Открыть по ссылке"
-                            Command="{Binding NavPublicShareCommand}"
-                            Classes="header-nav"
-                            Background="Transparent"
-                            Foreground="White" />
-                    <Button Content="Настройки"
-                            Command="{Binding NavSettingsCommand}"
-                            Classes="header-nav"
-                            Background="Transparent"
-                            Foreground="White" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                    <!-- P2P online/offline toggle -->
-                    <Button Command="{Binding OnlineToggleCommand}"
-                            Background="Transparent"
-                            Foreground="White">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Ellipse Width="10" Height="10" Fill="#4caf50"
-                                     IsVisible="{Binding IsOnline}" />
-                            <TextBlock Text="Online" IsVisible="{Binding IsOnline}"
+
+            <Grid RowDefinitions="Auto,*,Auto">
+
+                <!-- Brand mark -->
+                <Border Grid.Row="0" Padding="16,18,16,14">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="32" Height="32" CornerRadius="9"
+                                Background="{DynamicResource BrandPrimaryBrush}">
+                            <TextBlock Text="G" Foreground="White"
+                                       FontWeight="Bold" FontSize="15"
+                                       HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
-                            <Ellipse Width="10" Height="10" Fill="#9e9e9e"
+                        </Border>
+                        <TextBlock Text="GraNAS" FontSize="16" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Navigation items -->
+                <StackPanel Grid.Row="1" Margin="8,0" Spacing="1">
+                    <Button Classes="nav-item" Command="{Binding NavHomeCommand}">
+                        Главная
+                    </Button>
+                    <Button Classes="nav-item" Command="{Binding NavFoldersCommand}">
+                        Мои папки
+                    </Button>
+                    <Button Classes="nav-item" Command="{Binding NavSharedCommand}">
+                        Доступные папки
+                    </Button>
+                    <Button Classes="nav-item" Command="{Binding NavLinksCommand}">
+                        Ссылки
+                    </Button>
+                    <Button Classes="nav-item" Command="{Binding NavRecentCommand}">
+                        Недавние
+                    </Button>
+                    <Button Classes="nav-item" Command="{Binding NavPublicShareCommand}">
+                        Открыть по ссылке
+                    </Button>
+                </StackPanel>
+
+                <!-- Bottom: user info, P2P, settings, logout -->
+                <StackPanel Grid.Row="2" Margin="8,0,8,16" Spacing="2">
+                    <!-- P2P online toggle -->
+                    <Button Classes="ghost" Command="{Binding OnlineToggleCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="10,7">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="8" Height="8"
+                                     Fill="{DynamicResource SuccessBrush}"
+                                     IsVisible="{Binding IsOnline}" />
+                            <Ellipse Width="8" Height="8"
+                                     Fill="{DynamicResource Ink300Brush}"
                                      IsVisible="{Binding !IsOnline}" />
-                            <TextBlock Text="Offline" IsVisible="{Binding !IsOnline}"
+                            <TextBlock Text="Онлайн" FontSize="13"
+                                       IsVisible="{Binding IsOnline}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="Офлайн" FontSize="13"
+                                       IsVisible="{Binding !IsOnline}"
+                                       Foreground="{DynamicResource Ink500Brush}"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+
+                    <!-- User email -->
                     <TextBlock Text="{Binding Session.CurrentUserEmail}"
-                               Foreground="White"
-                               VerticalAlignment="Center" />
-                    <Button Content="Выйти"
-                            Command="{Binding LogoutCommand}"
-                            Background="Transparent"
-                            Foreground="White" />
+                               FontSize="12"
+                               Foreground="{DynamicResource Ink500Brush}"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="10,2" />
+
+                    <!-- Separator -->
+                    <Border Height="1" Background="{DynamicResource Ink100Brush}"
+                            Margin="8,4" />
+
+                    <Button Classes="nav-item" Command="{Binding NavSettingsCommand}">
+                        Настройки
+                    </Button>
+                    <Button Classes="nav-item danger" Command="{Binding LogoutCommand}">
+                        Выйти
+                    </Button>
                 </StackPanel>
+
             </Grid>
         </Border>
 
-        <!-- Page content -->
-        <ContentControl Grid.Row="1"
-                        Content="{Binding CurrentPage}">
+        <!-- ══════════════════════════════ PAGE CONTENT ══════════════════════════════ -->
+        <ContentControl Grid.Column="1"
+                        Content="{Binding CurrentPage}"
+                        Background="{DynamicResource BgBrush}">
             <ContentControl.DataTemplates>
                 <DataTemplate DataType="vm:LoginViewModel">
                     <views:LoginView />
                 </DataTemplate>
                 <DataTemplate DataType="vm:RegisterViewModel">
                     <views:RegisterView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:HomeViewModel">
+                    <views:HomeView />
                 </DataTemplate>
                 <DataTemplate DataType="vm:MyFoldersViewModel">
                     <views:MyFoldersView />
@@ -88,6 +136,12 @@
                 </DataTemplate>
                 <DataTemplate DataType="vm:PublicShareViewModel">
                     <views:PublicShareView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:LinksViewModel">
+                    <views:LinksView />
+                </DataTemplate>
+                <DataTemplate DataType="vm:RecentViewModel">
+                    <views:RecentView />
                 </DataTemplate>
                 <DataTemplate DataType="vm:SettingsViewModel">
                     <views:SettingsView />

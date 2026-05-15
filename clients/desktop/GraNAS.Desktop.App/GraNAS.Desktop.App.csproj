@@ -23,9 +23,6 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
 
-    <!-- UI library -->
-    <PackageReference Include="Semi.Avalonia" Version="11.3.7" />
-
     <!-- ReactiveUI -->
     <PackageReference Include="ReactiveUI" Version="20.1.1" />
 

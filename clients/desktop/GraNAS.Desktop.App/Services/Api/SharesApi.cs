@@ -17,4 +17,10 @@ public class SharesApi : ApiBase, ISharesApi
 
   public Task<ShareDetailsResponse> GetShareDetailsAsync(string token, CancellationToken ct = default)
     => GetAsync<ShareDetailsResponse>($"api/sharing/share/{token}", ct);
+
+  public async Task<List<ShareLinkOwnerResponse>> ListAllSharesAsync(bool activeOnly = true, CancellationToken ct = default)
+  {
+    try { return await GetAsync<List<ShareLinkOwnerResponse>>($"api/share-links?activeOnly={activeOnly}", ct); }
+    catch { return []; }
+  }
 }

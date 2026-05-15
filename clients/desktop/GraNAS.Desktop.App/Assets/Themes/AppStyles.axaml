@@ -1,0 +1,120 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Global font -->
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource FontSans}" />
+    </Style>
+    <Style Selector="TextBox">
+        <Setter Property="FontFamily" Value="{DynamicResource FontSans}" />
+    </Style>
+    <Style Selector="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource FontSans}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- Brand button — violet fill -->
+    <Style Selector="Button.brand">
+        <Setter Property="Background" Value="{DynamicResource BrandPrimaryBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BrandPrimaryBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+        <Setter Property="Padding" Value="14,8" />
+    </Style>
+    <Style Selector="Button.brand:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BrandPrimaryHoverBrush}" />
+    </Style>
+
+    <!-- Primary button — dark fill -->
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="{DynamicResource Ink900Brush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Ink900Brush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+        <Setter Property="Padding" Value="14,8" />
+    </Style>
+
+    <!-- Ghost button — transparent -->
+    <Style Selector="Button.ghost">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Ink700Brush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    </Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Surface2Brush}" />
+    </Style>
+
+    <!-- Danger button — red text, transparent bg -->
+    <Style Selector="Button.danger">
+        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    </Style>
+
+    <!-- Small modifier -->
+    <Style Selector="Button.sm">
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="FontSize" Value="12.5" />
+    </Style>
+
+    <!-- Sidebar nav-item -->
+    <Style Selector="Button.nav-item">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Ink700Brush}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Padding" Value="10,9" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+        <Setter Property="FontSize" Value="13.5" />
+    </Style>
+    <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Surface2Brush}" />
+    </Style>
+    <Style Selector="Button.nav-item.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BrandPrimarySoftBrush}" />
+    </Style>
+    <Style Selector="Button.nav-item.active">
+        <Setter Property="Foreground" Value="{DynamicResource BrandPrimaryBrush}" />
+    </Style>
+
+    <!-- TextBox refinement -->
+    <Style Selector="TextBox">
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Ink200Brush}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Padding" Value="10,8" />
+    </Style>
+
+    <!-- Card border -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Ink100Brush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLg}" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <!-- Stat card -->
+    <Style Selector="Border.stat-card">
+        <Setter Property="Background" Value="{DynamicResource Surface2Brush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <!-- Tag styles -->
+    <Style Selector="Border.tag">
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="Padding" Value="8,3" />
+    </Style>
+    <Style Selector="Border.tag.green">
+        <Setter Property="Background" Value="{DynamicResource SuccessSoftBrush}" />
+    </Style>
+    <Style Selector="Border.tag.red">
+        <Setter Property="Background" Value="{DynamicResource DangerSoftBrush}" />
+    </Style>
+
+</Styles>

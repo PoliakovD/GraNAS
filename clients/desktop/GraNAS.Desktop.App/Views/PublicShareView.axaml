@@ -17,12 +17,11 @@
                          Width="380" />
                 <Button Content="Открыть"
                         Command="{Binding LookupCommand}"
-                        Background="#722ed1"
-                        Foreground="White" />
+                        Classes="brand" />
             </StackPanel>
 
             <!-- Result card -->
-            <Border Background="#f9f0ff"
+            <Border Background="{DynamicResource BrandPrimarySoftBrush}"
                     CornerRadius="8"
                     Padding="16"
                     IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -31,12 +30,12 @@
                                FontSize="16"
                                FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Details.OwnerId, StringFormat='Владелец (ID): {0}'}"
-                               Foreground="Gray" />
+                               Foreground="{DynamicResource Ink500Brush}" />
                     <TextBlock Text="{Binding Details.ExpiresAt, StringFormat='Истекает: {0:g}'}"
-                               Foreground="Gray" />
+                               Foreground="{DynamicResource Ink500Brush}" />
                     <TextBlock Text="{Binding Details.Path, StringFormat='Путь: {0}'}"
                                IsVisible="{Binding Details.Path, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               Foreground="Gray" />
+                               Foreground="{DynamicResource Ink500Brush}" />
                 </StackPanel>
             </Border>
 
