@@ -8,4 +8,5 @@ public interface ISharesApi
   Task<CreateShareResponse> CreateShareAsync(Guid folderId, CreateShareRequest request, CancellationToken ct = default);
   Task RevokeShareAsync(Guid shareLinkId, CancellationToken ct = default);
   Task<ShareDetailsResponse> GetShareDetailsAsync(string token, CancellationToken ct = default);
+  Task<List<ShareLinkOwnerResponse>> ListAllSharesAsync(bool activeOnly = true, CancellationToken ct = default);
 }

@@ -10,7 +10,7 @@
             <TextBlock Text="GraNAS"
                        FontSize="28"
                        FontWeight="Bold"
-                       Foreground="#722ed1"
+                       Foreground="{DynamicResource BrandPrimaryBrush}"
                        HorizontalAlignment="Center" />
 
             <TextBlock Text="Регистрация"
@@ -27,7 +27,7 @@
                     IsEnabled="{Binding !IsLoading}"
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
-                    Background="#722ed1"
+                    Classes="brand"
                     Foreground="White" />
 
             <Button Content="Уже есть аккаунт? Войти"

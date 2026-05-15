@@ -21,9 +21,9 @@
             <Button Content="Отмена" Command="{Binding CancelCommand}" Width="90" />
             <Button Content="Создать"
                     Command="{Binding ConfirmCommand}"
-                    Background="#722ed1"
-                    Foreground="White"
+                    Classes="brand"
                     Width="90" />
         </StackPanel>
     </StackPanel>
 </Window>
+

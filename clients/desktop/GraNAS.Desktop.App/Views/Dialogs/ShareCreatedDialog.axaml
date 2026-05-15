@@ -12,7 +12,7 @@
     <StackPanel Margin="20" Spacing="12">
         <TextBlock Text="Сохраните токен — после закрытия он не показывается."
                    TextWrapping="Wrap"
-                   Foreground="#d46b08" />
+                   Foreground="{DynamicResource WarnBrush}" />
 
         <Grid ColumnDefinitions="*,Auto">
             <TextBox Text="{Binding Token}"
@@ -22,8 +22,7 @@
                     Content="Копировать"
                     Command="{Binding CopyCommand}"
                     Margin="8,0,0,0"
-                    Background="#722ed1"
-                    Foreground="White" />
+                    Classes="brand" />
         </Grid>
 
         <Button Content="Закрыть"
@@ -32,3 +31,4 @@
                 Width="100" />
     </StackPanel>
 </Window>
+

@@ -19,7 +19,7 @@
                   GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Папка" Binding="{Binding Name}" Width="*" />
-                <DataGridTextColumn Header="Владелец (ID)" Binding="{Binding OwnerId}" Width="280" />
+                <DataGridTextColumn Header="Владелец" Binding="{Binding OwnerEmail}" Width="280" />
                 <DataGridTextColumn Header="Уровень доступа" Binding="{Binding AccessLevel}" Width="140" />
                 <DataGridTextColumn Header="Путь" Binding="{Binding Path}" Width="200" />
             </DataGrid.Columns>
@@ -28,7 +28,7 @@
         <TextBlock Grid.Row="2"
                    Text="Загрузка..."
                    IsVisible="{Binding IsLoading}"
-                   Foreground="Gray"
+                   Foreground="{DynamicResource Ink500Brush}"
                    Margin="16,8" />
 
     </Grid>

@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GraNAS.Desktop.App.ViewModels"
+             xmlns:contracts="using:GraNAS.Desktop.Contracts.Metadata"
+             x:DataType="vm:HomeViewModel"
+             x:Class="GraNAS.Desktop.App.Views.HomeView">
+
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="24">
+
+            <TextBlock Text="Главная" FontSize="22" FontWeight="Bold" />
+
+            <!-- Stat cards -->
+            <UniformGrid Columns="4">
+
+                <Border Classes="stat-card" Margin="0,0,6,0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Мои папки" FontSize="12"
+                                   Foreground="{DynamicResource Ink500Brush}" />
+                        <TextBlock Text="{Binding OwnedCount}" FontSize="28" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="stat-card" Margin="3,0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Доступные мне" FontSize="12"
+                                   Foreground="{DynamicResource Ink500Brush}" />
+                        <TextBlock Text="{Binding SharedCount}" FontSize="28" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="stat-card" Margin="3,0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Активные ссылки" FontSize="12"
+                                   Foreground="{DynamicResource Ink500Brush}" />
+                        <TextBlock Text="{Binding ActiveLinksCount}" FontSize="28" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="stat-card" Margin="6,0,0,0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Всего папок" FontSize="12"
+                                   Foreground="{DynamicResource Ink500Brush}" />
+                        <TextBlock Text="{Binding TotalCount}" FontSize="28" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+
+            </UniformGrid>
+
+            <!-- Recent folders -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Недавние папки" FontSize="15" FontWeight="SemiBold" />
+
+                <TextBlock Text="Загрузка…" IsVisible="{Binding IsLoading}"
+                           Foreground="{DynamicResource Ink500Brush}" FontSize="13" />
+
+                <ItemsControl ItemsSource="{Binding RecentFolders}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="contracts:FolderResponse">
+                            <Border Classes="card" Width="200" Height="100"
+                                    Margin="0,0,12,12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="SemiBold" FontSize="14"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding OwnerEmail}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource Ink500Brush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding OwnerEmail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

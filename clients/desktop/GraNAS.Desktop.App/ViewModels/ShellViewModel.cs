@@ -13,12 +13,6 @@ namespace GraNAS.Desktop.App.ViewModels;
 /// Главная ViewModel приложения. Управляет навигацией между страницами, состоянием аутентификации
 /// и P2P-подключением.
 /// </summary>
-/// <remarks>
-/// Реагирует на изменения <c>IAuthSession.IsAuthenticated</c> через ReactiveUI:
-/// при входе — переходит на страницу папок и (если <c>ShouldBeOnline</c>) запускает P2P;
-/// при выходе — показывает форму входа и отключает P2P.
-/// <c>OnlineToggleCommand</c> позволяет пользователю вручную управлять P2P-подключением.
-/// </remarks>
 public class ShellViewModel : ViewModelBase
 {
   private readonly IAuthSession _session;
@@ -32,26 +26,24 @@ public class ShellViewModel : ViewModelBase
   private readonly IFolderShareRegistry _registry;
   private readonly ISignalingApi _signalingApi;
   private readonly IDeviceIdentity _deviceIdentity;
+  private readonly IClipboardService _clipboard;
 
   private ViewModelBase? _currentPage;
-  private string _currentNav = "folders";
+  private string _currentNav = "home";
   private bool _isOnline;
 
-  /// <summary>Текущая отображаемая страница (ViewModel активного экрана).</summary>
   public ViewModelBase? CurrentPage
   {
     get => _currentPage;
     private set => this.RaiseAndSetIfChanged(ref _currentPage, value);
   }
 
-  /// <summary>Идентификатор текущего раздела навигации: <c>folders</c>, <c>shared</c>, <c>login</c> и т.д.</summary>
   public string CurrentNav
   {
     get => _currentNav;
     set => this.RaiseAndSetIfChanged(ref _currentNav, value);
   }
 
-  /// <summary><c>true</c>, если P2P-подключение к хабу сигналинга активно.</summary>
   public bool IsOnline
   {
     get => _isOnline;
@@ -60,13 +52,14 @@ public class ShellViewModel : ViewModelBase
 
   public IAuthSession Session => _session;
 
-  /// <summary>Команда выхода из аккаунта. Вызывает logout API и <c>SignOutAsync</c> сессии.</summary>
   public ReactiveCommand<Unit, Unit> LogoutCommand { get; }
+  public ReactiveCommand<Unit, Unit> NavHomeCommand { get; }
   public ReactiveCommand<Unit, Unit> NavFoldersCommand { get; }
   public ReactiveCommand<Unit, Unit> NavSharedCommand { get; }
   public ReactiveCommand<Unit, Unit> NavPublicShareCommand { get; }
+  public ReactiveCommand<Unit, Unit> NavLinksCommand { get; }
+  public ReactiveCommand<Unit, Unit> NavRecentCommand { get; }
   public ReactiveCommand<Unit, Unit> NavSettingsCommand { get; }
-  /// <summary>Переключает P2P-подключение: если онлайн — отключает; если офлайн — подключает.</summary>
   public ReactiveCommand<Unit, Unit> OnlineToggleCommand { get; }
 
   public ShellViewModel(
@@ -80,7 +73,8 @@ public class ShellViewModel : ViewModelBase
     IP2PHost p2pHost,
     IFolderShareRegistry registry,
     ISignalingApi signalingApi,
-    IDeviceIdentity deviceIdentity)
+    IDeviceIdentity deviceIdentity,
+    IClipboardService clipboard)
   {
     _session = session;
     _authApi = authApi;
@@ -93,15 +87,18 @@ public class ShellViewModel : ViewModelBase
     _registry = registry;
     _signalingApi = signalingApi;
     _deviceIdentity = deviceIdentity;
+    _clipboard = clipboard;
 
     LogoutCommand = ReactiveCommand.CreateFromTask(LogoutAsync);
+    NavHomeCommand = ReactiveCommand.Create(() => ShowHome());
     NavFoldersCommand = ReactiveCommand.Create(() => ShowFolders());
     NavSharedCommand = ReactiveCommand.Create(() => ShowSharedWithMe());
     NavPublicShareCommand = ReactiveCommand.Create(() => ShowPublicShare());
+    NavLinksCommand = ReactiveCommand.Create(() => ShowLinks());
+    NavRecentCommand = ReactiveCommand.Create(() => ShowRecent());
     NavSettingsCommand = ReactiveCommand.Create(() => ShowSettings());
     OnlineToggleCommand = ReactiveCommand.CreateFromTask(ToggleOnlineAsync);
 
-    // React to auth state changes: login/restore → Folders; logout/expire → Login.
     _session.WhenAnyValue(s => s.IsAuthenticated)
       .Skip(1)
       .DistinctUntilChanged()
@@ -110,7 +107,7 @@ public class ShellViewModel : ViewModelBase
       {
         if (isAuth)
         {
-          ShowFolders();
+          ShowHome();
           if (_p2pHost.ShouldBeOnline)
             Task.Run(() => ConnectP2PAsync()).ConfigureAwait(false);
         }
@@ -122,11 +119,9 @@ public class ShellViewModel : ViewModelBase
         }
       });
 
-    // Default state: Login. window.Opened triggers TryRestoreAsync which updates IsAuthenticated.
     ShowLogin();
   }
 
-  /// <summary>Запускает P2P-подключение и обновляет <see cref="IsOnline"/>. Ошибки логируются без исключений.</summary>
   private async Task ConnectP2PAsync()
   {
     try
@@ -177,6 +172,12 @@ public class ShellViewModel : ViewModelBase
     CurrentNav = "register";
   }
 
+  public void ShowHome()
+  {
+    CurrentPage = new HomeViewModel(_foldersApi, _sharesApi, _session, _notifications);
+    CurrentNav = "home";
+  }
+
   public void ShowFolders()
   {
     var vm = new MyFoldersViewModel(_foldersApi, _session, _dialogs, _notifications, _registry, _p2pHost, _signalingApi, _deviceIdentity);
@@ -187,7 +188,7 @@ public class ShellViewModel : ViewModelBase
 
   public void ShowFolderDetail(FolderResponse folder)
   {
-    CurrentPage = new FolderDetailViewModel(folder, _permissionsApi, _sharesApi, _dialogs, _notifications);
+    CurrentPage = new FolderDetailViewModel(folder, _permissionsApi, _sharesApi, _signalingApi, _session, _dialogs, _notifications);
     CurrentNav = "folder-detail";
   }
 
@@ -203,6 +204,20 @@ public class ShellViewModel : ViewModelBase
     CurrentNav = "public-share";
   }
 
+  public void ShowLinks()
+  {
+    CurrentPage = new LinksViewModel(_sharesApi, _clipboard, _notifications);
+    CurrentNav = "links";
+  }
+
+  public void ShowRecent()
+  {
+    var vm = new RecentViewModel(_foldersApi, _notifications);
+    vm.FolderOpened += (_, folder) => ShowFolderDetail(folder);
+    CurrentPage = vm;
+    CurrentNav = "recent";
+  }
+
   public void ShowSettings()
   {
     CurrentPage = new SettingsViewModel(_session, _signalingApi, _deviceIdentity, _notifications);
@@ -215,7 +230,6 @@ public class ShellViewModel : ViewModelBase
     catch { /* best-effort */ }
     finally
     {
-      // SignOutAsync sets IsAuthenticated = false → WhenAnyValue subscription calls ShowLogin()
       await _session.SignOutAsync();
     }
   }

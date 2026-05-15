@@ -12,8 +12,7 @@
             <TextBlock Text="Мои папки" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
             <Button Content="+ Создать папку"
                     Command="{Binding CreateRootCommand}"
-                    Background="#722ed1"
-                    Foreground="White"
+                    Classes="brand"
                     Margin="8,0,0,0" />
             <Button Content="↻"
                     Command="{Binding LoadCommand}"
@@ -41,7 +40,7 @@
                                 <Button Content="✕"
                                         Command="{Binding $parent[TreeView].((vm:MyFoldersViewModel)DataContext).DeleteCommand}"
                                         CommandParameter="{Binding}"
-                                        Foreground="Red"
+                                        Foreground="{DynamicResource DangerBrush}"
                                         Background="Transparent"
                                         Padding="6,2"
                                         ToolTip.Tip="Удалить папку и все вложенные" />
@@ -70,7 +69,7 @@
                                        VerticalAlignment="Center" FontWeight="SemiBold" />
                             <TextBlock Grid.Column="1"
                                        Text="{Binding LocalPath}"
-                                       Foreground="Gray"
+                                       Foreground="{DynamicResource Ink500Brush}"
                                        VerticalAlignment="Center"
                                        TextTrimming="CharacterEllipsis" />
                             <Button Grid.Column="2"
@@ -88,7 +87,7 @@
         <TextBlock Grid.Row="3"
                    Text="Загрузка..."
                    IsVisible="{Binding IsLoading}"
-                   Foreground="Gray"
+                   Foreground="{DynamicResource Ink500Brush}"
                    Margin="16,8" />
 
     </Grid>

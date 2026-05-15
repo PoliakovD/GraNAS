@@ -164,6 +164,7 @@ public partial class App : Application
       sp.GetRequiredService<INotificationService>(),
       hubUrl));
 
+    services.AddSingleton<IClipboardService, ClipboardService>();
     services.AddSingleton<ShellViewModel>();
 
     return services.BuildServiceProvider();
