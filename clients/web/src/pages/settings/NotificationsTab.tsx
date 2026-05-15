@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { settingsApi, defaultChannelPrefs } from '../../api/settings.api';
 import type { NotificationPrefs } from '../../api/settings.api';
-import { pushApi } from '../../api/push.api';
 import { enablePush, disablePush, isPushEnabled } from '../../lib/pushSubscribe';
 import { toast } from '../../shared/useToast';
 import { ALL_NOTIFICATION_TYPES, NOTIFICATION_TYPE_LABELS } from '../../types/notification';
