@@ -14,11 +14,6 @@ afterAll(() => server.close());
 
 const BASE = 'http://localhost:8080';
 
-const DEVICES = [
-  { deviceId: 'dev-1', deviceName: 'MyPC', platform: 'Windows', createdAt: '2026-01-01T00:00:00Z', lastSeenAt: '2026-05-13T10:00:00Z', isOnline: true },
-  { deviceId: 'dev-2', deviceName: 'Laptop', platform: 'Linux', createdAt: '2026-01-01T00:00:00Z', lastSeenAt: '2026-05-12T08:00:00Z', isOnline: false },
-];
-
 describe('DevicesTab', () => {
   it('renders table with two devices (one online, one offline)', async () => {
     renderWithProviders(<DevicesTab />);

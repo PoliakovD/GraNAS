@@ -1,4 +1,3 @@
-import type { NotificationType } from '../types/notification';
 import { api } from './client';
 
 export interface NotificationChannelPrefs {

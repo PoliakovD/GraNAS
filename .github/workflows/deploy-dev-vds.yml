@@ -24,7 +24,6 @@ jobs:
       TURN_SECRET: ${{ secrets.TURN_SECRET }}
       AUTH_POSTGRES_PASSWORD: ${{ secrets.AUTH_POSTGRES_PASSWORD }}
       METADATA_POSTGRES_PASSWORD: ${{ secrets.METADATA_POSTGRES_PASSWORD }}
-      LOG_POSTGRES_PASSWORD: ${{ secrets.LOG_POSTGRES_PASSWORD }}
       SHARING_POSTGRES_PASSWORD: ${{ secrets.SHARING_POSTGRES_PASSWORD }}
       SIGNALING_POSTGRES_PASSWORD: ${{ secrets.SIGNALING_POSTGRES_PASSWORD }}
       NOTIFICATION_POSTGRES_PASSWORD: ${{ secrets.NOTIFICATION_POSTGRES_PASSWORD }}
@@ -65,7 +64,6 @@ jobs:
             echo "RABBITMQ_VERSION=4.3.0"
             echo "AUTH_POSTGRES_PORT_HOST=5433"
             echo "METADATA_POSTGRES_PORT_HOST=5434"
-            echo "LOG_POSTGRES_PORT_HOST=5435"
             echo "POSTGRES_PORT_CONTAINER=5432"
             echo "REDIS_PORT_HOST=6379"
             echo "REDIS_PORT_CONTAINER=6379"
@@ -88,10 +86,6 @@ jobs:
             echo "METADATA_POSTGRES_USER=metadata_user"
             echo "METADATA_POSTGRES_PASSWORD=$METADATA_POSTGRES_PASSWORD"
             echo "METADATA_POSTGRES_HOST=postgres-metadata"
-            echo "LOG_POSTGRES_DB=logs_dev"
-            echo "LOG_POSTGRES_USER=log_user"
-            echo "LOG_POSTGRES_PASSWORD=$LOG_POSTGRES_PASSWORD"
-            echo "LOG_POSTGRES_HOST=postgres-log"
             echo "REDIS_HOST=redis"
             echo "REDIS_CONNECTION_STRING=redis:6379"
             echo "RABBITMQ_HOST=rabbitmq"
@@ -124,7 +118,6 @@ jobs:
             echo "WEB_CLIENT_VERSION=latest"
             echo "AUTH_DB_CONNECTION_STRING=Host=postgres-auth;Port=5432;Database=auth_dev;Username=auth_user;Password=$AUTH_POSTGRES_PASSWORD"
             echo "METADATA_DB_CONNECTION_STRING=Host=postgres-metadata;Port=5432;Database=metadata_dev;Username=metadata_user;Password=$METADATA_POSTGRES_PASSWORD"
-            echo "LOG_DB_CONNECTION_STRING=Host=postgres-log;Port=5432;Database=logs_dev;Username=log_user;Password=$LOG_POSTGRES_PASSWORD"
             echo "SHARING_DB_CONNECTION_STRING=Host=postgres-sharing;Port=5432;Database=sharing_dev;Username=sharing_user;Password=$SHARING_POSTGRES_PASSWORD"
             echo "GATEWAY_PORT_HOST=8080"
             echo "GATEWAY_SERVICE_IMAGE=granas-gateway"
