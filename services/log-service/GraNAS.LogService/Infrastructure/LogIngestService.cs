@@ -1,9 +1,9 @@
-using System.Text.Json;
-using GraNAS.LogService.Models;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Text;
 using OpenSearch.Client;
+using OpenSearch.Net;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMqConnection = RabbitMQ.Client.IConnection;
 
 namespace GraNAS.LogService.Infrastructure;
 
@@ -15,7 +15,7 @@ public sealed class LogIngestService : BackgroundService
     private readonly IConfiguration _config;
     private readonly OpenSearchClient _os;
     private readonly ILogger<LogIngestService> _logger;
-    private IConnection? _connection;
+    private RabbitMqConnection? _connection;
     private IChannel? _channel;
 
     public LogIngestService(IConfiguration config, OpenSearchClient os, ILogger<LogIngestService> logger)
@@ -52,18 +52,13 @@ public sealed class LogIngestService : BackgroundService
         {
             try
             {
-                var doc = JsonSerializer.Deserialize<LogDocument>(ea.Body.Span);
-                if (doc is null)
-                {
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
-                    return;
-                }
-
+                var json = Encoding.UTF8.GetString(ea.Body.Span);
                 var utcNow = DateTime.UtcNow;
-                var indexResult = await _os.IndexAsync(doc,
-                    idx => idx.Index($"granas-logs-{utcNow:yyyy.MM.dd}"));
+                var indexResult = await _os.LowLevel.IndexAsync<StringResponse>(
+                    $"granas-logs-{utcNow:yyyy.MM.dd}",
+                    PostData.String(json));
 
-                if (indexResult.IsValid)
+                if (indexResult.Success)
                 {
                     await _channel.BasicAckAsync(ea.DeliveryTag, false);
                 }
@@ -73,11 +68,6 @@ public sealed class LogIngestService : BackgroundService
                     await Task.Delay(2000);
                     await _channel.BasicNackAsync(ea.DeliveryTag, false, true);
                 }
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Malformed log message — dropping");
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
             }
             catch (Exception ex)
             {
