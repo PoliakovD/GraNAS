@@ -28,12 +28,13 @@ jobs:
       SIGNALING_POSTGRES_PASSWORD: ${{ secrets.SIGNALING_POSTGRES_PASSWORD }}
       NOTIFICATION_POSTGRES_PASSWORD: ${{ secrets.NOTIFICATION_POSTGRES_PASSWORD }}
       RABBITMQ_DEFAULT_PASS: ${{ secrets.RABBITMQ_DEFAULT_PASS }}
+      DASHBOARDS_PASSWORD: ${{ secrets.DASHBOARDS_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install sshpass + rsync
-        run: sudo apt-get update -q && sudo apt-get install -y sshpass rsync
+      - name: Install sshpass + rsync + apache2-utils
+        run: sudo apt-get update -q && sudo apt-get install -y sshpass rsync apache2-utils
 
       - name: Guard required secrets
         run: |
@@ -42,6 +43,7 @@ jobs:
           : "${VDS_PASSWORD:?Secret VDS_PASSWORD is not set}"
           : "${DOMAIN:?Secret DOMAIN is not set}"
           : "${JWT_SECRET:?Secret JWT_SECRET is not set}"
+          : "${DASHBOARDS_PASSWORD:?Secret DASHBOARDS_PASSWORD is not set}"
 
       - name: Render vds.env
         working-directory: infrastructure/docker-compose
@@ -151,6 +153,11 @@ jobs:
             echo "SMTP_FROM=noreply@granas.local"
             echo "SMTP_USE_STARTTLS=false"
           } > vds.env
+
+      - name: Generate nginx htpasswd
+        run: |
+          htpasswd -bnB admin "$DASHBOARDS_PASSWORD" \
+            > infrastructure/docker-compose/nginx/htpasswd
 
       - name: Add VDS to known_hosts
         run: |

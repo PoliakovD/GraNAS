@@ -66,17 +66,20 @@ public class Program
 
     builder.AddPostgreSql<MetadataDbContext>();
 
-    builder.Services.AddCors(options =>
+    if (builder.Environment.IsDevelopment())
     {
-      options.AddPolicy(corsPolicyName,
-        policy =>
-        {
-          policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-        });
-    });
+      builder.Services.AddCors(options =>
+      {
+        options.AddPolicy(corsPolicyName,
+          policy =>
+          {
+            policy
+              .AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+          });
+      });
+    }
 
     builder.Services.AddScoped<ILoggerService, LoggerService>();
 
@@ -204,7 +207,11 @@ public class Program
       policy.AddStrictTransportSecurityMaxAge(TimeSpan.FromDays(300).Seconds);
     });
 
-    app.UseCors(corsPolicyName);
+    if (app.Environment.IsDevelopment())
+    {
+      app.UseCors(corsPolicyName);
+    }
+
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();

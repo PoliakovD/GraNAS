@@ -76,11 +76,14 @@ public class Program
 
     builder.Services.AddHttpContextAccessor();
 
-    builder.Services.AddCors(options =>
+    if (builder.Environment.IsDevelopment())
     {
-      options.AddPolicy(corsPolicyName, policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-    });
+      builder.Services.AddCors(options =>
+      {
+        options.AddPolicy(corsPolicyName, policy =>
+          policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+      });
+    }
 
     builder.Services.AddScoped<ILoggerService, LoggerService>();
 
@@ -205,7 +208,11 @@ public class Program
       policy.AddStrictTransportSecurityMaxAge((int)TimeSpan.FromDays(365).TotalSeconds);
     });
 
-    app.UseCors(corsPolicyName);
+    if (app.Environment.IsDevelopment())
+    {
+      app.UseCors(corsPolicyName);
+    }
+
     app.UseAuthentication();
     app.UseAuthorization();
 

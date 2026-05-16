@@ -26,3 +26,4 @@ services:
       - bootstrap.memory_lock=true
       - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS}
       - DISABLE_SECURITY_PLUGIN=true
+
