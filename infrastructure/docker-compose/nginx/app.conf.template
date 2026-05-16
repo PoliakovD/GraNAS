@@ -46,6 +46,22 @@ server {
         proxy_set_header X-Forwarded-Proto https;
     }
 
+    # OpenSearch Dashboards (protected by basic auth)
+    location /_dashboards/ {
+        auth_basic           "GraNAS Logs";
+        auth_basic_user_file /etc/nginx/htpasswd;
+
+        proxy_pass         http://opensearch-dashboards:5601;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_read_timeout 86400;
+    }
+
     # React SPA
     location / {
         proxy_pass       http://web-client:80;

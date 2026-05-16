@@ -49,6 +49,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/app.conf.template:/etc/nginx/templates/app.conf.template:ro
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_certs:/etc/letsencrypt:ro
     environment:
@@ -57,7 +58,39 @@ services:
     depends_on:
       - web-client
       - api-gateway
+      - opensearch-dashboards
     restart: unless-stopped
+    networks:
+      - app-network
+
+  # ----- OpenSearch Dashboards (доступны через nginx /_dashboards/) -----
+  opensearch-dashboards:
+    container_name: ${PREFIX}_opensearch_dashboards
+    image: opensearchproject/opensearch-dashboards:${OPENSEARCH_VERSION}
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+      SERVER_BASEPATH: /_dashboards
+      SERVER_REWRITEBASEPATH: "true"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ----- Dashboards init: импорт saved-objects (запускается один раз) -----
+  dashboards-init:
+    image: curlimages/curl:8.10.1
+    container_name: ${PREFIX}_dashboards_init
+    depends_on:
+      opensearch-dashboards:
+        condition: service_started
+    volumes:
+      - ./dashboards/granas-debug.ndjson:/work/granas-debug.ndjson:ro
+      - ./dashboards/init.sh:/work/init.sh:ro
+    entrypoint: ["/bin/sh", "/work/init.sh"]
+    restart: "no"
     networks:
       - app-network
 

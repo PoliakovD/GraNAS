@@ -6,6 +6,9 @@
 # dotenv files
 *.env
 
+# nginx basic auth — create on server via htpasswd, never commit
+infrastructure/docker-compose/nginx/htpasswd
+
 # User-specific files
 *.rsuser
 *.suo

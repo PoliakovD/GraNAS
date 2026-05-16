@@ -34,12 +34,27 @@ services:
     image: opensearchproject/opensearch-dashboards:${OPENSEARCH_VERSION}
     environment:
       OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
-      DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+      SERVER_BASEPATH: /_dashboards
+      SERVER_REWRITEBASEPATH: "true"
     ports:
       - "5601:5601"
     depends_on:
       opensearch:
         condition: service_healthy
+    networks:
+      - app-network
+
+  dashboards-init:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      opensearch-dashboards:
+        condition: service_started
+    volumes:
+      - ./dashboards/granas-debug.ndjson:/work/granas-debug.ndjson:ro
+      - ./dashboards/init.sh:/work/init.sh:ro
+    entrypoint: ["/bin/sh", "/work/init.sh"]
+    restart: "no"
     networks:
       - app-network
 

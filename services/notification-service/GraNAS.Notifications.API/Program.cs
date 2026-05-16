@@ -66,11 +66,14 @@ public class Program
         builder.AddPostgreSql<NotificationDbContext>();
         builder.Services.AddNotificationDal();
 
-        builder.Services.AddCors(options =>
+        if (builder.Environment.IsDevelopment())
         {
-            options.AddPolicy(corsPolicyName, policy =>
-                policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-        });
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy(corsPolicyName, policy =>
+                    policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+            });
+        }
 
         var jwtSettings = builder.Configuration.GetSection("Jwt");
         var secretKey = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
@@ -221,7 +224,11 @@ public class Program
             policy.AddStrictTransportSecurityMaxAge((int)TimeSpan.FromDays(365).TotalSeconds);
         });
 
-        app.UseCors(corsPolicyName);
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseCors(corsPolicyName);
+        }
+
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();

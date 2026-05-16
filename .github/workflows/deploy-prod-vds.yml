@@ -114,9 +114,13 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       SMTP_FROM: ${{ secrets.SMTP_FROM }}
       SMTP_USE_STARTTLS: ${{ secrets.SMTP_USE_STARTTLS }}
+      DASHBOARDS_PASSWORD: ${{ secrets.DASHBOARDS_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install apache2-utils
+        run: sudo apt-get update -q && sudo apt-get install -y apache2-utils
 
       - uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -128,6 +132,7 @@ jobs:
           : "${VDS_USER:?Secret VDS_USER is not set}"
           : "${DOMAIN:?Secret DOMAIN is not set}"
           : "${JWT_SECRET:?Secret JWT_SECRET is not set}"
+          : "${DASHBOARDS_PASSWORD:?Secret DASHBOARDS_PASSWORD is not set}"
 
       - name: Add VDS to known_hosts
         run: |
@@ -276,9 +281,16 @@ jobs:
             echo "WEB_CLIENT_VERSION=${IMAGE_TAG}"
           } > infrastructure/docker-compose/vds.prod-images.env
 
+      - name: Generate nginx htpasswd
+        run: |
+          htpasswd -bnB admin "$DASHBOARDS_PASSWORD" \
+            > infrastructure/docker-compose/nginx/htpasswd
+
       - name: Prepare VDS directory structure
         run: |
-          ssh "${VDS_USER}@${VDS_HOST}" 'mkdir -p /opt/granas/infrastructure/docker-compose/nginx'
+          ssh "${VDS_USER}@${VDS_HOST}" \
+            'mkdir -p /opt/granas/infrastructure/docker-compose/nginx \
+                      /opt/granas/infrastructure/docker-compose/dashboards'
 
       - name: Scp compose files and env to VDS
         run: |
@@ -291,7 +303,12 @@ jobs:
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/"
           scp \
             infrastructure/docker-compose/nginx/app.conf.template \
+            infrastructure/docker-compose/nginx/htpasswd \
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/nginx/"
+          scp \
+            infrastructure/docker-compose/dashboards/granas-debug.ndjson \
+            infrastructure/docker-compose/dashboards/init.sh \
+            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/dashboards/"
 
       - name: Bootstrap or deploy
         run: |
