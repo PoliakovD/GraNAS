@@ -216,10 +216,19 @@ jobs:
             COMPOSE="docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml"
             $COMPOSE up -d --build --remove-orphans
             $COMPOSE exec nginx nginx -s reload
+            echo "==> Ожидание готовности OpenSearch (до 5 минут)..."
+            for i in $(seq 1 30); do
+              if $COMPOSE exec -T opensearch curl -sf http://localhost:9200/_cluster/health >/dev/null 2>&1; then
+                echo "   OpenSearch готов (попытка $i)."
+                break
+              fi
+              echo "   Попытка $i/30, ждём 10 сек..."
+              sleep 10
+            done
             $COMPOSE ps
           ENDSSH
 
       - name: Smoke test
         run: |
-          sleep 120 # Wait for services
+          sleep 60
           curl -fsS --max-time 10 "https://$DOMAIN/api/auth/health"
