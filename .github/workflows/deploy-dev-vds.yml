@@ -205,10 +205,9 @@ jobs:
             set -euo pipefail
             cd /opt/granas/infrastructure/docker-compose
             COMPOSE="docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml"
-            if ! docker volume inspect granas-dev_certbot_certs >/dev/null 2>&1; then
-              echo "==> First run: bootstrapping HTTPS..."
-              bash init-letsencrypt.sh
-            fi
+            echo "==> First run: bootstrapping HTTPS..."
+            bash init-letsencrypt.sh
+
             $COMPOSE up -d --build --remove-orphans
             $COMPOSE ps
           ENDSSH

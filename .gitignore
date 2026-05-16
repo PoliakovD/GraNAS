@@ -511,3 +511,5 @@ dist-ssr
 *.sln
 *.sw?
 
+/infrastructure/docker-compose/README.md
+/infrastructure/docker-compose/nginx/htpasswd.example
