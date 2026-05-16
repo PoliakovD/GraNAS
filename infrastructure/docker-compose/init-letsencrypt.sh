@@ -32,9 +32,9 @@ $COMPOSE run --rm --entrypoint sh certbot -c "
   fi
 "
 
-# ── 2. Запускаем nginx с временным сертификатом ──
-echo "==> Запуск nginx (web-client + api-gateway)..."
-$COMPOSE up -d nginx web-client api-gateway
+# ── 2. Запускаем только nginx (для ACME challenge нужен только порт 80) ──
+echo "==> Запуск nginx..."
+$COMPOSE up -d --no-deps nginx
 echo "   Ожидание готовности nginx..."
 sleep 6
 
