@@ -96,7 +96,7 @@ services:
 
   # ----- Certbot: автообновление сертификата -----
   certbot:
-    image: certbot/certbot:v3.2.0
+    image: certbot/certbot:latest
     container_name: ${PREFIX}_certbot
     volumes:
       - certbot_www:/var/www/certbot
