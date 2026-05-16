@@ -198,17 +198,24 @@ jobs:
           sshpass -e scp infrastructure/docker-compose/vds.env \
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/vds.env"
 
-      - name: Bootstrap or deploy
+      - name: Bootstrap HTTPS certificate
+        run: |
+          export SSHPASS="$VDS_PASSWORD"
+          sshpass -e ssh "${VDS_USER}@${VDS_HOST}" 'bash -s' << 'ENDSSH'
+            set -euo pipefail
+            cd /opt/granas/infrastructure/docker-compose
+            bash init-letsencrypt.sh
+          ENDSSH
+
+      - name: Start services
         run: |
           export SSHPASS="$VDS_PASSWORD"
           sshpass -e ssh "${VDS_USER}@${VDS_HOST}" 'bash -s' << 'ENDSSH'
             set -euo pipefail
             cd /opt/granas/infrastructure/docker-compose
             COMPOSE="docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml"
-            echo "==> First run: bootstrapping HTTPS..."
-            bash init-letsencrypt.sh
-
             $COMPOSE up -d --build --remove-orphans
+            $COMPOSE exec nginx nginx -s reload
             $COMPOSE ps
           ENDSSH
 

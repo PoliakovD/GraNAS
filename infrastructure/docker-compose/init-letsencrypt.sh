@@ -1,8 +1,7 @@
 #!/bin/bash
-# Первичная настройка HTTPS (запускать один раз перед docker compose up).
+# Получение/проверка TLS-сертификата Let's Encrypt.
+# Запускать перед стартом сервисов.
 # Требования: порт 80 свободен, DNS домена уже указывает на этот VDS.
-#
-# Использование: bash init-letsencrypt.sh
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,6 +15,25 @@ CERTBOT_EMAIL=$(grep -m1 '^CERTBOT_EMAIL=' vds.env | cut -d= -f2- | tr -d '"' | 
 
 COMPOSE="docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml"
 
+# ── 0. Проверяем: есть ли уже действующий сертификат от Let's Encrypt ──
+echo "==> Проверка существующего сертификата для ${DOMAIN}..."
+CERT_STATUS=$(
+  $COMPOSE run --rm --entrypoint sh certbot -c "
+    CERT=/etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+    if [ ! -f \"\$CERT\" ]; then echo invalid; exit 0; fi
+    openssl x509 -in \"\$CERT\" -noout -checkend 604800 2>/dev/null || { echo invalid; exit 0; }
+    openssl x509 -in \"\$CERT\" -noout -issuer 2>/dev/null | grep -qi 'let' || { echo invalid; exit 0; }
+    echo valid
+  " 2>/dev/null | tail -1
+) || CERT_STATUS="invalid"
+
+if [ "$CERT_STATUS" = "valid" ]; then
+  echo "   Сертификат Let's Encrypt действующий (>7 дней), certbot пропускается."
+  exit 0
+fi
+
+echo "   Действующего сертификата нет — получаем новый."
+
 # ── 1. Создаём временный самоподписанный сертификат (нужен чтобы nginx стартовал) ──
 echo "==> Создание временного сертификата для ${DOMAIN}..."
 $COMPOSE run --rm --entrypoint sh certbot -c "
@@ -28,7 +46,7 @@ $COMPOSE run --rm --entrypoint sh certbot -c "
       -subj '/CN=${DOMAIN}' 2>/dev/null
     echo 'Временный сертификат создан.'
   else
-    echo 'Сертификат уже существует, пропускаем.'
+    echo 'Файл уже существует, пропускаем.'
   fi
 "
 
@@ -58,7 +76,6 @@ if [ "$NGINX_READY" -eq 0 ]; then
   $COMPOSE logs --tail=50 nginx 2>&1 || true
   echo "--- netstat port 80 ---"
   ss -tlnp | grep :80 || echo "(порт 80 не слушает)"
-  echo ""
   exit 1
 fi
 
@@ -81,19 +98,9 @@ $COMPOSE run --rm --entrypoint certbot certbot certonly \
   --agree-tos --no-eff-email \
   -d "${DOMAIN}"
 
-# ── 5. Перезагружаем nginx с настоящим сертификатом ──
-echo "==> Перезагрузка nginx..."
-$COMPOSE exec nginx nginx -s reload
-
-# ── 6. Регистрируем cron для ежемесячной перезагрузки nginx (подхватывает обновлённый сертификат) ──
+# ── 5. Регистрируем cron для ежемесячной перезагрузки nginx ──
 CRON_CMD="0 4 1 * * docker compose --env-file ${SCRIPT_DIR}/vds.env -f ${SCRIPT_DIR}/compose.yaml -f ${SCRIPT_DIR}/compose.vds.yaml exec -T nginx nginx -s reload >> /var/log/nginx-reload.log 2>&1"
 ( crontab -l 2>/dev/null | grep -v "nginx -s reload" ; echo "$CRON_CMD" ) | crontab -
-echo "==> Cron для перезагрузки nginx зарегистрирован (1-е число каждого месяца)."
+echo "==> Cron для перезагрузки nginx зарегистрирован."
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  HTTPS настроен! Запусти все сервисы командой:          ║"
-echo "║                                                          ║"
-echo "║  docker compose --env-file vds.env \\                    ║"
-echo "║    -f compose.yaml -f compose.vds.yaml up -d            ║"
-echo "╚══════════════════════════════════════════════════════════╝"
+echo "==> Сертификат получен успешно."
