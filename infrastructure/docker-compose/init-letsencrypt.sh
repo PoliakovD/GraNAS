@@ -40,10 +40,12 @@ sleep 6
 
 # ── 3. Получаем настоящий сертификат Let's Encrypt через webroot ──
 echo "==> Получение сертификата Let's Encrypt для ${DOMAIN}..."
-$COMPOSE run --rm certbot certonly \
+$COMPOSE run --rm --entrypoint certbot certbot certonly \
   --webroot -w /var/www/certbot \
   --email "${CERTBOT_EMAIL}" \
   --agree-tos --no-eff-email \
+  --force-renewal \
+  --verbose \
   -d "${DOMAIN}"
 
 # ── 4. Перезагружаем nginx с настоящим сертификатом ──
