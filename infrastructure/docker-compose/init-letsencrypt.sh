@@ -68,7 +68,7 @@ $COMPOSE run --rm --entrypoint certbot certbot certonly \
   --webroot -w /var/www/certbot \
   --email "${CERTBOT_EMAIL}" \
   --agree-tos --no-eff-email \
-  --force-renewal \
+  --overwrite-existing-cert \
   --verbose \
   -d "${DOMAIN}"
 
