@@ -270,6 +270,8 @@ public class P2PHost : IP2PHost, IAsyncDisposable
 
         pc.onicecandidate += async iceCandidate =>
         {
+            var typ = ExtractIceType(iceCandidate.candidate);
+            Log.Information("ICE candidate generated: type={IceType} peer={ConnId}", typ, receiverConnId);
             if (_hub?.State != HubConnectionState.Connected) return;
             try
             {
@@ -279,11 +281,15 @@ public class P2PHost : IP2PHost, IAsyncDisposable
                     iceCandidate.sdpMid,
                     (int?)iceCandidate.sdpMLineIndex);
             }
-            catch (Exception ex) { Log.Warning(ex, "ICE send failed"); }
+            catch (Exception ex) { Log.Warning(ex, "ICE send failed for peer {ConnId}", receiverConnId); }
         };
+
+        pc.oniceconnectionstatechange += state =>
+            Log.Information("ICE connection state → {State} for peer {ConnId}", state, receiverConnId);
 
         var offer = pc.createOffer(null);
         await pc.setLocalDescription(offer);
+        Log.Information("Offer created (sdpLength={Length}), sending to receiver {ConnId}", offer.sdp?.Length ?? 0, receiverConnId);
 
         if (_hub?.State == HubConnectionState.Connected)
             await _hub.InvokeAsync("SendOffer", receiverConnId, offer.sdp);
@@ -294,15 +300,20 @@ public class P2PHost : IP2PHost, IAsyncDisposable
     /// <summary>Применяет SDP-answer от receiver'а к соответствующей <c>RTCPeerConnection</c>.</summary>
     private async Task HandleAnswerAsync(string senderConnId, string sdp)
     {
-        if (!_peers.TryGetValue(senderConnId, out var session)) return;
+        if (!_peers.TryGetValue(senderConnId, out var session))
+        {
+            Log.Warning("Answer from {ConnId} ignored — no active peer session found", senderConnId);
+            return;
+        }
         try
         {
+            Log.Information("Answer received from peer {ConnId} (sdpLength={Length})", senderConnId, sdp.Length);
             session.Pc!.setRemoteDescription(new RTCSessionDescriptionInit
             {
                 type = RTCSdpType.answer,
                 sdp = sdp
             });
-            Log.Debug("Answer set from {ConnId}", senderConnId);
+            Log.Information("Remote description set for peer {ConnId}", senderConnId);
         }
         catch (Exception ex) { Log.Warning(ex, "HandleAnswer failed for {ConnId}", senderConnId); }
     }
@@ -311,6 +322,8 @@ public class P2PHost : IP2PHost, IAsyncDisposable
     private async Task HandleIceCandidateAsync(string senderConnId, string candidate, string? sdpMid, int? sdpMLineIndex)
     {
         if (!_peers.TryGetValue(senderConnId, out var session)) return;
+        var typ = ExtractIceType(candidate);
+        Log.Information("ICE candidate received from peer {ConnId}: type={IceType}", senderConnId, typ);
         try
         {
             session.Pc!.addIceCandidate(new RTCIceCandidateInit
@@ -494,6 +507,15 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         }
 
         return new RTCPeerConnection(config);
+    }
+
+    private static string ExtractIceType(string? candidate)
+    {
+        if (candidate is null) return "null";
+        var idx = candidate.IndexOf(" typ ", StringComparison.Ordinal);
+        if (idx < 0) return "unknown";
+        var rest = candidate[(idx + 5)..];
+        return rest.Split(' ')[0];
     }
 
     private static void SendText(PeerSession session, string text)

@@ -66,14 +66,28 @@ export function createP2PSession(
       }
     }
 
+    console.debug('[P2P] TURN in use:', turnCredentials ? turnCredentials.uris : 'none (STUN only)');
     pc = new RTCPeerConnection({ iceServers });
 
     pc.onicecandidate = async (e) => {
       if (!e.candidate) return;
+      console.debug('[P2P] local ICE candidate:', e.candidate.type, e.candidate.candidate);
       try {
         await hub.invoke('SendIceCandidate',
           senderConnId, e.candidate.candidate, e.candidate.sdpMid, e.candidate.sdpMLineIndex);
       } catch { /* non-fatal */ }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.debug('[P2P] connection state:', pc?.connectionState);
+      if (pc?.connectionState === 'failed') {
+        callbacks.onStatusChange('error');
+        callbacks.onError('ICE connection failed — check TURN server or network reachability');
+      }
+    };
+
+    pc.onicegatheringstatechange = () => {
+      console.debug('[P2P] ICE gathering state:', pc?.iceGatheringState);
     };
 
     pc.ondatachannel = (e) => { attachDataChannel(e.channel); };

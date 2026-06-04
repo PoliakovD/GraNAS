@@ -243,7 +243,7 @@ public class SignalingHub : Hub
     {
         await AssertValidSessionAsync("SendOffer", targetConnectionId);
         await Clients.Client(targetConnectionId).SendAsync("Offer", Context.ConnectionId, sdp);
-        _logger.LogDebug("SendOffer forwarded {From} → {To} (sdpLength={Length})",
+        _logger.LogInformation("SendOffer forwarded {From} → {To} (sdpLength={Length})",
             Context.ConnectionId, targetConnectionId, sdp.Length);
     }
 
@@ -258,7 +258,7 @@ public class SignalingHub : Hub
     {
         await AssertValidSessionAsync("SendAnswer", targetConnectionId);
         await Clients.Client(targetConnectionId).SendAsync("Answer", Context.ConnectionId, sdp);
-        _logger.LogDebug("SendAnswer forwarded {From} → {To} (sdpLength={Length})",
+        _logger.LogInformation("SendAnswer forwarded {From} → {To} (sdpLength={Length})",
             Context.ConnectionId, targetConnectionId, sdp.Length);
     }
 
