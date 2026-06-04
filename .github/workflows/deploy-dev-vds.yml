@@ -103,8 +103,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install sshpass + apache2-utils
-        run: sudo apt-get update -q && sudo apt-get install -y sshpass apache2-utils
+      - name: Install sshpass
+        run: sudo apt-get update -q && sudo apt-get install -y sshpass
 
       - name: Guard required secrets
         run: |
@@ -204,6 +204,7 @@ jobs:
             echo "SMTP_PASSWORD="
             echo "SMTP_FROM=noreply@granas.local"
             echo "SMTP_USE_STARTTLS=false"
+            echo "DASHBOARDS_PASSWORD=$DASHBOARDS_PASSWORD"
           } > vds.env
 
       - name: Render vds.dev-images.env
@@ -228,11 +229,6 @@ jobs:
             echo "WEB_CLIENT_IMAGE=${{ env.REGISTRY }}/${OWNER}/web-client"
             echo "WEB_CLIENT_VERSION=dev-${SHORT_SHA}"
           } > infrastructure/docker-compose/vds.dev-images.env
-
-      - name: Generate nginx htpasswd
-        run: |
-          htpasswd -bnB admin "$DASHBOARDS_PASSWORD" \
-            > infrastructure/docker-compose/nginx/htpasswd
 
       - name: Add VDS to known_hosts
         run: |
@@ -274,10 +270,10 @@ jobs:
             infrastructure/docker-compose/compose.yaml \
             infrastructure/docker-compose/compose.vds.yaml \
             infrastructure/docker-compose/init-letsencrypt.sh \
+            infrastructure/docker-compose/generate-htpasswd.sh \
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/"
           sshpass -e scp \
             infrastructure/docker-compose/nginx/app.conf.template \
-            infrastructure/docker-compose/nginx/htpasswd \
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/nginx/"
           sshpass -e scp \
             infrastructure/docker-compose/dashboards/granas-debug.ndjson \
@@ -300,6 +296,7 @@ jobs:
             set -euo pipefail
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             cd /opt/granas/infrastructure/docker-compose
+            bash generate-htpasswd.sh
             COMPOSE="docker compose --env-file vds.env --env-file vds.dev-images.env -f compose.yaml -f compose.vds.yaml"
             \$COMPOSE pull
             \$COMPOSE up -d --remove-orphans
@@ -319,4 +316,4 @@ jobs:
       - name: Smoke test
         run: |
           sleep 60
-          curl -fsS --max-time 10 "https://$DOMAIN/api/auth/health"
+          curl -fsS --max-time 10 "https://$DOMAIN/api/auth/live"

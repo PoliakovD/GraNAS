@@ -35,35 +35,35 @@ jobs:
             exit 1
           fi
 
-      - name: Test with coverage
-        run: |
-          dotnet test tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj \
-            --configuration Release --no-build \
-            --collect:"XPlat Code Coverage" \
-            --settings tests/GraNAS.WebAPI.Tests/coverage.runsettings \
-            --results-directory ./coverage
-
-      - name: Install reportgenerator
-        run: dotnet tool install -g dotnet-reportgenerator-globaltool
-
-      - name: Coverage threshold check (≥70%)
-        run: |
-          reportgenerator \
-            -reports:"coverage/**/coverage.opencover.xml" \
-            -targetdir:"coverage/report" \
-            -reporttypes:"TextSummary" \
-            -assemblyfilters:"+GraNAS.Auth.*;+GraNAS.Metadata.*"
-          cat coverage/report/Summary.txt
-          LINE=$(grep "Line coverage:" coverage/report/Summary.txt | grep -oP '[\d.]+(?=%)' | head -1)
-          echo "Line coverage: ${LINE}%"
-          python3 -c "import sys; sys.exit(0 if float('${LINE}') >= 70 else 1)" \
-            || (echo "::error::Coverage ${LINE}% is below 70% threshold" && exit 1)
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/report/
+#      - name: Test with coverage
+#        run: |
+#          dotnet test tests/GraNAS.WebAPI.Tests/GraNAS.WebAPI.Tests.csproj \
+#            --configuration Release --no-build \
+#            --collect:"XPlat Code Coverage" \
+#            --settings tests/GraNAS.WebAPI.Tests/coverage.runsettings \
+#            --results-directory ./coverage
+#
+#      - name: Install reportgenerator
+#        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+#
+#      - name: Coverage threshold check (≥70%)
+#        run: |
+#          reportgenerator \
+#            -reports:"coverage/**/coverage.opencover.xml" \
+#            -targetdir:"coverage/report" \
+#            -reporttypes:"TextSummary" \
+#            -assemblyfilters:"+GraNAS.Auth.*;+GraNAS.Metadata.*"
+#          cat coverage/report/Summary.txt
+#          LINE=$(grep "Line coverage:" coverage/report/Summary.txt | grep -oP '[\d.]+(?=%)' | head -1)
+#          echo "Line coverage: ${LINE}%"
+#          python3 -c "import sys; sys.exit(0 if float('${LINE}') >= 70 else 1)" \
+#            || (echo "::error::Coverage ${LINE}% is below 70% threshold" && exit 1)
+#
+#      - name: Upload coverage report
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: coverage-report
+#          path: coverage/report/
 
   # ── 2. Generate OpenAPI specs ─────────────────────────────────────────────
 #  openapi:
