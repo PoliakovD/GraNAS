@@ -122,11 +122,11 @@ jobs:
           name: openapi-specs
           path: docs/openapi/
 
-  # ── 3. Build & push Docker images ─────────────────────────────────────────
+  # ── 3. Build & push Docker images to GHCR ────────────────────────────────
   docker:
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    if: github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -135,15 +135,32 @@ jobs:
         include:
           - service: auth-service
             dockerfile: services/auth-service/GraNAS.Auth.API/Dockerfile
-            image: auth-service
+            context: .
           - service: metadata-service
             dockerfile: services/metadata-service/GraNAS.Metadata.API/Dockerfile
-            image: metadata-service
+            context: .
           - service: log-service
             dockerfile: services/log-service/GraNAS.LogService/Dockerfile
-            image: log-service
+            context: .
+          - service: sharing-service
+            dockerfile: services/sharing-service/GraNAS.Sharing.API/Dockerfile
+            context: .
+          - service: signaling-service
+            dockerfile: services/signaling-service/GraNAS.Signaling.API/Dockerfile
+            context: .
+          - service: notification-service
+            dockerfile: services/notification-service/GraNAS.Notifications.API/Dockerfile
+            context: .
+          - service: api-gateway
+            dockerfile: services/api-gateway/GraNAS.Gateway/Dockerfile
+            context: .
+          - service: web-client
+            dockerfile: clients/web/Dockerfile
+            context: clients/web
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
         with:
@@ -154,17 +171,17 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=sha,prefix=,format=short
 
       - uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
