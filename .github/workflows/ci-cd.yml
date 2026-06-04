@@ -66,61 +66,61 @@ jobs:
           path: coverage/report/
 
   # ── 2. Generate OpenAPI specs ─────────────────────────────────────────────
-  openapi:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Restore & Build
-        run: |
-          dotnet restore GraNAS.slnx
-          dotnet build GraNAS.slnx --configuration Release --no-restore
-
-      - name: Restore dotnet tools
-        run: dotnet tool restore
-
-      - name: Generate auth-service OpenAPI spec
-        env:
-          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
-          ConnectionStrings__Redis: "localhost:6379"
-          Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
-          Jwt__Issuer: "GraNAS"
-          Jwt__Audience: "GraNASClients"
-          RabbitMQ__Host: "localhost"
-          RabbitMQ__Username: "guest"
-          RabbitMQ__Password: "guest"
-        run: |
-          mkdir -p docs/openapi
-          dotnet swagger tofile \
-            --output docs/openapi/auth-v1.json \
-            services/auth-service/GraNAS.Auth.API/bin/Release/net10.0/GraNAS.Auth.API.dll \
-            v1
-
-      - name: Generate metadata-service OpenAPI spec
-        env:
-          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
-          Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
-          Jwt__Issuer: "GraNAS"
-          Jwt__Audience: "GraNASClients"
-          RabbitMQ__Host: "localhost"
-          RabbitMQ__Username: "guest"
-          RabbitMQ__Password: "guest"
-        run: |
-          dotnet swagger tofile \
-            --output docs/openapi/metadata-v1.json \
-            services/metadata-service/GraNAS.Metadata.API/bin/Release/net10.0/GraNAS.Metadata.API.dll \
-            v1
-
-      - name: Upload OpenAPI specs
-        uses: actions/upload-artifact@v4
-        with:
-          name: openapi-specs
-          path: docs/openapi/
+#  openapi:
+#    runs-on: ubuntu-latest
+#    needs: test
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - uses: actions/setup-dotnet@v4
+#        with:
+#          dotnet-version: '10.0.x'
+#
+#      - name: Restore & Build
+#        run: |
+#          dotnet restore GraNAS.slnx
+#          dotnet build GraNAS.slnx --configuration Release --no-restore
+#
+#      - name: Restore dotnet tools
+#        run: dotnet tool restore
+#
+#      - name: Generate auth-service OpenAPI spec
+#        env:
+#          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
+#          ConnectionStrings__Redis: "localhost:6379"
+#          Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
+#          Jwt__Issuer: "GraNAS"
+#          Jwt__Audience: "GraNASClients"
+#          RabbitMQ__Host: "localhost"
+#          RabbitMQ__Username: "guest"
+#          RabbitMQ__Password: "guest"
+#        run: |
+#          mkdir -p docs/openapi
+#          dotnet swagger tofile \
+#            --output docs/openapi/auth-v1.json \
+#            services/auth-service/GraNAS.Auth.API/bin/Release/net10.0/GraNAS.Auth.API.dll \
+#            v1
+#
+#      - name: Generate metadata-service OpenAPI spec
+#        env:
+#          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
+#          Jwt__Secret: "ci-swagger-placeholder-key-min-32-chars!!"
+#          Jwt__Issuer: "GraNAS"
+#          Jwt__Audience: "GraNASClients"
+#          RabbitMQ__Host: "localhost"
+#          RabbitMQ__Username: "guest"
+#          RabbitMQ__Password: "guest"
+#        run: |
+#          dotnet swagger tofile \
+#            --output docs/openapi/metadata-v1.json \
+#            services/metadata-service/GraNAS.Metadata.API/bin/Release/net10.0/GraNAS.Metadata.API.dll \
+#            v1
+#
+#      - name: Upload OpenAPI specs
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: openapi-specs
+#          path: docs/openapi/
 
   # ── 3. Build & push Docker images to GHCR ────────────────────────────────
   docker:
