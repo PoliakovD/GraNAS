@@ -232,7 +232,7 @@ export function FileListPanel({ folderId, shareToken }: Props) {
 
   const isConnecting = sessionStatus === 'connecting' || sessionStatus === 'negotiating' || sessionStatus === 'ecdh';
 
-  if (sessionStatus === 'idle' || (tree.length === 0 && !isConnecting && sessionStatus !== 'ready')) {
+  if (sessionStatus === 'idle' || isConnecting || (tree.length === 0 && sessionStatus !== 'ready')) {
     return (
       <div className="empty">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>

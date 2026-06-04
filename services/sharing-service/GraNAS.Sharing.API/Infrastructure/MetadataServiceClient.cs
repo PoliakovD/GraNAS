@@ -73,7 +73,10 @@ public class MetadataServiceClient : IMetadataServiceClient
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
-            _logger.LogError(ex, "MetadataClient: request to {Path} failed", path);
+            if (ct.IsCancellationRequested)
+                _logger.LogDebug("MetadataClient: request to {Path} canceled (client disconnected)", path);
+            else
+                _logger.LogError(ex, "MetadataClient: request to {Path} failed", path);
             return null;
         }
     }
