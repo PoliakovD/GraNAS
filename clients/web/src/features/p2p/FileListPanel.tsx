@@ -232,6 +232,21 @@ export function FileListPanel({ folderId, shareToken }: Props) {
 
   const isConnecting = sessionStatus === 'connecting' || sessionStatus === 'negotiating' || sessionStatus === 'ecdh';
 
+  if (sessionStatus === 'error') {
+    return (
+      <div className="empty">
+        <div className="glyph" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
+          <Icon name="wifi" size={28} />
+        </div>
+        <h4>Не удалось подключиться</h4>
+        <p>Ошибка P2P-соединения. Попробуйте ещё раз.</p>
+        <button className="btn" onClick={() => void connect()}>
+          <Icon name="rotate-cw" size={14} /> Повторить
+        </button>
+      </div>
+    );
+  }
+
   if (sessionStatus === 'idle' || isConnecting || (tree.length === 0 && sessionStatus !== 'ready')) {
     return (
       <div className="empty">

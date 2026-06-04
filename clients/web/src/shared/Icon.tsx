@@ -10,7 +10,8 @@ export type IconName =
   | 'wifi' | 'user' | 'eye'
   | 'arrow-right' | 'arrow-left'
   | 'cloud' | 'image' | 'file' | 'send'
-  | 'sun' | 'moon';
+  | 'sun' | 'moon'
+  | 'rotate-cw';
 
 interface IconProps {
   name: IconName;
@@ -76,6 +77,7 @@ export function Icon({ name, size = 16, stroke = 1.75, className }: IconProps) {
     case 'send': return <svg {...props}><path d="m22 2-10 20-2-9-9-2 21-9Z"/></svg>;
     case 'sun': return <svg {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>;
     case 'moon': return <svg {...props}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>;
+    case 'rotate-cw': return <svg {...props}><path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/></svg>;
     default: return null;
   }
 }
