@@ -34,9 +34,9 @@ public class TurnController : ControllerBase
     /// UserId извлекается из JWT-клейма (<c>NameIdentifier</c> или <c>sub</c>).
     /// Учётные данные передаются клиенту для конфигурации <c>RTCPeerConnection.iceServers</c>.
     /// </remarks>
+    [AllowAnonymous]
     [HttpGet("credentials")]
     [ProducesResponseType(typeof(TurnCredentialsResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     public IActionResult GetCredentials()
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

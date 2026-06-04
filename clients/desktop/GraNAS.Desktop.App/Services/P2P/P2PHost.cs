@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
@@ -79,7 +80,15 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         _hub = new HubConnectionBuilder()
             .WithUrl(_hubUrl, opts =>
             {
-                opts.AccessTokenProvider = () => Task.FromResult<string?>(_session.AccessToken);
+                opts.AccessTokenProvider = async () =>
+                {
+                    if (IsTokenNearExpiry(_session.AccessToken))
+                    {
+                        try { await _session.RefreshAsync(); }
+                        catch (Exception ex) { Log.Warning(ex, "Token refresh failed in AccessTokenProvider"); }
+                    }
+                    return _session.AccessToken;
+                };
                 opts.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString());
             })
             .WithAutomaticReconnect()
@@ -175,8 +184,13 @@ public class P2PHost : IP2PHost, IAsyncDisposable
 
     private async Task JoinAllFoldersAsync(CancellationToken ct = default)
     {
-        foreach (var folderId in _registry.GetAll().Keys)
-            await JoinFolderAsync(folderId, ct);
+        foreach (var (folderId, localPath) in _registry.GetAll())
+        {
+            if (Directory.Exists(localPath))
+                await JoinFolderAsync(folderId, ct);
+            else
+                Log.Warning("Skipping JoinAsOwner for folder {FolderId}: local path not found ({LocalPath})", folderId, localPath);
+        }
     }
 
     /// <summary>
@@ -492,6 +506,17 @@ public class P2PHost : IP2PHost, IAsyncDisposable
     {
         try { session.DataChannel?.send(data); }
         catch (Exception ex) { Log.Warning(ex, "DataChannel send (binary) failed"); }
+    }
+
+    private static bool IsTokenNearExpiry(string? token)
+    {
+        if (token is null) return true;
+        try
+        {
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            return jwt.ValidTo < DateTime.UtcNow.AddMinutes(1);
+        }
+        catch { return true; }
     }
 
     public async ValueTask DisposeAsync()

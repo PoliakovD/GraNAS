@@ -52,7 +52,15 @@ public class FolderShareRegistry : IFolderShareRegistry
         try
         {
             var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<Dictionary<Guid, string>>(json, Opts) ?? [];
+            var all = JsonSerializer.Deserialize<Dictionary<Guid, string>>(json, Opts) ?? [];
+            var valid = all
+                .Where(kv => Directory.Exists(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (valid.Count != all.Count)
+            {
+                File.WriteAllText(_filePath, JsonSerializer.Serialize(valid, Opts));
+            }
+            return valid;
         }
         catch { return []; }
     }

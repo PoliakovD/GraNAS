@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signalingApi } from '../../api/signaling.api';
 import { createP2PSession, type P2PSession } from '../../p2p/P2PSession';
 import { OwnerStatusBadge } from './OwnerStatusBadge';
@@ -12,15 +12,152 @@ interface Props {
   shareToken?: string;
 }
 
+// ── Tree types & builder ──────────────────────────────────────────────────────
+
+type FileNode =
+  | { kind: 'file'; name: string; entry: RemoteFileEntry }
+  | { kind: 'dir'; name: string; path: string; children: FileNode[] };
+
+function buildTree(entries: RemoteFileEntry[]): FileNode[] {
+  const roots: FileNode[] = [];
+  const dirMap = new Map<string, FileNode & { kind: 'dir' }>();
+
+  function getOrCreateDir(path: string): FileNode & { kind: 'dir' } {
+    if (dirMap.has(path)) return dirMap.get(path)!;
+    const parts = path.split('/');
+    const dir: FileNode & { kind: 'dir' } = { kind: 'dir', name: parts[parts.length - 1], path, children: [] };
+    dirMap.set(path, dir);
+    const parentPath = parts.slice(0, -1).join('/');
+    if (parentPath === '') roots.push(dir);
+    else getOrCreateDir(parentPath).children.push(dir);
+    return dir;
+  }
+
+  for (const entry of entries) {
+    const parts = entry.path.split('/');
+    const name = parts[parts.length - 1];
+    const fileNode: FileNode = { kind: 'file', name, entry };
+    if (parts.length === 1) roots.push(fileNode);
+    else getOrCreateDir(parts.slice(0, -1).join('/')).children.push(fileNode);
+  }
+
+  function sortLevel(nodes: FileNode[]) {
+    nodes.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+    for (const n of nodes) if (n.kind === 'dir') sortLevel(n.children);
+  }
+  sortLevel(roots);
+  return roots;
+}
+
 function extBadgeClass(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'pdf') return 'pdf';
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'img';
-  if (ext === 'zip' || ext === 'rar' || ext === '7z' || ext === 'tar' || ext === 'gz') return 'zip';
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'zip';
   if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'doc';
   if (['js', 'ts', 'tsx', 'jsx', 'py', 'rs', 'go', 'cs', 'java'].includes(ext)) return 'code';
   return 'misc';
 }
+
+// ── Tree renderer ─────────────────────────────────────────────────────────────
+
+interface TreeRowsProps {
+  nodes: FileNode[];
+  depth: number;
+  expanded: Set<string>;
+  toggle: (path: string) => void;
+  progress: Record<string, number>;
+  status: SessionStatus;
+  onDownload: (entry: RemoteFileEntry) => void;
+}
+
+function TreeRows({ nodes, depth, expanded, toggle, progress, status, onDownload }: TreeRowsProps) {
+  return (
+    <>
+      {nodes.map(node => {
+        if (node.kind === 'dir') {
+          const isOpen = expanded.has(node.path);
+          return (
+            <div key={node.path}>
+              <div
+                className="tree-dir-row"
+                style={{ paddingLeft: depth * 16 + 10 }}
+                onClick={() => toggle(node.path)}
+                role="button"
+                aria-expanded={isOpen}
+              >
+                <Icon
+                  name="chevron-right"
+                  size={13}
+                  className={`tree-chevron${isOpen ? ' open' : ''}`}
+                />
+                <span style={{ color: 'var(--warn)', lineHeight: 0, flexShrink: 0 }}>
+                  <Icon name="folder" size={15} />
+                </span>
+                <span className="tree-dir-name">{node.name}</span>
+                <span className="meta-text" style={{ marginLeft: 'auto', fontSize: 11 }}>
+                  {node.children.length}
+                </span>
+              </div>
+              {isOpen && (
+                <TreeRows
+                  nodes={node.children}
+                  depth={depth + 1}
+                  expanded={expanded}
+                  toggle={toggle}
+                  progress={progress}
+                  status={status}
+                  onDownload={onDownload}
+                />
+              )}
+            </div>
+          );
+        }
+
+        const ext = (node.entry.path.split('.').pop() ?? '').toUpperCase().slice(0, 4);
+        const extCls = extBadgeClass(node.entry.path);
+        const pct = progress[node.entry.path];
+        return (
+          <div key={node.entry.path} className="file-row" style={{ paddingLeft: depth * 16 + 14 }}>
+            <span className={`ext-badge ${extCls}`}>{ext || '?'}</span>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {node.name}
+              </div>
+            </div>
+            <span className="meta-text">{node.entry.modifiedAt ? relTime(node.entry.modifiedAt) : '—'}</span>
+            <div>
+              {pct != null ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="progress-bar"><div style={{ width: `${pct}%` }} /></div>
+                  <span style={{ fontSize: 11.5, color: 'var(--ink-500)', minWidth: 32 }}>{pct}%</span>
+                </div>
+              ) : (
+                <span className="meta-text">—</span>
+              )}
+            </div>
+            <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-500)' }}>
+              {fmtBytes(node.entry.size)}
+            </span>
+            <button
+              className="icon-btn"
+              onClick={() => onDownload(node.entry)}
+              disabled={status === 'downloading'}
+              title="Скачать"
+            >
+              <Icon name="download" size={15} />
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function FileListPanel({ folderId, shareToken }: Props) {
   const ownerStatus = useOwnerOnlineStatus(folderId);
@@ -28,6 +165,30 @@ export function FileListPanel({ folderId, shareToken }: Props) {
   const [files, setFiles] = useState<RemoteFileEntry[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const sessionRef = useRef<P2PSession | null>(null);
+
+  const tree = useMemo(() => buildTree(files), [files]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const initExpandedRef = useRef(false);
+
+  // Auto-expand all dirs when tree first loads
+  useEffect(() => {
+    if (tree.length === 0 || initExpandedRef.current) return;
+    initExpandedRef.current = true;
+    const allDirs = new Set<string>();
+    function collect(nodes: FileNode[]) {
+      for (const n of nodes) if (n.kind === 'dir') { allDirs.add(n.path); collect(n.children); }
+    }
+    collect(tree);
+    setExpanded(allDirs);
+  }, [tree]);
+
+  const toggle = useCallback((path: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  }, []);
 
   const connect = useCallback(async () => {
     let turnCredentials = null;
@@ -71,7 +232,7 @@ export function FileListPanel({ folderId, shareToken }: Props) {
 
   const isConnecting = sessionStatus === 'connecting' || sessionStatus === 'negotiating' || sessionStatus === 'ecdh';
 
-  if (sessionStatus === 'idle' || (files.length === 0 && !isConnecting && sessionStatus !== 'ready')) {
+  if (sessionStatus === 'idle' || (tree.length === 0 && !isConnecting && sessionStatus !== 'ready')) {
     return (
       <div className="empty">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
@@ -96,7 +257,7 @@ export function FileListPanel({ folderId, shareToken }: Props) {
     );
   }
 
-  if (files.length === 0) {
+  if (tree.length === 0) {
     return (
       <div className="empty">
         <OwnerStatusBadge status={ownerStatus} />
@@ -116,41 +277,15 @@ export function FileListPanel({ folderId, shareToken }: Props) {
         <span style={{ textAlign: 'right' }}>Размер</span>
         <span></span>
       </div>
-      {files.map(f => {
-        const pct = progress[f.path];
-        const extCls = extBadgeClass(f.path);
-        const ext = (f.path.split('.').pop() ?? '').toUpperCase().slice(0, 4);
-        return (
-          <div key={f.path} className="file-row">
-            <span className={`ext-badge ${extCls}`}>{ext || '?'}</span>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path}</div>
-            </div>
-            <span className="meta-text">{f.modifiedAt ? relTime(f.modifiedAt) : '—'}</span>
-            <div>
-              {pct != null ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div className="progress-bar"><div style={{ width: `${pct}%` }} /></div>
-                  <span style={{ fontSize: 11.5, color: 'var(--ink-500)', minWidth: 32 }}>{pct}%</span>
-                </div>
-              ) : (
-                <span className="meta-text">—</span>
-              )}
-            </div>
-            <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-500)' }}>
-              {fmtBytes(f.size)}
-            </span>
-            <button
-              className="icon-btn"
-              onClick={() => downloadFile(f)}
-              disabled={sessionStatus === 'downloading'}
-              title="Скачать"
-            >
-              <Icon name="download" size={15} />
-            </button>
-          </div>
-        );
-      })}
+      <TreeRows
+        nodes={tree}
+        depth={0}
+        expanded={expanded}
+        toggle={toggle}
+        progress={progress}
+        status={sessionStatus}
+        onDownload={downloadFile}
+      />
     </div>
   );
 }

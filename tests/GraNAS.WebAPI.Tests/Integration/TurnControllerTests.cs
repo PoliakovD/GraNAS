@@ -50,10 +50,13 @@ public class TurnControllerTests : IClassFixture<SignalingWebApplicationFactory>
     }
 
     [Fact]
-    public async Task GetCredentials_Anonymous_Returns401()
+    public async Task GetCredentials_Anonymous_Returns200WithAnonymousUsername()
     {
         var response = await AnonClient().GetAsync("/api/turn/credentials");
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TurnCredentialsResponse>();
+        Assert.NotNull(body);
+        Assert.Contains("anonymous", body.Username);
     }
 
     [Fact]
