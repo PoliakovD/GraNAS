@@ -202,10 +202,23 @@ export function createP2PSession(
   return {
     async connect() {
       callbacks.onStatusChange('connecting');
-      hub.on('Offer', (senderConnId: string, sdp: string) => void handleOffer(senderConnId, sdp));
+      hub.on('Offer', (senderConnId: string, sdp: string) => {
+        handleOffer(senderConnId, sdp).catch(err => {
+          callbacks.onStatusChange('error');
+          callbacks.onError(`P2P handshake failed: ${err}`);
+        });
+      });
       hub.on('IceCandidate', (_: string, candidate: string, sdpMid: string | null, sdpMLineIndex: number | null) =>
         handleIceCandidate(candidate, sdpMid, sdpMLineIndex));
       hub.on('OwnerOnlineStatusChanged', () => { /* handled by useOwnerOnlineStatus */ });
+      hub.on('AccessDenied', (_folderId: string, reason: string) => {
+        callbacks.onStatusChange('error');
+        callbacks.onError(`Access denied: ${reason}`);
+      });
+      hub.on('OwnerOffline', () => {
+        callbacks.onStatusChange('error');
+        callbacks.onError('Owner went offline');
+      });
       await hub.start();
       await hub.invoke('WatchFolder', folderId);
       await requestSession();
