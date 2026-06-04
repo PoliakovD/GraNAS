@@ -26,6 +26,9 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
 
   private async Task HandleExceptionAsync(HttpContext context, Exception exception)
   {
+    if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested)
+      return;
+
     logger.LogError(exception, "An unhandled exception occurred.");
 
     var response = context.Response;
