@@ -232,6 +232,11 @@ public class Program
 
     app.MapControllers();
 
+    app.MapHealthChecks("/api/auth/live", new HealthCheckOptions
+    {
+      Predicate = c => c.Tags.Contains("live")
+    }).AllowAnonymous().DisableRateLimiting();
+
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
       Predicate = c => c.Tags.Contains("live")

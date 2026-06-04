@@ -123,9 +123,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install apache2-utils
-        run: sudo apt-get update -q && sudo apt-get install -y apache2-utils
-
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.VDS_SSH_KEY }}
@@ -258,6 +255,7 @@ jobs:
             echo "SMTP_PASSWORD=$SMTP_PASSWORD"
             echo "SMTP_FROM=$SMTP_FROM"
             echo "SMTP_USE_STARTTLS=$SMTP_USE_STARTTLS"
+            echo "DASHBOARDS_PASSWORD=$DASHBOARDS_PASSWORD"
           } > vds.env
 
       - name: Render vds.prod-images.env
@@ -285,11 +283,6 @@ jobs:
             echo "WEB_CLIENT_VERSION=${IMAGE_TAG}"
           } > infrastructure/docker-compose/vds.prod-images.env
 
-      - name: Generate nginx htpasswd
-        run: |
-          htpasswd -bnB admin "$DASHBOARDS_PASSWORD" \
-            > infrastructure/docker-compose/nginx/htpasswd
-
       - name: Prepare VDS directory structure
         run: |
           ssh "${VDS_USER}@${VDS_HOST}" \
@@ -304,10 +297,10 @@ jobs:
             infrastructure/docker-compose/compose.yaml \
             infrastructure/docker-compose/compose.vds.yaml \
             infrastructure/docker-compose/init-letsencrypt.sh \
+            infrastructure/docker-compose/generate-htpasswd.sh \
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/"
           scp \
             infrastructure/docker-compose/nginx/app.conf.template \
-            infrastructure/docker-compose/nginx/htpasswd \
             "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/nginx/"
           scp \
             infrastructure/docker-compose/dashboards/granas-debug.ndjson \
@@ -319,6 +312,7 @@ jobs:
           ssh "${VDS_USER}@${VDS_HOST}" 'bash -s' << 'ENDSSH'
             set -euo pipefail
             cd /opt/granas/infrastructure/docker-compose
+            bash generate-htpasswd.sh
             COMPOSE="docker compose --env-file vds.env --env-file vds.prod-images.env -f compose.yaml -f compose.vds.yaml"
             if ! docker volume inspect granas-prod_certbot_certs >/dev/null 2>&1; then
               echo "==> First run: bootstrapping HTTPS..."
