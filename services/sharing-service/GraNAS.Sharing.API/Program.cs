@@ -64,7 +64,6 @@ public class Program
       };
     });
 
-    builder.Services.AddHttpContextAccessor();
     builder.AddPostgreSql<SharingDbContext>();
 
     if (builder.Environment.IsDevelopment())

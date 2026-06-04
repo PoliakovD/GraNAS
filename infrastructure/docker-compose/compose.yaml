@@ -229,7 +229,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ENVIRONMENT}
       ASPNETCORE_URLS: http://+:${SERVICE_PORT_CONTAINER}
-      ConnectionStrings__DefaultConnection: ${LOG_DB_CONNECTION_STRING}
       OpenSearch__Uri: ${OPENSEARCH_URI}
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
