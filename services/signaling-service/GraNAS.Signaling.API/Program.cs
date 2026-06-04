@@ -122,10 +122,18 @@ public class Program
               ctx.Token = accessToken;
             return Task.CompletedTask;
           },
-          OnAuthenticationFailed = ctx =>
+          OnAuthenticationFailed = context =>
           {
-            var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogWarning(ctx.Exception, "JWT authentication failed");
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+            if (context.Exception is SecurityTokenExpiredException)
+            {
+              logger.LogWarning("JWT authentication failed: Token has expired.");
+            }
+            else
+            {
+              logger.LogError(context.Exception, "JWT authentication failed due to an unexpected error.");
+            }
             return Task.CompletedTask;
           }
         };

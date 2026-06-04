@@ -9,9 +9,79 @@ concurrency:
   group: dev-vds
   cancel-in-progress: false
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
+  # ── 1. Build & push all images to GHCR ──────────────────────────────────
+  build-images:
+    runs-on: ubuntu-latest
+    environment: dev-vds
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: auth-service
+            dockerfile: services/auth-service/GraNAS.Auth.API/Dockerfile
+            context: .
+          - service: metadata-service
+            dockerfile: services/metadata-service/GraNAS.Metadata.API/Dockerfile
+            context: .
+          - service: log-service
+            dockerfile: services/log-service/GraNAS.LogService/Dockerfile
+            context: .
+          - service: sharing-service
+            dockerfile: services/sharing-service/GraNAS.Sharing.API/Dockerfile
+            context: .
+          - service: signaling-service
+            dockerfile: services/signaling-service/GraNAS.Signaling.API/Dockerfile
+            context: .
+          - service: notification-service
+            dockerfile: services/notification-service/GraNAS.Notifications.API/Dockerfile
+            context: .
+          - service: api-gateway
+            dockerfile: services/api-gateway/GraNAS.Gateway/Dockerfile
+            context: .
+          - service: web-client
+            dockerfile: clients/web/Dockerfile
+            context: clients/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}
+          tags: |
+            type=raw,value=dev-latest
+            type=sha,prefix=dev-,format=short
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            VITE_API_BASE_URL=https://${{ secrets.DOMAIN }}
+
+  # ── 2. Deploy to dev VDS ─────────────────────────────────────────────────
   deploy:
     runs-on: ubuntu-latest
+    needs: build-images
     environment: dev-vds
     env:
       VDS_HOST: ${{ secrets.VDS_HOST }}
@@ -33,8 +103,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install sshpass + rsync + apache2-utils
-        run: sudo apt-get update -q && sudo apt-get install -y sshpass rsync apache2-utils
+      - name: Install sshpass + apache2-utils
+        run: sudo apt-get update -q && sudo apt-get install -y sshpass apache2-utils
 
       - name: Guard required secrets
         run: |
@@ -102,28 +172,10 @@ jobs:
             echo "SHARING_POSTGRES_USER=sharing_user"
             echo "SHARING_POSTGRES_PASSWORD=$SHARING_POSTGRES_PASSWORD"
             echo "SHARING_POSTGRES_HOST=postgres-sharing"
-            echo "AUTH_SERVICE_IMAGE=granas-auth-api"
-            echo "AUTH_SERVICE_VERSION=latest"
-            echo "METADATA_SERVICE_IMAGE=granas-metadata-api"
-            echo "METADATA_SERVICE_VERSION=latest"
-            echo "LOG_SERVICE_IMAGE=granas-log-api"
-            echo "LOG_SERVICE_VERSION=latest"
-            echo "SHARING_SERVICE_IMAGE=granas-sharing-api"
-            echo "SHARING_SERVICE_VERSION=latest"
-            echo "SIGNALING_SERVICE_IMAGE=granas-signaling-api"
-            echo "SIGNALING_SERVICE_VERSION=latest"
-            echo "NOTIFICATION_SERVICE_IMAGE=granas-notification-api"
-            echo "NOTIFICATION_SERVICE_VERSION=latest"
-            echo "GATEWAY_SERVICE_IMAGE=granas-gateway"
-            echo "GATEWAY_SERVICE_VERSION=latest"
-            echo "WEB_CLIENT_IMAGE=granas-web-client"
-            echo "WEB_CLIENT_VERSION=latest"
             echo "AUTH_DB_CONNECTION_STRING=Host=postgres-auth;Port=5432;Database=auth_dev;Username=auth_user;Password=$AUTH_POSTGRES_PASSWORD"
             echo "METADATA_DB_CONNECTION_STRING=Host=postgres-metadata;Port=5432;Database=metadata_dev;Username=metadata_user;Password=$METADATA_POSTGRES_PASSWORD"
             echo "SHARING_DB_CONNECTION_STRING=Host=postgres-sharing;Port=5432;Database=sharing_dev;Username=sharing_user;Password=$SHARING_POSTGRES_PASSWORD"
             echo "GATEWAY_PORT_HOST=8080"
-            echo "GATEWAY_SERVICE_IMAGE=granas-gateway"
-            echo "GATEWAY_SERVICE_VERSION=latest"
             echo "WEB_CLIENT_ORIGIN=https://$DOMAIN"
             echo "WEB_CLIENT_PORT_HOST=5173"
             echo "VITE_API_BASE_URL=https://$DOMAIN"
@@ -154,6 +206,29 @@ jobs:
             echo "SMTP_USE_STARTTLS=false"
           } > vds.env
 
+      - name: Render vds.dev-images.env
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          {
+            echo "AUTH_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/auth-service"
+            echo "AUTH_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "METADATA_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/metadata-service"
+            echo "METADATA_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "LOG_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/log-service"
+            echo "LOG_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "SHARING_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/sharing-service"
+            echo "SHARING_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "SIGNALING_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/signaling-service"
+            echo "SIGNALING_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "NOTIFICATION_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/notification-service"
+            echo "NOTIFICATION_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "GATEWAY_SERVICE_IMAGE=${{ env.REGISTRY }}/${OWNER}/api-gateway"
+            echo "GATEWAY_SERVICE_VERSION=dev-${SHORT_SHA}"
+            echo "WEB_CLIENT_IMAGE=${{ env.REGISTRY }}/${OWNER}/web-client"
+            echo "WEB_CLIENT_VERSION=dev-${SHORT_SHA}"
+          } > infrastructure/docker-compose/vds.dev-images.env
+
       - name: Generate nginx htpasswd
         run: |
           htpasswd -bnB admin "$DASHBOARDS_PASSWORD" \
@@ -183,20 +258,31 @@ jobs:
             $SUDO ufw --force enable
           ENDSSH
 
-      - name: Rsync repo to VDS
+      - name: Prepare VDS directory structure
         run: |
           export SSHPASS="$VDS_PASSWORD"
-          sshpass -e rsync -az --delete \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='infrastructure/docker-compose/vds.env' \
-            ./ "${VDS_USER}@${VDS_HOST}:/opt/granas/"
+          sshpass -e ssh "${VDS_USER}@${VDS_HOST}" \
+            'mkdir -p /opt/granas/infrastructure/docker-compose/nginx \
+                      /opt/granas/infrastructure/docker-compose/dashboards'
 
-      - name: Scp vds.env to VDS
+      - name: Scp compose files and envs to VDS
         run: |
           export SSHPASS="$VDS_PASSWORD"
-          sshpass -e scp infrastructure/docker-compose/vds.env \
-            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/vds.env"
+          sshpass -e scp \
+            infrastructure/docker-compose/vds.env \
+            infrastructure/docker-compose/vds.dev-images.env \
+            infrastructure/docker-compose/compose.yaml \
+            infrastructure/docker-compose/compose.vds.yaml \
+            infrastructure/docker-compose/init-letsencrypt.sh \
+            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/"
+          sshpass -e scp \
+            infrastructure/docker-compose/nginx/app.conf.template \
+            infrastructure/docker-compose/nginx/htpasswd \
+            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/nginx/"
+          sshpass -e scp \
+            infrastructure/docker-compose/dashboards/granas-debug.ndjson \
+            infrastructure/docker-compose/dashboards/init.sh \
+            "${VDS_USER}@${VDS_HOST}:/opt/granas/infrastructure/docker-compose/dashboards/"
 
       - name: Bootstrap HTTPS certificate
         run: |
@@ -207,26 +293,28 @@ jobs:
             bash init-letsencrypt.sh
           ENDSSH
 
-      - name: Start services
+      - name: Pull and start services
         run: |
           export SSHPASS="$VDS_PASSWORD"
-          sshpass -e ssh "${VDS_USER}@${VDS_HOST}" 'bash -s' << 'ENDSSH'
+          sshpass -e ssh "${VDS_USER}@${VDS_HOST}" bash << EOF
             set -euo pipefail
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             cd /opt/granas/infrastructure/docker-compose
-            COMPOSE="docker compose --env-file vds.env -f compose.yaml -f compose.vds.yaml"
-            $COMPOSE up -d --build --remove-orphans
-            $COMPOSE exec nginx nginx -s reload
+            COMPOSE="docker compose --env-file vds.env --env-file vds.dev-images.env -f compose.yaml -f compose.vds.yaml"
+            \$COMPOSE pull
+            \$COMPOSE up -d --remove-orphans
+            \$COMPOSE exec nginx nginx -s reload
             echo "==> Ожидание готовности OpenSearch (до 5 минут)..."
-            for i in $(seq 1 30); do
-              if $COMPOSE exec -T opensearch curl -sf http://localhost:9200/_cluster/health >/dev/null 2>&1; then
-                echo "   OpenSearch готов (попытка $i)."
+            for i in \$(seq 1 30); do
+              if \$COMPOSE exec -T opensearch curl -sf http://localhost:9200/_cluster/health >/dev/null 2>&1; then
+                echo "   OpenSearch готов (попытка \$i)."
                 break
               fi
-              echo "   Попытка $i/30, ждём 10 сек..."
+              echo "   Попытка \$i/30, ждём 10 сек..."
               sleep 10
             done
-            $COMPOSE ps
-          ENDSSH
+            \$COMPOSE ps
+          EOF
 
       - name: Smoke test
         run: |
