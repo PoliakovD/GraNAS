@@ -479,15 +479,16 @@ services:
   coturn:
     container_name: ${PREFIX}_coturn
     image: coturn/coturn:latest
-    ports:
-      - "${TURN_PORT}:3478/udp"
-      - "${TURN_PORT}:3478/tcp"
-      - "50000-50200:50000-50200/udp"
+    # host network required: hairpin relay (both peers on same TURN server) doesn't work
+    # with Docker bridge — packets to the server's own external IP don't loop back into
+    # the container. With host mode the kernel routes them correctly.
+    network_mode: host
     command:
       - "--use-auth-secret"
       - "--static-auth-secret=${TURN_SECRET}"
       - "--realm=${TURN_REALM}"
       - "--external-ip=${EXTERNAL_IP}"
+      - "--listening-port=${TURN_PORT}"
       - "--no-tls"
       - "--fingerprint"
       - "--min-port=50000"
@@ -496,8 +497,6 @@ services:
       - "--stale-nonce=600"
       - "--verbose"
     restart: unless-stopped
-    networks:
-      - app-network
 
   mailpit:
     container_name: ${PREFIX}_mailpit

@@ -36,6 +36,7 @@ public class P2PHost : IP2PHost, IAsyncDisposable
     private readonly string _hubUrl;
 
     private HubConnection? _hub;
+    private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly ConcurrentDictionary<string, PeerSession> _peers = new();
     private readonly ConcurrentDictionary<Guid, Guid?> _bindingCache = new();
     private TurnCredentials? _turnCredentials;
@@ -69,53 +70,61 @@ public class P2PHost : IP2PHost, IAsyncDisposable
     /// </remarks>
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        if (_hub?.State is HubConnectionState.Connected
-                        or HubConnectionState.Connecting
-                        or HubConnectionState.Reconnecting) return;
-
-        if (!_deviceIdentity.IsRegisteredForUser(_session.CurrentUserId))
+        if (!await _connectLock.WaitAsync(0, ct)) return;
+        try
         {
-            await _signalingApi.RegisterDeviceAsync(
-                new DeviceRegistrationRequest(_deviceIdentity.DeviceId, _deviceIdentity.DeviceName, _deviceIdentity.Platform), ct);
-            _deviceIdentity.MarkRegisteredForUser(_session.CurrentUserId);
-        }
+            if (_hub?.State is HubConnectionState.Connected
+                            or HubConnectionState.Connecting
+                            or HubConnectionState.Reconnecting) return;
 
-        _turnCredentials = await _signalingApi.GetTurnCredentialsAsync(ct);
-
-        _hub = new HubConnectionBuilder()
-            .WithUrl(_hubUrl, opts =>
+            if (!_deviceIdentity.IsRegisteredForUser(_session.CurrentUserId))
             {
-                opts.AccessTokenProvider = async () =>
+                await _signalingApi.RegisterDeviceAsync(
+                    new DeviceRegistrationRequest(_deviceIdentity.DeviceId, _deviceIdentity.DeviceName, _deviceIdentity.Platform), ct);
+                _deviceIdentity.MarkRegisteredForUser(_session.CurrentUserId);
+            }
+
+            _turnCredentials = await _signalingApi.GetTurnCredentialsAsync(ct);
+
+            _hub = new HubConnectionBuilder()
+                .WithUrl(_hubUrl, opts =>
                 {
-                    if (IsTokenNearExpiry(_session.AccessToken))
+                    opts.AccessTokenProvider = async () =>
                     {
-                        try { await _session.RefreshAsync(); }
-                        catch (Exception ex) { Log.Warning(ex, "Token refresh failed in AccessTokenProvider"); }
-                    }
-                    return _session.AccessToken;
-                };
-                opts.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString());
-            })
-            .WithAutomaticReconnect()
-            .Build();
+                        if (IsTokenNearExpiry(_session.AccessToken))
+                        {
+                            try { await _session.RefreshAsync(); }
+                            catch (Exception ex) { Log.Warning(ex, "Token refresh failed in AccessTokenProvider"); }
+                        }
+                        return _session.AccessToken;
+                    };
+                    opts.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString());
+                })
+                .WithAutomaticReconnect()
+                .Build();
 
-        _hub.On<string, Guid, string?>("IncomingPeerRequest", HandleIncomingPeerRequestAsync);
-        _hub.On<string, string>("Answer", HandleAnswerAsync);
-        _hub.On<string, string, string?, int?>("IceCandidate", HandleIceCandidateAsync);
-        _hub.On("ForceDisconnect", HandleForceDisconnectAsync);
+            _hub.On<string, Guid, string?>("IncomingPeerRequest", HandleIncomingPeerRequestAsync);
+            _hub.On<string, string>("Answer", HandleAnswerAsync);
+            _hub.On<string, string, string?, int?>("IceCandidate", HandleIceCandidateAsync);
+            _hub.On("ForceDisconnect", HandleForceDisconnectAsync);
 
-        _hub.Reconnected += async _ =>
+            _hub.Reconnected += async _ =>
+            {
+                _turnCredentials = await _signalingApi.GetTurnCredentialsAsync();
+                await RegisterDeviceInHubAsync();
+                await JoinAllFoldersAsync();
+            };
+
+            await _hub.StartAsync(ct);
+            await RegisterDeviceInHubAsync(ct);
+            _isOnline = true;
+            await JoinAllFoldersAsync(ct);
+            Log.Information("P2PHost connected to signaling hub (device {DeviceId})", _deviceIdentity.DeviceId);
+        }
+        finally
         {
-            _turnCredentials = await _signalingApi.GetTurnCredentialsAsync();
-            await RegisterDeviceInHubAsync();
-            await JoinAllFoldersAsync();
-        };
-
-        await _hub.StartAsync(ct);
-        await RegisterDeviceInHubAsync(ct);
-        _isOnline = true;
-        await JoinAllFoldersAsync(ct);
-        Log.Information("P2PHost connected to signaling hub (device {DeviceId})", _deviceIdentity.DeviceId);
+            _connectLock.Release();
+        }
     }
 
     /// <inheritdoc/>
