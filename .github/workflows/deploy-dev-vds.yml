@@ -190,6 +190,7 @@ jobs:
             echo "TURN_SECRET=$TURN_SECRET"
             echo "TURN_REALM=$DOMAIN"
             echo "TURN_HOST=$VDS_HOST"
+            echo "EXTERNAL_IP=$VDS_HOST"
             echo "TURN_PORT=3478"
             echo "NOTIFICATION_POSTGRES_DB=notification_dev"
             echo "NOTIFICATION_POSTGRES_USER=notification_user"
