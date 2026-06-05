@@ -489,8 +489,8 @@ services:
       - "--realm=${TURN_REALM}"
       - "--no-tls"
       - "--fingerprint"
-      - "--min-port=49152"
-      - "--max-port=49252"
+      - "--min-port=50000"
+      - "--max-port=50010"
       - "--total-quota=100"
       - "--stale-nonce=600"
     restart: unless-stopped

@@ -270,8 +270,14 @@ public class P2PHost : IP2PHost, IAsyncDisposable
 
         pc.onicecandidate += async iceCandidate =>
         {
+            if (iceCandidate.candidate is null)
+            {
+                Log.Information("ICE gathering complete (end-of-candidates) for peer {ConnId}", receiverConnId);
+                return;
+            }
             var typ = ExtractIceType(iceCandidate.candidate);
-            Log.Information("ICE candidate generated: type={IceType} peer={ConnId}", typ, receiverConnId);
+            Log.Information("ICE candidate generated: type={IceType} peer={ConnId} candidate={Candidate}",
+                typ, receiverConnId, iceCandidate.candidate);
             if (_hub?.State != HubConnectionState.Connected) return;
             try
             {
@@ -283,6 +289,9 @@ public class P2PHost : IP2PHost, IAsyncDisposable
             }
             catch (Exception ex) { Log.Warning(ex, "ICE send failed for peer {ConnId}", receiverConnId); }
         };
+
+        pc.onicegatheringstatechange += state =>
+            Log.Information("ICE gathering state → {State} for peer {ConnId}", state, receiverConnId);
 
         pc.oniceconnectionstatechange += state =>
             Log.Information("ICE connection state → {State} for peer {ConnId}", state, receiverConnId);
@@ -504,6 +513,12 @@ public class P2PHost : IP2PHost, IAsyncDisposable
                     credentialType = RTCIceCredentialType.password
                 });
             }
+            Log.Information("ICE servers configured: STUN=stun.l.google.com:19302, TURN uris=[{TurnUris}] user={TurnUser}",
+                string.Join(", ", _turnCredentials.Uris), _turnCredentials.Username);
+        }
+        else
+        {
+            Log.Warning("No TURN credentials available — using STUN only");
         }
 
         return new RTCPeerConnection(config);

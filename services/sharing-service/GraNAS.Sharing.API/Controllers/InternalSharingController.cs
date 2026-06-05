@@ -27,6 +27,7 @@ public class InternalSharingController : ControllerBase
     }
 
     /// <summary>Получить метаданные share-ссылки по хэшу токена (межсервисный вызов из signaling-service)</summary>
+    [AllowAnonymous]
     [HttpGet("by-token-hash/{tokenHash}")]
     [ProducesResponseType(typeof(ShareAccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
