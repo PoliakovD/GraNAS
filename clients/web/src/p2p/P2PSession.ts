@@ -54,6 +54,9 @@ export function createP2PSession(
   let ecdhKeyPair: CryptoKeyPair | null = null;
   let aesKey: CryptoKey | null = null;
   let downloadState: DownloadState | null = null;
+  // Buffer ICE candidates that arrive before pc + remote description are ready (trickle/offer race).
+  let remoteReady = false;
+  const pendingCandidates: { candidate: string; sdpMid: string | null; sdpMLineIndex: number | null }[] = [];
 
   // ---- Hub signaling ----
 
@@ -113,24 +116,48 @@ export function createP2PSession(
     pc.ondatachannel = (e) => { p2pDebug.log('datachannel получен'); attachDataChannel(e.channel); };
 
     await pc.setRemoteDescription({ type: 'offer', sdp });
+    remoteReady = true;
     p2pDebug.log('remote offer установлен');
+    flushPendingCandidates();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await hub.invoke('SendAnswer', senderConnId, answer.sdp ?? '');
     p2pDebug.log(`answer отправлен (sdpLen=${answer.sdp?.length ?? 0})`);
   }
 
-  function handleIceCandidate(candidate: string, sdpMid: string | null, sdpMLineIndex: number | null): void {
-    if (!pc) { p2pDebug.log(`✗ remote кандидат пришёл до pc: ${describeCandidate(candidate)}`); return; }
-    p2pDebug.log(`remote кандидат: ${describeCandidate(candidate)}`);
+  // SIPSorcery emits srflx/relay candidates with "raddr 0.0.0.0 rport 0", which Chrome rejects
+  // ("Error processing ICE candidate"). The related-address is optional in the ICE grammar, so we
+  // strip the bogus tokens — the candidate is then accepted and usable for connectivity.
+  function sanitizeCandidate(c: string): string {
+    return c.replace(/\s+raddr\s+(?:0\.0\.0\.0|::)\s+rport\s+0\b/i, '');
+  }
+
+  function addCandidate(candidate: string, sdpMid: string | null, sdpMLineIndex: number | null): void {
+    if (!pc) return;
+    const fixed = sanitizeCandidate(candidate);
     pc.addIceCandidate({
-      candidate,
+      candidate: fixed,
       sdpMid: sdpMid ?? undefined,
       sdpMLineIndex: sdpMLineIndex ?? undefined,
-    }).catch((err: unknown) => {
-      // KEY diagnostic: if the browser rejects the owner's relay/srflx candidate, it shows here.
-      p2pDebug.log(`✗ addIceCandidate REJECT [${describeCandidate(candidate)}]: ${String(err)}`);
-    });
+    })
+      .then(() => p2pDebug.log(`  ✓ кандидат добавлен: ${describeCandidate(fixed)}`))
+      .catch((err: unknown) => p2pDebug.log(`✗ addIceCandidate REJECT [${describeCandidate(fixed)}]: ${String(err)}`));
+  }
+
+  function flushPendingCandidates(): void {
+    if (pendingCandidates.length) p2pDebug.log(`применяю ${pendingCandidates.length} буфер. кандидат(ов)`);
+    for (const c of pendingCandidates) addCandidate(c.candidate, c.sdpMid, c.sdpMLineIndex);
+    pendingCandidates.length = 0;
+  }
+
+  function handleIceCandidate(candidate: string, sdpMid: string | null, sdpMLineIndex: number | null): void {
+    p2pDebug.log(`remote кандидат: ${describeCandidate(candidate)}`);
+    if (!pc || !remoteReady) {
+      pendingCandidates.push({ candidate, sdpMid, sdpMLineIndex });
+      p2pDebug.log('  (в буфер — pc/remote ещё не готовы)');
+      return;
+    }
+    addCandidate(candidate, sdpMid, sdpMLineIndex);
   }
 
   // ---- Data channel ----
