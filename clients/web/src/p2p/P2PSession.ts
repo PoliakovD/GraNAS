@@ -125,11 +125,15 @@ export function createP2PSession(
     p2pDebug.log(`answer отправлен (sdpLen=${answer.sdp?.length ?? 0})`);
   }
 
-  // SIPSorcery emits srflx/relay candidates with "raddr 0.0.0.0 rport 0", which Chrome rejects
-  // ("Error processing ICE candidate"). The related-address is optional in the ICE grammar, so we
-  // strip the bogus tokens — the candidate is then accepted and usable for connectivity.
+  // SIPSorcery sends trickled candidates WITHOUT the "candidate:" prefix that Chrome's
+  // addIceCandidate requires (offer-SDP candidates have it, trickled ones don't) — and emits
+  // srflx/relay with a bogus "raddr 0.0.0.0 rport 0". Both make Chrome throw "Error processing
+  // ICE candidate". Add the prefix and strip the invalid related-address.
   function sanitizeCandidate(c: string): string {
-    return c.replace(/\s+raddr\s+(?:0\.0\.0\.0|::)\s+rport\s+0\b/i, '');
+    let s = c.trim();
+    if (s && !s.startsWith('candidate:')) s = `candidate:${s}`;
+    s = s.replace(/\s+raddr\s+(?:0\.0\.0\.0|::)\s+rport\s+0\b/i, '');
+    return s;
   }
 
   function addCandidate(candidate: string, sdpMid: string | null, sdpMLineIndex: number | null): void {
