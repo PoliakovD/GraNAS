@@ -287,6 +287,7 @@ jobs:
           sshpass -e ssh "${VDS_USER}@${VDS_HOST}" 'bash -s' << 'ENDSSH'
             set -euo pipefail
             cd /opt/granas/infrastructure/docker-compose
+            bash generate-htpasswd.sh
             bash init-letsencrypt.sh
           ENDSSH
 
@@ -297,7 +298,6 @@ jobs:
             set -euo pipefail
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             cd /opt/granas/infrastructure/docker-compose
-            bash generate-htpasswd.sh
             COMPOSE="docker compose --env-file vds.env --env-file vds.dev-images.env -f compose.yaml -f compose.vds.yaml"
             \$COMPOSE pull
             \$COMPOSE up -d --remove-orphans

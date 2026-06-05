@@ -18,6 +18,9 @@ if [ -z "$DASHBOARDS_PASSWORD" ]; then
 fi
 
 mkdir -p nginx
+# Docker creates bind-mount targets as directories if they don't exist yet;
+# remove the directory so we can write the file in its place.
+[ -d nginx/htpasswd ] && rm -rf nginx/htpasswd
 HASH=$(openssl passwd -apr1 -- "$DASHBOARDS_PASSWORD")
 printf 'admin:%s\n' "$HASH" > nginx/htpasswd
 echo "nginx/htpasswd generated"
