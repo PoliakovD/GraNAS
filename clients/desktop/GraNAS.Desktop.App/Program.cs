@@ -18,9 +18,13 @@ Log.Logger = new LoggerConfiguration()
   .ReadFrom.Configuration(config)
   .CreateLogger();
 
-// Route SIPSorcery internal logs (STUN/TURN/ICE) through Serilog for diagnostics
+// Route SIPSorcery internal logs (STUN/TURN/ICE) through Serilog for diagnostics.
+// The SCTP layer spams Warning-level "SACK TSN behind expected" during data-channel transfers
+// (benign reordering on the relay path) — silence it below Error while keeping ICE/TURN logs.
 SIPSorcery.LogFactory.Set(LoggerFactory.Create(b =>
-    b.AddSerilog(Log.Logger).SetMinimumLevel(LogLevel.Debug)));
+    b.AddSerilog(Log.Logger)
+     .SetMinimumLevel(LogLevel.Debug)
+     .AddFilter("SIPSorcery.Net.Sctp", LogLevel.Error)));
 
 try
 {

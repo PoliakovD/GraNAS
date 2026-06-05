@@ -54,6 +54,7 @@ export function createP2PSession(
   let ecdhKeyPair: CryptoKeyPair | null = null;
   let aesKey: CryptoKey | null = null;
   let downloadState: DownloadState | null = null;
+  let ecdhStarted = false;
   // Buffer ICE candidates that arrive before pc + remote description are ready (trickle/offer race).
   let remoteReady = false;
   const pendingCandidates: { candidate: string; sdpMid: string | null; sdpMLineIndex: number | null }[] = [];
@@ -184,6 +185,9 @@ export function createP2PSession(
   }
 
   async function initiateEcdh(): Promise<void> {
+    // ondatachannel can fire both the readyState check and onopen — run the handshake once.
+    if (ecdhStarted) return;
+    ecdhStarted = true;
     callbacks.onStatusChange('ecdh');
     p2pDebug.log('ECDH: отправка публичного ключа');
     ecdhKeyPair = await generateEcdhKeyPair();
