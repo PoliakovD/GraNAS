@@ -67,7 +67,10 @@ export function createP2PSession(
     }
 
     console.debug('[P2P] TURN in use:', turnCredentials ? turnCredentials.uris : 'none (STUN only)');
-    pc = new RTCPeerConnection({ iceServers });
+    // When TURN is available, restrict to relay-only transport so Chrome tries the relay-relay
+    // pair immediately instead of spending 15+ seconds retransmitting to unreachable host candidates.
+    const iceTransportPolicy: RTCIceTransportPolicy = turnCredentials ? 'relay' : 'all';
+    pc = new RTCPeerConnection({ iceServers, iceTransportPolicy });
 
     pc.onicecandidate = async (e) => {
       if (!e.candidate) return;

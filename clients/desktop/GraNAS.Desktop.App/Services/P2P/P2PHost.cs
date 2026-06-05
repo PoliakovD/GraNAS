@@ -297,6 +297,15 @@ public class P2PHost : IP2PHost, IAsyncDisposable
             var typ = ExtractIceType(iceCandidate.candidate);
             Log.Information("ICE candidate generated: type={IceType} peer={ConnId} candidate={Candidate}",
                 typ, receiverConnId, iceCandidate.candidate);
+
+            // When TURN is available, skip private host candidates: the receiver (web/mobile)
+            // would waste 15+ seconds retransmitting to unreachable VPN/LAN IPs before trying relay.
+            if (typ == "host" && _turnCredentials != null && IsPrivateIpCandidate(iceCandidate.candidate))
+            {
+                Log.Debug("Skipping private host candidate for peer {ConnId} (TURN available)", receiverConnId);
+                return;
+            }
+
             if (_hub?.State != HubConnectionState.Connected) return;
             try
             {
@@ -552,6 +561,20 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         }
 
         return new RTCPeerConnection(config);
+    }
+
+    private static bool IsPrivateIpCandidate(string candidate)
+    {
+        var parts = candidate.Split(' ');
+        if (parts.Length < 6) return false;
+        if (!IPAddress.TryParse(parts[4], out var ip)) return false;
+        if (ip.AddressFamily != AddressFamily.InterNetwork) return false;
+        var b = ip.GetAddressBytes();
+        return b[0] == 10
+            || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+            || (b[0] == 192 && b[1] == 168)
+            || b[0] == 127
+            || (b[0] == 169 && b[1] == 254);
     }
 
     private static string ExtractIceType(string? candidate)
