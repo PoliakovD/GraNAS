@@ -367,7 +367,6 @@ services:
       Turn__StaticAuthSecret: ${TURN_SECRET}
       Turn__Realm: ${TURN_REALM}
       Turn__Uris__0: turn:${TURN_HOST}:${TURN_PORT}?transport=udp
-      Turn__Uris__1: turn:${TURN_HOST}:${TURN_PORT}?transport=tcp
       Turn__TtlSeconds: 600
       RabbitMQ__Host: ${RABBITMQ_HOST}
       RabbitMQ__Username: ${RABBITMQ_DEFAULT_USER}
@@ -487,7 +486,9 @@ services:
       - "--use-auth-secret"
       - "--static-auth-secret=${TURN_SECRET}"
       - "--realm=${TURN_REALM}"
-      - "--external-ip=${EXTERNAL_IP}"
+      - "--external-ip=${EXTERNAL_IP}/${INTERNAL_IP}"
+      - "--relay-ip=${INTERNAL_IP}"
+      - "--allowed-peer-ip=${INTERNAL_IP}"
       - "--listening-port=${TURN_PORT}"
       - "--no-tls"
       - "--fingerprint"
