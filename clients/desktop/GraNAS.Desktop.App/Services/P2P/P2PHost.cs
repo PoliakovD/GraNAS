@@ -300,9 +300,9 @@ public class P2PHost : IP2PHost, IAsyncDisposable
 
             // When TURN is available, skip private host candidates: the receiver (web/mobile)
             // would waste 15+ seconds retransmitting to unreachable VPN/LAN IPs before trying relay.
-            if (typ == "host" && _turnCredentials != null && IsPrivateIpCandidate(iceCandidate.candidate))
+            if (typ == "host" && _turnCredentials != null && IsUnreachableHostCandidate(iceCandidate.candidate))
             {
-                Log.Debug("Skipping private host candidate for peer {ConnId} (TURN available)", receiverConnId);
+                Log.Debug("Skipping VPN/tunnel host candidate for peer {ConnId} (TURN available)", receiverConnId);
                 return;
             }
 
@@ -563,18 +563,20 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         return new RTCPeerConnection(config);
     }
 
-    private static bool IsPrivateIpCandidate(string candidate)
+    // Filters host candidates that are unreachable from the internet (VPN/tunnel IPs).
+    // We keep 192.168.x.x so peers on the same LAN can still use direct host-host ICE.
+    // 10.x.x.x is filtered because it's typically a VPN tunnel IP — Chrome would waste
+    // 15+ seconds trying relay→10.x.x.x before falling back to relay-relay.
+    private static bool IsUnreachableHostCandidate(string candidate)
     {
         var parts = candidate.Split(' ');
         if (parts.Length < 6) return false;
         if (!IPAddress.TryParse(parts[4], out var ip)) return false;
         if (ip.AddressFamily != AddressFamily.InterNetwork) return false;
         var b = ip.GetAddressBytes();
-        return b[0] == 10
-            || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
-            || (b[0] == 192 && b[1] == 168)
-            || b[0] == 127
-            || (b[0] == 169 && b[1] == 254);
+        return b[0] == 10                                           // VPN/tunnel (10.x.x.x)
+            || b[0] == 127                                          // loopback
+            || (b[0] == 169 && b[1] == 254);                       // link-local
     }
 
     private static string ExtractIceType(string? candidate)

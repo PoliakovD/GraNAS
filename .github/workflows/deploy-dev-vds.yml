@@ -318,6 +318,9 @@ jobs:
             cd /opt/granas/infrastructure/docker-compose
             COMPOSE="docker compose --env-file vds.env --env-file vds.dev-images.env -f compose.yaml -f compose.vds.yaml"
             \$COMPOSE pull
+            # Remove manually-started coturn container so compose can recreate it with updated config
+            docker stop dev_coturn 2>/dev/null || true
+            docker rm dev_coturn 2>/dev/null || true
             \$COMPOSE up -d --remove-orphans
             \$COMPOSE exec nginx nginx -s reload
             echo "==> Ожидание готовности OpenSearch (до 5 минут)..."
