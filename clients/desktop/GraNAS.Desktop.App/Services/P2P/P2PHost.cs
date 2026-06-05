@@ -298,14 +298,6 @@ public class P2PHost : IP2PHost, IAsyncDisposable
             Log.Information("ICE candidate generated: type={IceType} peer={ConnId} candidate={Candidate}",
                 typ, receiverConnId, iceCandidate.candidate);
 
-            // When TURN is available, skip private host candidates: the receiver (web/mobile)
-            // would waste 15+ seconds retransmitting to unreachable VPN/LAN IPs before trying relay.
-            if (typ == "host" && _turnCredentials != null && IsUnreachableHostCandidate(iceCandidate.candidate))
-            {
-                Log.Debug("Skipping VPN/tunnel host candidate for peer {ConnId} (TURN available)", receiverConnId);
-                return;
-            }
-
             if (_hub?.State != HubConnectionState.Connected) return;
             try
             {
@@ -326,10 +318,12 @@ public class P2PHost : IP2PHost, IAsyncDisposable
 
         var offer = pc.createOffer(null);
         await pc.setLocalDescription(offer);
-        Log.Information("Offer created (sdpLength={Length}), sending to receiver {ConnId}", offer.sdp?.Length ?? 0, receiverConnId);
+        var sdpToSend = offer.sdp ?? string.Empty;
+        Log.Information("Offer created (sdpLength={Length}), sending to receiver {ConnId}",
+            sdpToSend.Length, receiverConnId);
 
         if (_hub?.State == HubConnectionState.Connected)
-            await _hub.InvokeAsync("SendOffer", receiverConnId, offer.sdp);
+            await _hub.InvokeAsync("SendOffer", receiverConnId, sdpToSend);
 
         Log.Information("Offer sent to receiver {ConnId}", receiverConnId);
     }
@@ -561,22 +555,6 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         }
 
         return new RTCPeerConnection(config);
-    }
-
-    // Filters host candidates that are unreachable from the internet (VPN/tunnel IPs).
-    // We keep 192.168.x.x so peers on the same LAN can still use direct host-host ICE.
-    // 10.x.x.x is filtered because it's typically a VPN tunnel IP — Chrome would waste
-    // 15+ seconds trying relay→10.x.x.x before falling back to relay-relay.
-    private static bool IsUnreachableHostCandidate(string candidate)
-    {
-        var parts = candidate.Split(' ');
-        if (parts.Length < 6) return false;
-        if (!IPAddress.TryParse(parts[4], out var ip)) return false;
-        if (ip.AddressFamily != AddressFamily.InterNetwork) return false;
-        var b = ip.GetAddressBytes();
-        return b[0] == 10                                           // VPN/tunnel (10.x.x.x)
-            || b[0] == 127                                          // loopback
-            || (b[0] == 169 && b[1] == 254);                       // link-local
     }
 
     private static string ExtractIceType(string? candidate)

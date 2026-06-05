@@ -17,6 +17,7 @@ import { SharedPage } from './pages/SharedPage';
 import { AppLayout } from './shared/Layout';
 import { ErrorBoundary } from './shared/ErrorBoundary';
 import { ErrorPage } from './shared/ErrorPage';
+import { P2PDebugLog } from './features/p2p/P2PDebugLog'; // TEMP debug — remove when P2P is stable
 
 const router = createBrowserRouter([
   {
@@ -56,6 +57,7 @@ export default function App() {
           <RouterProvider router={router} />
         </AuthProvider>
       </QueryClientProvider>
+      <P2PDebugLog />
     </ThemeProvider>
   );
 }

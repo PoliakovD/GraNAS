@@ -7,6 +7,15 @@ import {
 import { MsgType, parseMsg } from './protocol';
 import type { RemoteFileEntry, SessionStatus } from './types';
 import type { TurnCredentials } from '../api/signaling.api';
+import { p2pDebug } from './p2pDebug'; // TEMP debug — remove with P2PDebugLog
+
+// TEMP debug helper: extract "typ <x>" + ip:port from an ICE candidate string.
+function describeCandidate(c: string): string {
+  const typ = /\btyp (\w+)/.exec(c)?.[1] ?? '?';
+  const parts = c.split(' ');
+  const ipPort = parts.length >= 6 ? `${parts[4]}:${parts[5]}` : c;
+  return `${typ} ${ipPort}`;
+}
 
 const STUN: RTCIceServer = { urls: 'stun:stun.l.google.com:19302' };
 
@@ -50,11 +59,13 @@ export function createP2PSession(
 
   async function requestSession(): Promise<void> {
     callbacks.onStatusChange('negotiating');
+    p2pDebug.log('→ RequestSession у signaling');
     try {
       await hub.invoke('RequestSession', folderId, shareToken ?? null);
     } catch {
       callbacks.onStatusChange('error');
       callbacks.onError('Не удалось запросить сессию у signaling-сервера');
+      p2pDebug.log('✗ RequestSession failed');
     }
   }
 
@@ -66,45 +77,60 @@ export function createP2PSession(
       }
     }
 
-    console.debug('[P2P] TURN in use:', turnCredentials ? turnCredentials.uris : 'none (STUN only)');
+    p2pDebug.log(`offer получен (sdpLen=${sdp.length}); TURN=${turnCredentials ? turnCredentials.uris.join(',') : 'нет (только STUN)'}`);
     pc = new RTCPeerConnection({ iceServers });
 
     pc.onicecandidate = async (e) => {
-      if (!e.candidate) return;
-      console.debug('[P2P] local ICE candidate:', e.candidate.type, e.candidate.candidate);
+      if (!e.candidate) { p2pDebug.log('локальные кандидаты собраны (end-of-candidates)'); return; }
+      p2pDebug.log(`локальный кандидат: ${describeCandidate(e.candidate.candidate)}`);
       try {
         await hub.invoke('SendIceCandidate',
           senderConnId, e.candidate.candidate, e.candidate.sdpMid, e.candidate.sdpMLineIndex);
       } catch { /* non-fatal */ }
     };
 
+    pc.onicecandidateerror = (e) => {
+      const ev = e as RTCPeerConnectionIceErrorEvent;
+      p2pDebug.log(`⚠ ICE candidate error: url=${ev.url} code=${ev.errorCode} ${ev.errorText}`);
+    };
+
     pc.onconnectionstatechange = () => {
-      console.debug('[P2P] connection state:', pc?.connectionState);
+      p2pDebug.log(`connection state: ${pc?.connectionState}`);
       if (pc?.connectionState === 'failed') {
         callbacks.onStatusChange('error');
         callbacks.onError('ICE connection failed — check TURN server or network reachability');
       }
     };
 
-    pc.onicegatheringstatechange = () => {
-      console.debug('[P2P] ICE gathering state:', pc?.iceGatheringState);
+    pc.oniceconnectionstatechange = () => {
+      p2pDebug.log(`ICE state: ${pc?.iceConnectionState}`);
     };
 
-    pc.ondatachannel = (e) => { attachDataChannel(e.channel); };
+    pc.onicegatheringstatechange = () => {
+      p2pDebug.log(`ICE gathering: ${pc?.iceGatheringState}`);
+    };
+
+    pc.ondatachannel = (e) => { p2pDebug.log('datachannel получен'); attachDataChannel(e.channel); };
 
     await pc.setRemoteDescription({ type: 'offer', sdp });
+    p2pDebug.log('remote offer установлен');
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await hub.invoke('SendAnswer', senderConnId, answer.sdp ?? '');
+    p2pDebug.log(`answer отправлен (sdpLen=${answer.sdp?.length ?? 0})`);
   }
 
   function handleIceCandidate(candidate: string, sdpMid: string | null, sdpMLineIndex: number | null): void {
-    if (!pc) return;
+    if (!pc) { p2pDebug.log(`✗ remote кандидат пришёл до pc: ${describeCandidate(candidate)}`); return; }
+    p2pDebug.log(`remote кандидат: ${describeCandidate(candidate)}`);
     pc.addIceCandidate({
       candidate,
       sdpMid: sdpMid ?? undefined,
       sdpMLineIndex: sdpMLineIndex ?? undefined,
-    }).catch(() => { /* ignore late candidates */ });
+    }).catch((err: unknown) => {
+      // KEY diagnostic: if the browser rejects the owner's relay/srflx candidate, it shows here.
+      p2pDebug.log(`✗ addIceCandidate REJECT [${describeCandidate(candidate)}]: ${String(err)}`);
+    });
   }
 
   // ---- Data channel ----
@@ -112,7 +138,7 @@ export function createP2PSession(
   function attachDataChannel(channel: RTCDataChannel): void {
     dc = channel;
     dc.binaryType = 'arraybuffer';
-    dc.onopen = () => void initiateEcdh();
+    dc.onopen = () => { p2pDebug.log('✓ datachannel OPEN'); void initiateEcdh(); };
     dc.onmessage = (e) => {
       if (typeof e.data === 'string') handleTextMessage(e.data);
       else void handleBinaryChunk(new Uint8Array(e.data as ArrayBuffer));
@@ -120,13 +146,15 @@ export function createP2PSession(
     dc.onerror = () => {
       callbacks.onStatusChange('error');
       callbacks.onError('Data channel error');
+      p2pDebug.log('✗ datachannel error');
     };
     // Channel may already be open when ondatachannel fires (race with ICE)
-    if (dc.readyState === 'open') void initiateEcdh();
+    if (dc.readyState === 'open') { p2pDebug.log('✓ datachannel уже OPEN'); void initiateEcdh(); }
   }
 
   async function initiateEcdh(): Promise<void> {
     callbacks.onStatusChange('ecdh');
+    p2pDebug.log('ECDH: отправка публичного ключа');
     ecdhKeyPair = await generateEcdhKeyPair();
     const pubKeyB64 = await exportPublicKeyBase64(ecdhKeyPair.publicKey);
     dc?.send(JSON.stringify({ type: MsgType.EcdhOffer, publicKey: pubKeyB64 }));
@@ -144,6 +172,7 @@ export function createP2PSession(
         });
         break;
       case MsgType.ListResponse:
+        p2pDebug.log(`✓ список файлов получен: ${msg.files.length}`);
         callbacks.onFiles(msg.files);
         callbacks.onStatusChange('ready');
         break;
@@ -216,7 +245,9 @@ export function createP2PSession(
   return {
     async connect() {
       callbacks.onStatusChange('connecting');
+      p2pDebug.log(`=== connect() folder=${folderId} ===`);
       hub.on('Offer', (senderConnId: string, sdp: string) => {
+        p2pDebug.log(`Offer event от ${senderConnId.slice(0, 8)}`);
         handleOffer(senderConnId, sdp).catch(err => {
           callbacks.onStatusChange('error');
           callbacks.onError(`P2P handshake failed: ${err}`);
@@ -228,12 +259,15 @@ export function createP2PSession(
       hub.on('AccessDenied', (_folderId: string, reason: string) => {
         callbacks.onStatusChange('error');
         callbacks.onError(`Access denied: ${reason}`);
+        p2pDebug.log(`✗ AccessDenied: ${reason}`);
       });
       hub.on('OwnerOffline', () => {
         callbacks.onStatusChange('error');
         callbacks.onError('Owner went offline');
+        p2pDebug.log('✗ OwnerOffline');
       });
       await hub.start();
+      p2pDebug.log('hub подключён');
       await hub.invoke('WatchFolder', folderId);
       await requestSession();
     },
