@@ -262,13 +262,27 @@ jobs:
             $SUDO ufw allow 50000:50200/udp
             $SUDO ufw --force enable
           ENDSSH
-          # iptables hairpin: relay A (192.168.0.236:50xxx) → peer 80.78.247.88:50yyy
-          # DNAT routes locally; --allowed-peer-ip=192.168.0.236 lets relay B forward without per-session permission.
+          # coturn relay-relay behind 1:1 provider NAT: make coturn OWN the public IP locally
+          # (add it to lo) so it binds relays directly on the public IP (--relay-ip) and
+          # short-circuits relay-to-relay traffic in-process. Inbound relay-port traffic arrives
+          # at the internal NIC via provider NAT, so a PREROUTING DNAT redirects it to the public
+          # lo IP. The old OUTPUT/POSTROUTING "hairpin" rules are removed (they break this model).
           sshpass -e ssh "${VDS_USER}@${VDS_HOST}" "
-            iptables -t nat -C OUTPUT -d ${VDS_HOST}/32 -p udp --dport 50000:50200 -j DNAT --to-destination 192.168.0.236 2>/dev/null || \
-              iptables -t nat -I OUTPUT -d ${VDS_HOST}/32 -p udp --dport 50000:50200 -j DNAT --to-destination 192.168.0.236
-            grep -qF 'coturn hairpin' /etc/rc.local 2>/dev/null || {
-              printf '\n# coturn hairpin relay\niptables -t nat -I OUTPUT -d ${VDS_HOST}/32 -p udp --dport 50000:50200 -j DNAT --to-destination 192.168.0.236 2>/dev/null || true\n' >> /etc/rc.local
+            EXT='${VDS_HOST}'
+            INT=\$(ip route get 1 2>/dev/null | awk 'NR==1{print \$7}' | grep -E '^[0-9]+\.' || hostname -I | awk '{print \$1}')
+            echo \"coturn net: EXT=\$EXT INT=\$INT\"
+            # coturn owns the public IP on loopback
+            ip addr add \$EXT/32 dev lo 2>/dev/null || true
+            # drop legacy hairpin rules from previous deploys (ignore if absent)
+            iptables -t nat -D OUTPUT -d \$EXT/32 -p udp --dport 50000:50200 -j DNAT --to-destination \$INT 2>/dev/null || true
+            iptables -t nat -D POSTROUTING -s \$INT/32 -p udp --sport 50000:50200 -j SNAT --to-source \$EXT 2>/dev/null || true
+            # inbound relay-port traffic (internal IP via provider NAT) -> public IP on lo
+            iptables -t nat -C PREROUTING -d \$INT/32 -p udp --dport 50000:50200 -j DNAT --to-destination \$EXT 2>/dev/null || \
+              iptables -t nat -I PREROUTING -d \$INT/32 -p udp --dport 50000:50200 -j DNAT --to-destination \$EXT
+            # persist across reboot (replace any previous coturn block)
+            sed -i '/# coturn /,/coturn-end/d' /etc/rc.local 2>/dev/null || true
+            grep -qF 'coturn relay-ip' /etc/rc.local 2>/dev/null || {
+              printf '\n# coturn relay-ip (own public IP for relay-relay short-circuit)\nip addr add %s/32 dev lo 2>/dev/null || true\niptables -t nat -I PREROUTING -d %s/32 -p udp --dport 50000:50200 -j DNAT --to-destination %s 2>/dev/null || true\n# coturn-end\n' \"\$EXT\" \"\$INT\" \"\$EXT\" >> /etc/rc.local
               chmod +x /etc/rc.local
             }
           "

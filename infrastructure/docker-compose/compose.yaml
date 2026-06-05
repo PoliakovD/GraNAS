@@ -478,18 +478,20 @@ services:
   coturn:
     container_name: ${PREFIX}_coturn
     image: coturn/coturn:latest
-    # host network required: hairpin relay (both peers on same TURN server) doesn't work
-    # with Docker bridge — packets to the server's own external IP don't loop back into
-    # the container. With host mode the kernel routes them correctly.
+    # host network required: relay-relay (both peers on the same TURN server, behind 1:1 provider
+    # NAT) only works when coturn OWNS the public IP locally. The deploy adds EXTERNAL_IP to `lo`,
+    # so coturn binds relays directly on the public IP (--relay-ip) and short-circuits relay-to-relay
+    # traffic in-process. listening-ip stays on the internal NIC (control channel arrives via NAT).
+    # Do NOT use --external-ip here: with relay-ip already public there is no address to map, and the
+    # mapping breaks coturn's relay short-circuit + permission lookup. Inbound relay-port traffic is
+    # redirected from the internal IP to the public lo IP by a PREROUTING DNAT rule (see deploy workflow).
     network_mode: host
     command:
       - "--use-auth-secret"
       - "--static-auth-secret=${TURN_SECRET}"
       - "--realm=${TURN_REALM}"
-      - "--external-ip=${EXTERNAL_IP}"
       - "--listening-ip=${INTERNAL_IP}"
-      - "--allowed-peer-ip=${INTERNAL_IP}"
-      - "--allowed-peer-ip=${EXTERNAL_IP}"
+      - "--relay-ip=${EXTERNAL_IP}"
       - "--listening-port=${TURN_PORT}"
       - "--no-tls"
       - "--fingerprint"
