@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text;
 using GraNAS.Desktop.App.Services.Api;
 using GraNAS.Desktop.App.Services.Auth;
@@ -66,7 +69,9 @@ public class P2PHost : IP2PHost, IAsyncDisposable
     /// </remarks>
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        if (_hub?.State == HubConnectionState.Connected) return;
+        if (_hub?.State is HubConnectionState.Connected
+                        or HubConnectionState.Connecting
+                        or HubConnectionState.Reconnecting) return;
 
         if (!_deviceIdentity.IsRegisteredForUser(_session.CurrentUserId))
         {
@@ -141,6 +146,11 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         catch (Exception ex)
         {
             Log.Warning(ex, "JoinAsOwner failed for folder {FolderId}", folderId);
+            if (ex.Message.Contains("Not authorized as owner", StringComparison.OrdinalIgnoreCase))
+            {
+                _registry.RemoveMapping(folderId);
+                Log.Information("Removed stale binding for folder {FolderId} (not owned by current user)", folderId);
+            }
         }
     }
 
@@ -333,11 +343,22 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         if (!_peers.TryGetValue(senderConnId, out var session)) return;
         var typ = ExtractIceType(candidate);
         Log.Information("ICE candidate received from peer {ConnId}: type={IceType}", senderConnId, typ);
+
+        // Chrome anonymizes host candidates with mDNS names (*.local).
+        // SIPSorcery's multicast mDNS resolver fails on Windows; use the OS DNS client instead,
+        // which resolves Chrome-registered mDNS names via LLMNR/mDNS on the same machine.
+        var resolvedCandidate = await ResolveMdnsCandidateAsync(candidate);
+        if (resolvedCandidate is null)
+        {
+            Log.Warning("Skipping unresolvable mDNS candidate from peer {ConnId}: {Candidate}", senderConnId, candidate);
+            return;
+        }
+
         try
         {
             session.Pc!.addIceCandidate(new RTCIceCandidateInit
             {
-                candidate = candidate,
+                candidate = resolvedCandidate,
                 sdpMid = sdpMid,
                 sdpMLineIndex = (ushort)(sdpMLineIndex ?? 0)
             });
@@ -531,6 +552,158 @@ public class P2PHost : IP2PHost, IAsyncDisposable
         if (idx < 0) return "unknown";
         var rest = candidate[(idx + 5)..];
         return rest.Split(' ')[0];
+    }
+
+    /// <summary>
+    /// Если ICE-кандидат содержит mDNS-hostname (*.local), пытается разрешить его двумя способами:
+    /// 1. System.Net.Dns (работает без VPN, использует Windows DNS/LLMNR)
+    /// 2. Прямой multicast mDNS-запрос на физических интерфейсах (работает когда VPN меняет DNS).
+    /// Chrome регистрирует mDNS-имена на физическом интерфейсе — ответ на запрос 224.0.0.251:5353
+    /// приходит от самого Chrome на той же машине.
+    /// </summary>
+    private static async Task<string?> ResolveMdnsCandidateAsync(string candidate)
+    {
+        var parts = candidate.Split(' ');
+        if (parts.Length < 6) return candidate;
+
+        var address = parts[4];
+        if (!address.EndsWith(".local", StringComparison.OrdinalIgnoreCase))
+            return candidate;
+
+        // Phase 1: system DNS (works without VPN)
+        try
+        {
+            var addrs = await System.Net.Dns.GetHostAddressesAsync(address);
+            var ipv4 = Array.Find(addrs, a => a.AddressFamily == AddressFamily.InterNetwork);
+            if (ipv4 is not null)
+            {
+                Log.Debug("Resolved mDNS {Host} → {Ip} (system DNS)", address, ipv4);
+                parts[4] = ipv4.ToString();
+                return string.Join(' ', parts);
+            }
+        }
+        catch { /* fall through to multicast */ }
+
+        // Phase 2: raw multicast mDNS on physical interfaces (works when VPN overrides DNS)
+        var ip = await QueryMdnsMulticastAsync(address);
+        if (ip is not null)
+        {
+            Log.Debug("Resolved mDNS {Host} → {Ip} (multicast)", address, ip);
+            parts[4] = ip.ToString();
+            return string.Join(' ', parts);
+        }
+
+        Log.Warning("Could not resolve mDNS candidate {Host} — skipping", address);
+        return null;
+    }
+
+    /// <summary>
+    /// Отправляет DNS-запрос типа A на адрес mDNS-multicast (224.0.0.251:5353) через все
+    /// физические сетевые интерфейсы (не VPN, не loopback). Chrome отвечает на запросы
+    /// для своих зарегистрированных *.local имён с той же машины.
+    /// </summary>
+    private static async Task<IPAddress?> QueryMdnsMulticastAsync(string mdnsName)
+    {
+        var mcastEp = new IPEndPoint(IPAddress.Parse("224.0.0.251"), 5353);
+        var query = BuildDnsQuery(mdnsName);
+
+        var physicalIps = NetworkInterface.GetAllNetworkInterfaces()
+            .Where(ni => ni.OperationalStatus == OperationalStatus.Up
+                         && ni.NetworkInterfaceType != NetworkInterfaceType.Loopback
+                         && ni.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+            .SelectMany(ni => ni.GetIPProperties().UnicastAddresses)
+            .Where(a => a.Address.AddressFamily == AddressFamily.InterNetwork
+                        && !IPAddress.IsLoopback(a.Address))
+            .Select(a => a.Address)
+            .ToList();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        foreach (var localIp in physicalIps)
+        {
+            try
+            {
+                using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                sock.Bind(new IPEndPoint(localIp, 0));
+                sock.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership,
+                    new MulticastOption(IPAddress.Parse("224.0.0.251"), localIp));
+                sock.MulticastLoopback = true;
+                sock.ReceiveTimeout = 2000;
+                sock.SendTo(query, mcastEp);
+
+                var buf = new byte[4096];
+                while (!cts.IsCancellationRequested)
+                {
+                    int received;
+                    try { received = await Task.Run(() => sock.Receive(buf), cts.Token); }
+                    catch { break; }
+                    var ip = ParseDnsARecord(buf, received, mdnsName);
+                    if (ip is not null) return ip;
+                }
+            }
+            catch (Exception ex) { Log.Debug(ex, "mDNS multicast failed on interface {Ip}", localIp); }
+        }
+        return null;
+    }
+
+    private static byte[] BuildDnsQuery(string name)
+    {
+        using var ms = new MemoryStream();
+        // DNS header (big-endian)
+        ms.Write(new byte[] { 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 }); // ID=0, Flags=query, QDCOUNT=1
+        // QNAME
+        foreach (var label in name.TrimEnd('.').Split('.'))
+        {
+            var b = Encoding.UTF8.GetBytes(label);
+            ms.WriteByte((byte)b.Length);
+            ms.Write(b);
+        }
+        ms.WriteByte(0);               // end of QNAME
+        ms.Write(new byte[] { 0, 1 }); // QTYPE = A
+        ms.Write(new byte[] { 0, 1 }); // QCLASS = IN
+        return ms.ToArray();
+    }
+
+    private static IPAddress? ParseDnsARecord(byte[] buf, int length, string queryName)
+    {
+        if (length < 12) return null;
+        int anCount = (buf[6] << 8) | buf[7];
+        if (anCount == 0) return null;
+
+        int pos = 12;
+        int qdCount = (buf[4] << 8) | buf[5];
+
+        // Skip questions
+        for (int q = 0; q < qdCount && pos < length; q++)
+        {
+            while (pos < length)
+            {
+                if ((buf[pos] & 0xC0) == 0xC0) { pos += 2; break; }
+                if (buf[pos] == 0) { pos++; break; }
+                pos += 1 + buf[pos];
+            }
+            pos += 4; // QTYPE + QCLASS
+        }
+
+        // Parse answer records
+        for (int a = 0; a < anCount && pos < length; a++)
+        {
+            // Skip answer name (pointer or labels)
+            if ((buf[pos] & 0xC0) == 0xC0) pos += 2;
+            else { while (pos < length && buf[pos] != 0) pos += 1 + buf[pos]; pos++; }
+
+            if (pos + 10 > length) break;
+            int type = (buf[pos] << 8) | buf[pos + 1];
+            int rdLen = (buf[pos + 8] << 8) | buf[pos + 9];
+            pos += 10;
+
+            if (type == 1 && rdLen == 4 && pos + 4 <= length) // A record
+                return new IPAddress(new[] { buf[pos], buf[pos + 1], buf[pos + 2], buf[pos + 3] });
+
+            pos += rdLen;
+        }
+        return null;
     }
 
     private static void SendText(PeerSession session, string text)

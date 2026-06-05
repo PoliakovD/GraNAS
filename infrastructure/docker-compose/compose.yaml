@@ -482,17 +482,19 @@ services:
     ports:
       - "${TURN_PORT}:3478/udp"
       - "${TURN_PORT}:3478/tcp"
-      - "50000-50010:50000-50010/udp"
+      - "50000-50200:50000-50200/udp"
     command:
       - "--use-auth-secret"
       - "--static-auth-secret=${TURN_SECRET}"
       - "--realm=${TURN_REALM}"
+      - "--external-ip=${EXTERNAL_IP}"
       - "--no-tls"
       - "--fingerprint"
       - "--min-port=50000"
-      - "--max-port=50010"
+      - "--max-port=50200"
       - "--total-quota=100"
       - "--stale-nonce=600"
+      - "--verbose"
     restart: unless-stopped
     networks:
       - app-network
